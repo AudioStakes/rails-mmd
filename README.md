@@ -5,7 +5,7 @@ from Rails and ActiveRecord applications.
 
 The repository is currently in setup mode. It contains project operating
 contracts, local development-tooling documentation, and a minimal Ruby gem/CLI
-shell. It does not yet include Rails loading, diagram generation, hooks, or CI.
+shell. It does not yet include Rails loading, diagram generation, or CI.
 
 ## Project Model
 
@@ -41,6 +41,8 @@ Dependency classifications are documented in
 [`docs/development/dependencies.md`](docs/development/dependencies.md).
 Ruby tooling commands are documented in
 [`docs/development/tooling.md`](docs/development/tooling.md).
+Local Git hooks are documented in
+[`docs/development/hooks.md`](docs/development/hooks.md).
 
 ## P0 Contract
 
