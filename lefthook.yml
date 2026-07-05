@@ -13,7 +13,9 @@ pre-commit:
         - "exe/rails-mmd"
         - "bin/**/*"
         - "lib/**/*.rb"
+        - "spec/*.rb"
         - "spec/**/*.rb"
+        - "features/*.rb"
         - "features/**/*.rb"
       run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_mixed_changes!(ARGV)' -- {staged_files}
 
@@ -26,7 +28,9 @@ pre-commit:
         - "exe/rails-mmd"
         - "bin/**/*"
         - "lib/**/*.rb"
+        - "spec/*.rb"
         - "spec/**/*.rb"
+        - "features/*.rb"
         - "features/**/*.rb"
       run: bundle exec rubocop --autocorrect-all --force-exclusion {staged_files}
 
@@ -39,7 +43,9 @@ pre-commit:
         - "exe/rails-mmd"
         - "bin/**/*"
         - "lib/**/*.rb"
+        - "spec/*.rb"
         - "spec/**/*.rb"
+        - "features/*.rb"
         - "features/**/*.rb"
       run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_post_repair_diff!'
 
@@ -52,13 +58,16 @@ pre-commit:
         - "exe/rails-mmd"
         - "bin/**/*"
         - "lib/**/*.rb"
+        - "spec/*.rb"
         - "spec/**/*.rb"
+        - "features/*.rb"
         - "features/**/*.rb"
       run: bundle exec rubocop --force-exclusion {staged_files}
 
     ruby-targeted-specs:
       priority: 5
       glob:
+        - "spec/*.rb"
         - "spec/**/*"
       run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.run_targeted_specs!(ARGV)' -- {staged_files}
 
