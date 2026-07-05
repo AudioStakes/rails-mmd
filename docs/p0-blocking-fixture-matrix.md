@@ -25,8 +25,8 @@ claimed complete.
 | `CONFIG_SCHEMA_INVALID` | config | invalid config shape, unsupported output format, or invalid domain ID | 2 | yes | none |
 | `CONFIG_DOMAIN_NOT_FOUND` | config | `--domain` names no configured domain | 2 | yes | none |
 | `OUTPUT_DIRECTORY_INVALID` | output setup | output directory is absolute, escapes root, empty, backslash, NUL, drive, UNC, or unsafe symlink | 2 | yes | none |
-| `DOMAIN_MODEL_NOT_FOUND` | domain resolution | included or excluded model constant cannot be resolved | 2 | no | diagnostics only |
-| `DOMAIN_MODEL_NOT_RENDERABLE` | domain resolution | selected model is abstract, STI subclass, anonymous, or lacks table name | 2 | no | diagnostics only |
+| `DOMAIN_MODEL_NOT_FOUND` | domain resolution | included or excluded model constant cannot be resolved, including explicitly named anonymous or non-resolvable descendants | 2 | no | diagnostics only |
+| `DOMAIN_MODEL_NOT_RENDERABLE` | domain resolution | selected model is abstract, STI subclass, or lacks table name | 2 | no | diagnostics only |
 | `DOMAIN_EMPTY` | domain resolution | include/exclude rules leave no renderable selected models | 2 | no | diagnostics only |
 | `RAILS_LOAD_FAILED` | Rails boot | application environment raises before eager load | 2 | yes before output, otherwise no | none or diagnostics only |
 | `RAILS_EAGER_LOAD_FAILED` | Rails boot | eager loading raises after Rails boot | 2 | yes before output, otherwise no | none or diagnostics only |

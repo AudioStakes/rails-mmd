@@ -45,12 +45,14 @@ output:
 
 Successful domains can publish:
 
-- `global.diagnostics.json`
 - `<domain>.diagnostics.json`
 - `<domain>.er.mmd`
 - `<domain>.er.render_plan.json`
 - `<domain>.class.mmd`
 - `<domain>.class.render_plan.json`
+
+`global.diagnostics.json` is published only for post-output invocation-scope
+diagnostics when applicable. Empty diagnostics files are omitted.
 
 Blocking diagnostics publish diagnostics JSON when output is available and omit
 the affected Mermaid and render-plan artifacts. Pre-output fatal failures write

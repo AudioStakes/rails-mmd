@@ -138,13 +138,13 @@ RSpec.describe 'repository drift guards' do
   it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do
     text = repository_text('docs/p0-blocking-fixture-matrix.md')
 
-    expect(blocking_diagnostic_codes - documented_codes(text)).to be_empty
+    expect(matrix_codes(text)).to match_array(blocking_diagnostic_codes)
   end
 
   it 'documents the P0 user-facing exit codes' do
     text = repository_text('docs/usage.md')
 
-    expect(user_facing_exit_codes(text)).to include('0', '1', '2', '3', '4', '99')
+    expect(user_facing_exit_rows(text)).to eq(expected_user_facing_exit_rows)
   end
 
   it 'documents superseded invalid issues 1 through 6' do
@@ -197,32 +197,51 @@ RSpec.describe 'repository drift guards' do
   end
 
   def blocking_diagnostic_codes
-    config_blocking_codes + domain_blocking_codes + runtime_blocking_codes + publish_blocking_codes
+    diagnostic_catalog_rows.select { |row| blocking_exit_code?(row.fetch(:exit_code)) }.map { |row| row.fetch(:code) }
   end
 
-  def config_blocking_codes
-    %w[CONFIG_NOT_FOUND CONFIG_SCHEMA_INVALID CONFIG_DOMAIN_NOT_FOUND OUTPUT_DIRECTORY_INVALID]
+  def blocking_exit_code?(exit_code)
+    exit_code.split(/\s+or\s+/).intersect?(%w[2 3 4 99])
   end
 
-  def domain_blocking_codes
-    %w[DOMAIN_MODEL_NOT_FOUND DOMAIN_MODEL_NOT_RENDERABLE DOMAIN_EMPTY]
+  def diagnostic_catalog_rows
+    repository_text('docs/p0-contract.md').lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      next unless cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
+
+      { code: cells[0].delete('`'), exit_code: cells[2] }
+    end
   end
 
-  def runtime_blocking_codes
-    %w[RAILS_LOAD_FAILED RAILS_EAGER_LOAD_FAILED MULTI_DB_UNSUPPORTED MODEL_TABLE_MISSING
-       MODEL_PRIMARY_KEY_UNSUPPORTED SAFE_TOKEN_COLLISION MERMAID_SERIALIZATION_FAILED]
+  def matrix_codes(text)
+    text.lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      cells&.first&.delete('`') if cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
+    end
   end
 
-  def publish_blocking_codes
-    %w[OUTPUT_WRITE_FAILED INTERNAL_ERROR]
+  def markdown_table_cells(line)
+    return unless line.start_with?('|')
+
+    line.split('|')[1..-2]&.map(&:strip)
   end
 
-  def documented_codes(text)
-    text.scan(/`([A-Z0-9_]+)`/).flatten
+  def user_facing_exit_rows(text)
+    text.lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      [cells[0], cells[1]] if cells&.first&.match?(/\A\d+\z/)
+    end.to_h
   end
 
-  def user_facing_exit_codes(text)
-    text.scan(/^\| (\d+) \|/).flatten
+  def expected_user_facing_exit_rows
+    {
+      '0' => 'success, including warning diagnostics when `--fail-on-warning` is absent',
+      '1' => 'warning diagnostics were present and `--fail-on-warning` was set',
+      '2' => 'config, output setup, Rails boot, domain, or schema probe error',
+      '3' => 'Mermaid serialization failure or unresolved safe-token collision',
+      '4' => 'output write or atomic publish failure',
+      '99' => 'internal error'
+    }
   end
 
   def superseded_issue_numbers(text)
