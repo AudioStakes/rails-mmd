@@ -1,4 +1,4 @@
-simplecov: coverage/coverage.json
+simplecov: coverage/undercover.json
 compare: HEAD~1
 include_files: lib/**/*.rb,exe/rails-mmd
 exclude_files: spec/**/*.rb

@@ -24,7 +24,14 @@ module RailsMmd
       abort 'No usable Undercover compare ref found' unless compare_ref
 
       [
+        { 'SIMPLECOV_NO_DEFAULTS' => 'true' },
         'bundle', 'exec', 'undercover',
+        *undercover_options(config, compare_ref)
+      ]
+    end
+
+    def undercover_options(config, compare_ref)
+      [
         '--simplecov', config.fetch('simplecov'),
         '--compare', compare_ref,
         '--include-files', config.fetch('include_files'),

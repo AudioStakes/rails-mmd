@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 require 'rake'
-require 'rails_mmd/tooling_tasks'
 
 RSpec.describe Rake::Task do
   def expected_undercover_command
     [
+      { 'SIMPLECOV_NO_DEFAULTS' => 'true' },
       'bundle', 'exec', 'undercover',
-      '--simplecov', 'coverage/coverage.json',
+      '--simplecov', 'coverage/undercover.json',
       '--include-files', 'lib/**/*.rb,exe/rails-mmd',
       '--exclude-files', 'spec/**/*.rb',
       '--max-warnings', '20',
