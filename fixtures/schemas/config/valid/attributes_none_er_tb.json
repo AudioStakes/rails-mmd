@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "domains": {
+    "admin": {
+      "include_models": ["Admin::User"]
+    }
+  },
+  "output": {
+    "format": "er",
+    "attributes": "none",
+    "direction": "TB"
+  }
+}

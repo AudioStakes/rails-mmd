@@ -94,6 +94,10 @@ RSpec.describe RailsMmd::HookChecks do
     pre_commit_commands.fetch(name).fetch('run')
   end
 
+  def schema_fixture_command
+    pre_commit_commands.fetch('schema-fixture-routing')
+  end
+
   it 'fails before repair when a staged file also has unstaged changes' do
     in_git_repository do
       commit_example_file
@@ -142,9 +146,16 @@ RSpec.describe RailsMmd::HookChecks do
       .to output("targeted specs: no direct spec files matched\n").to_stdout
   end
 
-  it 'reports pending schema and fixture routing without unrelated checks' do
-    expect { described_class.schema_fixture_pending!(%w[schemas/example.json fixtures/example.mmd]) }
-      .to output("schema/fixture checks pending: schemas/example.json, fixtures/example.mmd\n").to_stdout
+  it 'routes schema and fixture changes to contract specs' do
+    expect(schema_fixture_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
+  end
+
+  it 'triggers contract specs for schema and fixture paths' do
+    expect(schema_fixture_command.fetch('glob')).to contain_exactly(
+      'schemas/**/*.json',
+      'fixtures/**/*.json',
+      'fixtures/**/*.mmd'
+    )
   end
 
   it 'separates RuboCop options from staged file arguments' do

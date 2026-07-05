@@ -100,7 +100,7 @@ pre-commit:
         - "schemas/**/*.json"
         - "fixtures/**/*.json"
         - "fixtures/**/*.mmd"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.schema_fixture_pending!(ARGV)' -- {staged_files}
+      run: bundle exec rspec spec/contracts
 
     p0-contract-doc:
       priority: 10

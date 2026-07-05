@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audiostakes.example/schemas/rails-mmd/config.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "domains"],
+  "properties": {
+    "version": { "const": 1 },
+    "domains": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "allOf": [
+          { "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+          { "not": { "pattern": "\\s" } }
+        ]
+      },
+      "additionalProperties": { "$ref": "#/$defs/domain" }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 },
+        "format": { "enum": ["er", "class", "both"] },
+        "attributes": { "enum": ["none", "keys"] },
+        "direction": { "enum": ["TB", "BT", "LR", "RL"] }
+      }
+    }
+  },
+  "$defs": {
+    "ruby_constant": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*$"
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include_models"],
+      "properties": {
+        "include_models": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ruby_constant" }
+        },
+        "exclude_models": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ruby_constant" },
+          "default": []
+        }
+      }
+    }
+  }
+}

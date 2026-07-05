@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "domain_id": "core",
+  "generated_at": "2026-07-05T00:00:00Z",
+  "absolute_path": "/tmp/project/app/models/user.rb",
+  "temp_path": "/var/folders/tmp",
+  "process_id": 1234,
+  "random_seed": 42,
+  "raw_backtrace": ["app/models/user.rb:1"],
+  "entities": [],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

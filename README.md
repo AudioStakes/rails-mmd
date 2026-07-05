@@ -45,6 +45,8 @@ Local Git hooks are documented in
 [`docs/development/hooks.md`](docs/development/hooks.md).
 GitHub Actions CI is documented in
 [`docs/development/ci.md`](docs/development/ci.md).
+P0 schema and Mermaid fixture scaffolding is documented in
+[`docs/development/contract-fixtures.md`](docs/development/contract-fixtures.md).
 
 ## P0 Contract
 

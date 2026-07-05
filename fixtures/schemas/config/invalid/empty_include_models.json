@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "domains": {
+    "core": {
+      "include_models": []
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "scope": "global",
+  "domain_id": null,
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_unknown",
+      "code": "UNKNOWN",
+      "severity": "error",
+      "phase": "internal",
+      "scope": "invocation",
+      "subject_id": null,
+      "message": "unknown",
+      "metadata": {},
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
