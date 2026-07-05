@@ -17,6 +17,7 @@ module RailsMmd
       'attributes' => 'keys',
       'direction' => 'LR'
     }.freeze
+    DOMAIN_ID_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
     VALID_FORMATS = %w[er class both].freeze
     EXIT_CONTRACT_ERROR = 2
 
@@ -45,10 +46,10 @@ module RailsMmd
       data = safe_load(config_path)
       return failure(config_schema_invalid(config_path, 'config', 'must be a YAML mapping')) unless data.is_a?(Hash)
 
-      output_directory_error = configured_output_directory_error(data)
+      output_directory_error = configured_output_directory_error(data, cli_options)
       return failure(output_directory_error) if output_directory_error
 
-      schema_errors = validator.errors(:config, data)
+      schema_errors = validator.errors(:config, data_for_schema_validation(data, cli_options))
       unless schema_errors.empty?
         return failure(config_schema_invalid(config_path, field_path(schema_errors.first),
                                              'does not match config schema'))
@@ -71,8 +72,13 @@ module RailsMmd
                                                 output.fetch(:directory_source)))
       end
       unless VALID_FORMATS.include?(output.fetch(:format))
-        return failure(config_schema_invalid(config_path, 'cli.format',
+        return failure(config_schema_invalid(config_path, '$.cli.format',
                                              'must be er, class, or both'))
+      end
+
+      unless valid_domain_selection?(cli_options.domain)
+        return failure(config_schema_invalid(config_path, '$.cli.domain',
+                                             'must match domain ID grammar'))
       end
 
       selected_domain_ids = selected_domain_ids(domains, cli_options.domain)
@@ -102,7 +108,7 @@ module RailsMmd
     end
 
     def build_output(data, cli_options)
-      directory_source = cli_options.output_dir.nil? ? 'output.directory' : 'cli.output_dir'
+      directory_source = cli_options.output_dir.nil? ? '$.output.directory' : '$.cli.output_dir'
       directory = cli_options.output_dir || data.fetch('directory', DEFAULT_OUTPUT.fetch('directory'))
       format = cli_options.format || data.fetch('format', DEFAULT_OUTPUT.fetch('format'))
 
@@ -175,12 +181,24 @@ module RailsMmd
       )
     end
 
-    def configured_output_directory_error(data)
+    def data_for_schema_validation(data, cli_options)
+      data = deep_dup(data)
+      output = data['output']
+      return data unless output.is_a?(Hash)
+
+      output.delete('directory') unless cli_options.output_dir.nil?
+      output.delete('format') unless cli_options.format.nil?
+      data
+    end
+
+    def configured_output_directory_error(data, cli_options)
+      return if cli_options.output_dir
+
       output = data['output']
       return unless output.is_a?(Hash) && output.key?('directory') && output.fetch('directory').is_a?(String)
 
       result = output_directory.resolve(output.fetch('directory'))
-      output_directory_invalid(result, 'output.directory') unless result.valid?
+      output_directory_invalid(result, '$.output.directory') unless result.valid?
     end
 
     def resolve_config_path(value)
@@ -202,13 +220,30 @@ module RailsMmd
 
     def field_path(error)
       pointer = error&.fetch('data_pointer', nil).to_s
-      pointer.empty? ? 'config' : pointer.delete_prefix('/').tr('/', '.')
+      return '$' if pointer.empty?
+
+      "$.#{pointer.delete_prefix('/').tr('/', '.')}"
     end
 
     def source_for(cli_value, config_data, key)
       return 'cli' unless cli_value.nil?
 
       config_data.key?(key) ? 'config' : 'default'
+    end
+
+    def valid_domain_selection?(domain)
+      domain.nil? || domain.match?(DOMAIN_ID_PATTERN)
+    end
+
+    def deep_dup(value)
+      case value
+      when Hash
+        value.transform_values { |item| deep_dup(item) }
+      when Array
+        value.map { |item| deep_dup(item) }
+      else
+        value
+      end
     end
   end
   # rubocop:enable Metrics/ClassLength, Metrics/AbcSize, Metrics/MethodLength

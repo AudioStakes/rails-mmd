@@ -115,6 +115,15 @@ RSpec.describe RailsMmd::Config do
     expect(project_root.children).to be_empty
   end
 
+  it 'redacts missing config paths outside the project root' do
+    result = load_config(config_path: project_root.parent.join('missing.yml').to_s)
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'CONFIG_NOT_FOUND')
+    expect(result.diagnostics.first.fetch('metadata')).to include('config_path' => 'rails_mmd.yml')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
   it 'uses safe YAML loading and rejects aliases' do
     write_config(<<~YAML)
       version: 1
@@ -164,6 +173,7 @@ RSpec.describe RailsMmd::Config do
 
     expect(result).not_to be_success
     expect(result.diagnostics.first).to include('code' => 'CONFIG_SCHEMA_INVALID')
+    expect(result.diagnostics.first.fetch('metadata')).to include('field_path' => '$.domains.core.depth')
     expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 
@@ -181,6 +191,62 @@ RSpec.describe RailsMmd::Config do
     expect(result).not_to be_success
     expect(result.diagnostics.first).to include('code' => 'CONFIG_DOMAIN_NOT_FOUND')
     expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'rejects malformed CLI domain selections without raising' do
+    write_config(<<~YAML)
+      version: 1
+      domains:
+        core:
+          include_models:
+            - User
+    YAML
+
+    ['billing-v2', 'billing v2', 'Billing', '../evil', "core\n"].each do |domain|
+      result = load_config(domain: domain)
+
+      expect(result).not_to be_success
+      expect(result.exit_code).to eq(2)
+      expect(result.diagnostics.first).to include('code' => 'CONFIG_SCHEMA_INVALID')
+      expect(result.diagnostics.first.fetch('metadata')).to include('field_path' => '$.cli.domain')
+      expect_schema_valid_diagnostic(result.diagnostics.first)
+    end
+  end
+
+  it 'reports invalid CLI format with the canonical field path' do
+    write_config(<<~YAML)
+      version: 1
+      domains:
+        core:
+          include_models:
+            - User
+    YAML
+
+    result = load_config(format: 'svg')
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'CONFIG_SCHEMA_INVALID')
+    expect(result.diagnostics.first.fetch('metadata')).to include('field_path' => '$.cli.format')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'validates effective CLI output overrides instead of stale config values' do
+    write_config(<<~YAML)
+      version: 1
+      domains:
+        core:
+          include_models:
+            - User
+      output:
+        directory: /tmp/oops
+        format: invalid
+    YAML
+
+    result = load_config(output_dir: 'docs/safe', format: 'er')
+
+    expect(result).to be_success
+    expect(result.config.output.directory).to eq('docs/safe')
+    expect(result.config.output.format).to eq('er')
   end
 
   it 'validates domain IDs with the repository grammar through the config schema' do
@@ -221,8 +287,26 @@ RSpec.describe RailsMmd::Config do
 
       expect(result).not_to be_success
       expect(result.diagnostics.first).to include('code' => 'OUTPUT_DIRECTORY_INVALID')
+      expect(result.diagnostics.first.fetch('metadata')).to include('field_path' => '$.output.directory')
       expect_schema_valid_diagnostic(result.diagnostics.first)
     end
+  end
+
+  it 'reports invalid CLI output directory with the canonical field path' do
+    write_config(<<~YAML)
+      version: 1
+      domains:
+        core:
+          include_models:
+            - User
+    YAML
+
+    result = load_config(output_dir: '/tmp/oops')
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'OUTPUT_DIRECTORY_INVALID')
+    expect(result.diagnostics.first.fetch('metadata')).to include('field_path' => '$.cli.output_dir')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 
   it 'rejects output directories that escape through symlinks' do
@@ -245,6 +329,16 @@ RSpec.describe RailsMmd::Config do
       expect(result.diagnostics.first).to include('code' => 'OUTPUT_DIRECTORY_INVALID')
       expect_schema_valid_diagnostic(result.diagnostics.first)
     end
+  end
+
+  it 'treats disappearing output path ancestors as invalid' do
+    resolver = RailsMmd::OutputDirectory.new(project_root: project_root)
+    allow(resolver).to receive(:closest_existing_path).and_return(project_root.join('gone'))
+
+    result = resolver.resolve('docs/rails_mmd')
+
+    expect(result).not_to be_valid
+    expect(result.reason).to eq('symlink escapes project root')
   end
 
   def valid_domain_id?(domain_id)
