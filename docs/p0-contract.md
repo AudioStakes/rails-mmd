@@ -110,6 +110,71 @@ matching, and attributes outside `none` and `keys`.
 - Domain IDs use the grammar in this document.
 - Output directories must be project-root-relative safe paths.
 
+### Config Shape
+
+Minimal valid config:
+
+```yaml
+version: 1
+domains:
+  core:
+    include_models:
+      - User
+    exclude_models: []
+output:
+  directory: docs/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR
+```
+
+Top-level keys:
+
+- `version`: required integer, exactly `1`.
+- `domains`: required object, non-empty.
+- `output`: optional object, defaults field-by-field.
+
+Domain keys:
+
+- `domains.<id>.include_models`: required array of one or more exact Ruby
+  constant strings.
+- `domains.<id>.exclude_models`: optional array of exact Ruby constant strings,
+  defaults to `[]`.
+- Empty `include_models`, omitted `include_models`, non-array domain lists, and
+  non-string model entries are `CONFIG_SCHEMA_INVALID`.
+- Unknown fields are `CONFIG_SCHEMA_INVALID`.
+
+Output keys:
+
+- `output.directory`: optional string, defaults to `docs/rails_mmd`.
+- `output.format`: optional string, allowed values `er`, `class`, and `both`,
+  defaults to `both`.
+- `output.attributes`: optional string, allowed values `none` and `keys`,
+  defaults to `keys`.
+- `output.direction`: optional string, allowed values `TB`, `BT`, `LR`, and
+  `RL`, defaults to `LR`.
+- Unknown output fields are `CONFIG_SCHEMA_INVALID`.
+
+### Output Directory Safety
+
+Normalize `--output-dir` or `output.directory` lexically before filesystem
+writes. Accept only non-empty relative paths that remain inside the project root
+after expanding `.` and `..` segments.
+
+Reject with `OUTPUT_DIRECTORY_INVALID`:
+
+- Empty strings.
+- Absolute paths.
+- Paths that normalize to `.`.
+- Paths that escape the project root via `..`.
+- Paths containing NUL.
+- Drive or UNC forms.
+- Symlink escapes after resolving existing path components.
+
+Symlinked directories are allowed only when their resolved real path remains
+inside the project root. Unsafe path evidence must be redacted before stderr,
+diagnostics, logs, or artifacts.
+
 Domain ID grammar is lowercase ASCII snake_case:
 
 ```ruby
@@ -170,8 +235,29 @@ Renderable means:
 - Table name is obtainable.
 
 Included STI subclasses or abstract models produce
-`DOMAIN_MODEL_NOT_RENDERABLE`. Domain-outside STI or abstract models are
-ignored.
+`DOMAIN_MODEL_NOT_RENDERABLE` during domain resolution when they appear in
+`include_models` or `exclude_models`. Model inventory may observe STI subclasses
+or abstract models outside the resolved domain set, but domain resolution ignores
+them because no configured domain selected them.
+
+## Stage Handoffs
+
+| Stage | Inputs | Outputs | Consumer |
+|---|---|---|---|
+| Config loader | CLI argv, `rails_mmd.yml` | validated config object, selected CLI overrides | Rails boot, domain resolution, publisher |
+| Rails boot/eager load | validated config, project root | loaded Rails environment or load diagnostics | model inventory |
+| Model inventory | ActiveRecord descendants | inventory records only | domain resolution |
+| Domain resolution | config domains, inventory records | selected renderable entity set or diagnostics | selected schema probe |
+| Selected schema probe | selected renderable entities | selected schema metadata and connection context set | relationship builder, cardinality evidence |
+| Relationship builder | selected entities, schema metadata, reflections | relationship records and omission diagnostics | IR builder |
+| IR builder | selected entities, attributes, relationships, diagnostics | normalized internal IR payload | render-plan generator |
+| Render-plan generator | normalized IR payload, output config | ER/class render-plan payloads with `digest_sha256` | Mermaid serializer, publisher |
+| Mermaid serializer | render plans | `.mmd` text payloads or serialization diagnostics | publisher |
+| Redactor | diagnostics, exceptions, paths, comments, logs | sanitized external-output payloads | publisher, stderr |
+| Publisher | render plans, `.mmd` payloads, diagnostics | atomic artifact set or write diagnostics | filesystem |
+
+IR is an internal payload owned by the IR builder. It is not a publishable P0
+artifact. Render plans are the first publishable structured rendering payloads.
 
 ## Domain Resolution
 
@@ -375,8 +461,8 @@ Categories:
 - Mermaid serialization and unresolved safe-token exhaustion exit `3`.
 - Output write failure exits `4`.
 - Internal error exits `99`.
-- Warning and info diagnostics default to exit `0` unless `--fail-on-warning`
-  promotes warnings to invocation exit `1`.
+- Warning diagnostics default to exit `0` unless `--fail-on-warning` promotes
+  warnings to invocation exit `1`.
 
 Warning diagnostic `default_exit_code: 0` is not an exemption from invocation
 exit policy. `SAFE_TOKEN_COLLISION`, `DB_METADATA_DEGRADED`, and other warnings
@@ -410,6 +496,52 @@ Artifact names:
 - `<domain>.class.mmd`
 - `<domain>.class.render_plan.json`
 
+Diagnostics file placement:
+
+- Invocation-scope diagnostics are written only to `global.diagnostics.json`
+  after the output directory is known and safe.
+- Domain, model, relationship, and artifact diagnostics are written only to the
+  matching `<domain>.diagnostics.json`.
+- A diagnostic must not be duplicated across global and domain diagnostics.
+- Empty diagnostics files are omitted.
+- Render plans may reference diagnostic IDs from `global.diagnostics.json` or
+  the matching domain diagnostics file only.
+
+Diagnostics JSON top-level shape:
+
+```json
+{
+  "schema_version": 1,
+  "scope": "global|domain",
+  "domain_id": "core|null-for-global",
+  "diagnostics": [],
+  "digest_sha256": "lowercase-64-hex"
+}
+```
+
+Render-plan JSON top-level shape:
+
+```json
+{
+  "schema_version": 1,
+  "artifact_kind": "er|class",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "lowercase-64-hex"
+}
+```
+
+Render-plan `entities[]`, `relationships[]`, and `comments[]` are closed
+objects produced from normalized IR. Each object must carry only canonical
+structured identifiers, safe tokens, Mermaid-facing labels/comments after
+sanitization, and deterministic ordering keys. They must not include raw Rails
+objects, absolute paths, timestamps, process IDs, random seeds, or raw exception
+data.
+
 Pre-output fatal publish policy:
 
 - `CONFIG_NOT_FOUND`, `CONFIG_SCHEMA_INVALID`, `CONFIG_DOMAIN_NOT_FOUND`, and
@@ -425,9 +557,10 @@ Atomic publish policy:
 4. Validate JSON schemas.
 5. Validate every render-plan `diagnostic_ids[]` exists in global or matching
    domain diagnostics.
-6. Publish diagnostics only when any error exists.
-7. Publish all selected `.mmd`, render-plan JSON, and diagnostics only when no
-   error exists.
+6. If any fatal or error diagnostic exists, publish diagnostics only and do not
+   publish selected `.mmd` or render-plan JSON.
+7. If no fatal or error diagnostic exists, publish all selected `.mmd`,
+   render-plan JSON, and non-empty diagnostics files.
 8. Remove the temporary directory on success or failure.
 
 Invocation-level publish:
@@ -518,7 +651,7 @@ Examples:
 
 Collision scope fields are `{artifact_kind, domain_id, token_kind}`:
 
-- `artifact_kind`: `er`, `class`, `ir`, or `render_plan`.
+- `artifact_kind`: `er`, `class`, or `render_plan`.
 - `domain_id`: configured domain ID or `global`.
 - `token_kind`: `entity`, `attribute`, `relationship`, `diagnostic`, or
   `comment`.
@@ -568,7 +701,7 @@ Ordering:
 - Attributes by attribute class `pk` before `fk`, then `attribute_id`.
 - Relationships by `relationship_id`.
 - Diagnostics by `severity_rank`, `code`, `subject_id` or empty string, then
-  `diagnostic_id`.
+  `diagnostic_id`. Severity rank is `fatal` = 0, `error` = 1, `warning` = 2.
 - Artifacts publish diagnostics first, then ER files, ER render plan, class
   files, and class render plan per domain ID.
 
@@ -576,7 +709,7 @@ JSON serialization for digests uses RFC 8785/JCS canonical object key ordering.
 Emitted pretty JSON may be human-readable but must preserve deterministic array
 ordering.
 
-IR and render-plan digest fields are named `digest_sha256`.
+Render-plan and diagnostics digest fields are named `digest_sha256`.
 
 Digest value:
 
