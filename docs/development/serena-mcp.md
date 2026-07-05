@@ -78,13 +78,19 @@ Run these checks from the repository root:
 ```sh
 serena --help
 test -f .serena/project.yml
-grep -E 'project_name: "rails-mmd"|^- ruby$' .serena/project.yml
+grep -Fx 'project_name: "rails-mmd"' .serena/project.yml
+grep -Fx '- ruby' .serena/project.yml
 serena project index
 ```
 
 If Serena is unavailable, if the local client cannot report MCP status, or if
 indexing cannot run in the local environment, record that as
-skipped-environment evidence instead of substituting another tool.
+skipped-environment evidence instead of substituting another tool. For indexing
+failures, record the command, exit status, local Ruby/LSP setup detail when
+shown, and the first relevant error line. During this setup issue, the observed
+local failure was Ruby language-server startup termination before any Ruby
+source existed in the repository; the later Ruby gem bootstrap issue owns the
+repo Ruby version and first analyzable Ruby files.
 
 ## Versioned And Local State
 

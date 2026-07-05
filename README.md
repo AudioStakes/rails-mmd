@@ -22,4 +22,4 @@ Local setup for Codex and Serena MCP is documented in
 
 The versioned Serena project configuration is `.serena/project.yml`. Local
 overrides, logs, caches, language-server installs, and Codex user config remain
-outside the repository.
+unversioned user-local state.
