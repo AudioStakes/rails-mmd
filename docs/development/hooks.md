@@ -30,9 +30,13 @@ Dependency/setup files have their own route. `Gemfile`, `Gemfile.lock`, and
 and CLI version smoke checks.
 
 RuboCop, RSpec, SimpleCov, and Undercover config files run the relevant
-read-only fallback tasks. Schema and fixture globs are intentionally inert until
-the schema/fixture specs exist; they print compact routing output and do not run
-unrelated checks.
+read-only fallback tasks. Schema and fixture globs run `spec/contracts` so JSON
+schemas, schema fixtures, and Mermaid golden fixtures stay executable without
+running unrelated checks.
+
+When a repair command changes files, inspect the deterministic diff and stage
+only the intended repairs before rerunning the hook. Do not rely on automatic
+restaging.
 
 ## Pre-Push
 

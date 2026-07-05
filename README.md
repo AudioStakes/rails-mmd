@@ -47,6 +47,8 @@ GitHub Actions CI is documented in
 [`docs/development/ci.md`](docs/development/ci.md).
 P0 schema and Mermaid fixture scaffolding is documented in
 [`docs/development/contract-fixtures.md`](docs/development/contract-fixtures.md).
+Repository drift guards and setup-mode release conditions are documented in
+[`docs/development/setup-guards.md`](docs/development/setup-guards.md).
 
 ## P0 Contract
 
