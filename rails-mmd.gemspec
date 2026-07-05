@@ -19,7 +19,13 @@ Gem::Specification.new do |spec|
   spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main"
   spec.metadata['rubygems_mfa_required'] = 'true'
 
-  spec.files = Dir['README.md', 'exe/rails-mmd', 'lib/**/*.rb']
+  spec.files = Dir[
+    'README.md',
+    'exe/rails-mmd',
+    'fixtures/schemas/diagnostics/valid/catalog.json',
+    'lib/**/*.rb',
+    'schemas/**/*.json'
+  ]
   spec.bindir = 'exe'
   spec.executables = ['rails-mmd']
   spec.require_paths = ['lib']
