@@ -8,6 +8,20 @@ require_relative 'version'
 module RailsMmd
   # Minimal Thor shell for smokeable help and version output.
   class CLI < Thor
+    GENERATE_HELP = <<~HELP
+      Usage:
+        rails-mmd generate
+
+      Options:
+        [--config=CONFIG]
+        [--output-dir=OUTPUT_DIR]
+        [--domain=DOMAIN]
+        [--format=FORMAT]
+        [--fail-on-warning]
+
+      Generate Mermaid diagrams from a Rails app
+    HELP
+
     package_name 'rails-mmd'
     remove_command :tree
     default_task :help
@@ -29,7 +43,7 @@ module RailsMmd
     method_option :format, type: :string
     method_option :fail_on_warning, type: :string
     def generate(*args)
-      return self.class.command_help(shell, 'generate') if args.include?('--help')
+      return say(GENERATE_HELP) if args.include?('--help')
 
       result = Generate.new.run(cli_options: cli_options, fail_on_warning: fail_on_warning?)
       emit_result(result)
