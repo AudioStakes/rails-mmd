@@ -4,9 +4,8 @@
 from Rails and ActiveRecord applications.
 
 The repository is currently in setup mode. It contains project operating
-contracts and local development-tooling documentation, but it does not yet
-include Ruby gem files, a CLI executable, Rails loading, diagram generation,
-hooks, or CI.
+contracts, local development-tooling documentation, and a minimal Ruby gem/CLI
+shell. It does not yet include Rails loading, diagram generation, hooks, or CI.
 
 ## Project Model
 
@@ -14,6 +13,27 @@ hooks, or CI.
 - No Node, TypeScript, pnpm, npm, yarn, Nx, or monorepo workspace setup.
 - No `packages/rails-mmd/` nesting.
 - Serena is local development tooling only and is not a runtime dependency.
+
+## Ruby And CLI
+
+This repository pins MRI Ruby `4.0.5` in [`.ruby-version`](.ruby-version).
+Ruby `4.0` is the selected stable branch for this project, and `4.0.5` was
+selected as the available `4.0` patch at this issue-plan revision time. This is
+not based on a claim that a downloads page alone labels `4.0.5` as the only
+current stable release.
+
+The current CLI shell supports only help and version smoke behavior:
+
+```sh
+bundle exec ruby -Ilib exe/rails-mmd --help
+bundle exec ruby -Ilib exe/rails-mmd --version
+```
+
+`rails-mmd generate` and all P0 feature options are intentionally absent until a
+future implementation issue adds the command with matching contract coverage.
+
+Dependency classifications are documented in
+[`docs/development/dependencies.md`](docs/development/dependencies.md).
 
 ## P0 Contract
 
