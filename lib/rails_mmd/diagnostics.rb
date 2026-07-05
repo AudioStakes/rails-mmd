@@ -3,6 +3,7 @@
 require 'json'
 require 'rails_mmd/artifact_refs'
 require 'rails_mmd/canonical_json'
+require 'rails_mmd/metadata_shapes'
 require 'rails_mmd/redactor'
 require 'rails_mmd/subject_ids'
 
@@ -10,6 +11,8 @@ module RailsMmd
   # Schema-backed diagnostic object factory.
   class Diagnostics
     CATALOG_PATH = Pathname(__dir__).join('../../fixtures/schemas/diagnostics/valid/catalog.json').expand_path
+    SCHEMA_PATH = Pathname(__dir__).join('../../schemas/diagnostics.schema.json').expand_path
+    FREE_TEXT_REFS = %w[#/$defs/relative_path #/$defs/sanitized_string].freeze
 
     def initialize(redactor: Redactor.new, artifact_refs: ArtifactRefs.new(redactor: redactor))
       @redactor = redactor
@@ -67,6 +70,10 @@ module RailsMmd
       end
     end
 
+    def self.metadata_shapes
+      @metadata_shapes ||= MetadataShapes.new(schema_path: SCHEMA_PATH)
+    end
+
     private
 
     attr_reader :artifact_refs, :redactor
@@ -77,7 +84,8 @@ module RailsMmd
     end
 
     def sanitized_metadata(code, metadata)
-      template_keys = self.class.catalog.fetch(code).fetch('metadata').keys
+      shape = self.class.metadata_shapes.fetch(code)
+      template_keys = shape.fetch('properties').keys
       metadata = stringify_keys(metadata)
       raise ArgumentError, "unknown diagnostic metadata for #{code}" unless (metadata.keys - template_keys).empty?
 
@@ -87,27 +95,18 @@ module RailsMmd
     end
 
     def sanitize_metadata_value(key, value)
-      case key
-      when 'config_path', 'path', 'exception_summary', 'reason'
-        sanitize_metadata_free_text(value)
-      else
-        value
-      end
+      return value unless metadata_free_text?(key)
+      raise ArgumentError, "invalid diagnostic metadata value for #{key}" unless value.is_a?(String)
+
+      redactor.sanitize(value)
     end
 
-    def sanitize_metadata_free_text(value)
-      case value
-      when String
-        redactor.sanitize(value)
-      when Array
-        value.map { |item| sanitize_metadata_free_text(item) }
-      else
-        value
-      end
+    def metadata_free_text?(key)
+      FREE_TEXT_REFS.include?(self.class.metadata_shapes.properties.fetch(key).fetch('$ref', nil))
     end
 
     def validate_metadata_keys!(code, metadata)
-      required_keys = self.class.catalog.fetch(code).fetch('metadata').keys
+      required_keys = self.class.metadata_shapes.fetch(code).fetch('required')
       missing_keys = required_keys - metadata.keys
       return if missing_keys.empty?
 

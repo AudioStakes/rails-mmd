@@ -60,6 +60,11 @@ RSpec.describe 'runtime primitives' do
       expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document([diagnostic]))).to be(true)
       expect(diagnostic.fetch('artifact_refs')).to eq([])
       expect(diagnostic.fetch('message')).not_to include(Dir.pwd)
+      expect(free_text_metadata_diagnostics).to all(satisfy do |item|
+        RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document([item]))
+      end)
+      expect(free_text_metadata_diagnostics.flat_map { |item| item.fetch('metadata').values }.join(' '))
+        .not_to include(Dir.pwd, '/tmp/rails-mmd/secret', 'api_key')
       expect(structured_identifier_metadata.fetch('ruby_constant')).to eq('Credential::ApiKey')
       expect do
         described_class.new.build(
@@ -78,7 +83,14 @@ RSpec.describe 'runtime primitives' do
 
       expect(machine_local_config_id).to eq(relative_config_id)
       expect(structured_subject_id).to eq('core:Credential::ApiKey:password_digest')
-      expect(free_text_array_metadata).to eq(['log.txt', 12])
+      expect(optional_metadata_diagnostics).to all(satisfy do |item|
+        RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document([item]))
+      end)
+      expect(valid_artifact_ref_diagnostic.fetch('artifact_refs').first).to eq(
+        'artifact_kind' => 'stderr',
+        'domain_id' => nil,
+        'path' => 'log.txt'
+      )
       expect do
         diagnostics.build(
           code: 'SAFE_TOKEN_COLLISION',
@@ -87,6 +99,29 @@ RSpec.describe 'runtime primitives' do
           artifact_refs: [{ artifact_kind: 'stderr', domain_id: nil, path: '/tmp/rails-mmd/stderr.log' }]
         )
       end.to raise_error(ArgumentError, /invalid artifact path/)
+      expect do
+        diagnostics.build(
+          code: 'CONFIG_NOT_FOUND',
+          message: 'missing',
+          metadata: { config_path: 'rails_mmd.yml' },
+          artifact_refs: [{ artifact_kind: 'stderr', domain_id: nil, path: 'log.txt', secret: 'super-secret-value' }]
+        )
+      end.to raise_error(ArgumentError, /unknown artifact ref keys/)
+      expect do
+        diagnostics.build(
+          code: 'CONFIG_NOT_FOUND',
+          subject_id: '/tmp/secret',
+          message: 'missing',
+          metadata: { config_path: 'rails_mmd.yml' }
+        )
+      end.to raise_error(ArgumentError, /invalid diagnostic subject_id/)
+      expect do
+        diagnostics.build(
+          code: 'OUTPUT_DIRECTORY_INVALID',
+          message: 'bad output',
+          metadata: { field_path: '$.output.directory', reason: ['not', 'a string'] }
+        )
+      end.to raise_error(ArgumentError, /invalid diagnostic metadata value/)
     end
 
     it 'converts exceptions without raw backtraces' do
@@ -194,6 +229,20 @@ RSpec.describe 'runtime primitives' do
     end
   end
 
+  describe 'gem packaging' do
+    it 'ships runtime JSON assets used by diagnostics and schema validation' do
+      files = Gem::Specification.load('rails-mmd.gemspec').files
+
+      expect(files).to include(
+        'fixtures/schemas/diagnostics/valid/catalog.json',
+        'schemas/diagnostics.schema.json',
+        'schemas/config.schema.json',
+        'schemas/ir.schema.json',
+        'schemas/render_plan.schema.json'
+      )
+    end
+  end
+
   def fixture(path)
     JSON.parse(Pathname(__dir__).join("../../fixtures/schemas/#{path}").expand_path.read)
   end
@@ -214,6 +263,34 @@ RSpec.describe 'runtime primitives' do
       message: 'missing model',
       metadata: { domain_id: 'core', ruby_constant: 'Credential::ApiKey' }
     ).fetch('metadata')
+  end
+
+  def free_text_metadata_diagnostics
+    [config_schema_invalid_diagnostic, domain_model_not_renderable_diagnostic]
+  end
+
+  def config_schema_invalid_diagnostic
+    RailsMmd::Diagnostics.new.build(
+      code: 'CONFIG_SCHEMA_INVALID',
+      message: 'invalid config',
+      metadata: { config_path: 'rails_mmd.yml', field_path: "#{Dir.pwd}/config/rails_mmd.yml" }
+    )
+  end
+
+  def domain_model_not_renderable_diagnostic
+    RailsMmd::Diagnostics.new.build(
+      code: 'DOMAIN_MODEL_NOT_RENDERABLE',
+      message: 'not renderable',
+      metadata: domain_model_not_renderable_metadata
+    )
+  end
+
+  def domain_model_not_renderable_metadata
+    {
+      domain_id: 'core',
+      ruby_constant: 'Credential::ApiKey',
+      renderability_reason: "api_key=/tmp/rails-mmd/secret at #{Dir.pwd}/models/user.rb"
+    }
   end
 
   def machine_local_config_id
@@ -241,12 +318,33 @@ RSpec.describe 'runtime primitives' do
     ).fetch('subject_id')
   end
 
-  def free_text_array_metadata
+  def optional_metadata_diagnostics
+    [association_target_unresolved_diagnostic, output_write_failed_diagnostic]
+  end
+
+  def valid_artifact_ref_diagnostic
     RailsMmd::Diagnostics.new.build(
-      code: 'OUTPUT_DIRECTORY_INVALID',
-      message: 'bad output',
-      metadata: { field_path: '$.output.directory', reason: ["#{Dir.pwd}/log.txt", 12] }
-    ).fetch('metadata').fetch('reason')
+      code: 'CONFIG_NOT_FOUND',
+      message: 'missing',
+      metadata: { config_path: 'rails_mmd.yml' },
+      artifact_refs: [{ artifact_kind: 'stderr', domain_id: nil, path: 'log.txt' }]
+    )
+  end
+
+  def association_target_unresolved_diagnostic
+    RailsMmd::Diagnostics.new.build(
+      code: 'ASSOCIATION_TARGET_UNRESOLVED',
+      message: 'target missing',
+      metadata: { domain_id: 'core', owner_constant: 'User', association_name: 'api_key_logs' }
+    )
+  end
+
+  def output_write_failed_diagnostic
+    RailsMmd::Diagnostics.new.build(
+      code: 'OUTPUT_WRITE_FAILED',
+      message: 'write failed',
+      metadata: { operation: 'write' }
+    )
   end
 
   def safe_token_metadata(token_kind:)

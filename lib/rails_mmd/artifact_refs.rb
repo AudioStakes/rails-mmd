@@ -5,6 +5,7 @@ require 'rails_mmd/redactor'
 module RailsMmd
   # Sanitizes and validates diagnostic artifact references.
   class ArtifactRefs
+    ALLOWED_KEYS = %w[artifact_kind domain_id path].freeze
     PATH_PATTERN = %r{\A(?!/)(?!.*(?:^|/)\.\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+\z}
 
     def initialize(redactor: Redactor.new)
@@ -23,6 +24,9 @@ module RailsMmd
 
     def sanitize_ref(artifact_ref)
       ref = artifact_ref.to_h.transform_keys(&:to_s)
+      unknown_keys = ref.keys - ALLOWED_KEYS
+      raise ArgumentError, "unknown artifact ref keys: #{unknown_keys.join(', ')}" unless unknown_keys.empty?
+
       ref['path'] = safe_path(ref.fetch('path')) if ref.key?('path')
       ref
     end
