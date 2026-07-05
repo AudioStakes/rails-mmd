@@ -1,0 +1,13 @@
+# User-local Serena overrides and runtime state
+/project.local.yml
+/cache/
+/caches/
+/logs/
+/tmp/
+/temp/
+/language_servers/
+/language-server/
+/language-server-installs/
+
+# Do not ignore /memories/ here. Serena memories are reviewable project
+# artifacts when a later issue explicitly asks to version them.
