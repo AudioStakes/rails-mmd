@@ -98,6 +98,10 @@ RSpec.describe RailsMmd::HookChecks do
     pre_commit_commands.fetch('schema-fixture-routing')
   end
 
+  def setup_drift_command
+    pre_commit_commands.fetch('setup-drift-routing')
+  end
+
   it 'fails before repair when a staged file also has unstaged changes' do
     in_git_repository do
       commit_example_file
@@ -155,6 +159,18 @@ RSpec.describe RailsMmd::HookChecks do
       'schemas/**/*.json',
       'fixtures/**/*.json',
       'fixtures/**/*.mmd'
+    )
+  end
+
+  it 'routes setup documentation changes to contract specs' do
+    expect(setup_drift_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
+  end
+
+  it 'triggers contract specs for setup documentation paths' do
+    expect(setup_drift_command.fetch('glob')).to contain_exactly(
+      'AGENTS.md',
+      'README.md',
+      'docs/**/*.md'
     )
   end
 

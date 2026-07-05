@@ -102,8 +102,16 @@ pre-commit:
         - "fixtures/**/*.mmd"
       run: bundle exec rspec spec/contracts
 
-    p0-contract-doc:
+    setup-drift-routing:
       priority: 10
+      glob:
+        - "AGENTS.md"
+        - "README.md"
+        - "docs/**/*.md"
+      run: bundle exec rspec spec/contracts
+
+    p0-contract-doc:
+      priority: 11
       glob:
         - "docs/p0-contract.md"
       run: printf '%s\n' 'docs/p0-contract.md changed; no P0 contract verifier exists yet.'

@@ -5,7 +5,8 @@ automation.
 
 ## Superseding Invalid Issues
 
-Issues `#1` through `#6` assumed the wrong repository model for `rails-mmd`.
+Issues `#1`, `#2`, `#3`, `#4`, `#5`, and `#6` assumed the wrong repository
+model for `rails-mmd`.
 When creating the replacement issue batch:
 
 1. Comment on each old issue that it is superseded because it assumed the wrong
