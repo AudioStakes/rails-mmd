@@ -63,7 +63,8 @@ module RailsMmd
       names = [[entity.primary_key, 'primary_key']]
       names.concat(foreign_key_names(entity, relationship_domain).map { |name| [name, 'foreign_key'] })
       payloads = names.compact.uniq.map do |name, role|
-        { 'attribute_id' => "#{entity_id(entity)}/attributes/#{name}", 'name' => name, 'role' => role }
+        { 'attribute_id' => "#{entity_id(entity)}/attributes/#{name}", 'name' => name, 'role' => role,
+          'type' => column_type(entity, name) }
       end
 
       payloads.sort_by do |attribute|
@@ -77,6 +78,10 @@ module RailsMmd
       relationship_domain.relationships.filter_map do |relationship|
         relationship.owner_foreign_key_column if relationship.owner_entity_id == entity_id(entity)
       end
+    end
+
+    def column_type(entity, name)
+      entity.columns.find { |column| column.name == name }&.type&.to_s || 'unknown'
     end
 
     def relationships_payload(relationship_domain)

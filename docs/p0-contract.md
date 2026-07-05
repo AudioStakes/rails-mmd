@@ -270,6 +270,10 @@ them because no configured domain selected them.
 IR is an internal payload owned by the IR builder. It is not a publishable P0
 artifact. Render plans are the first publishable structured rendering payloads.
 
+IR key attributes carry their source DB/Rails type as a string so the
+render-plan builder can project a serializer-facing type without reading schema
+metadata or Rails objects.
+
 ## Domain Resolution
 
 Resolution order is exact:
@@ -624,6 +628,13 @@ structured identifiers, safe tokens, Mermaid-facing labels/comments after
 sanitization, and deterministic ordering keys. They must not include raw Rails
 objects, absolute paths, timestamps, process IDs, random seeds, or raw exception
 data.
+
+Render-plan attributes carry a Mermaid-facing `type` string for serializers.
+The field is lowercase ASCII text matching `[a-z][a-z0-9_]*`. Unknown,
+unsupported, or unavailable DB/Rails attribute types are projected as
+`unknown`. Mermaid serializers must use this render-plan `type` field for
+attribute output and must not look back to IR, schema metadata, or Rails objects
+to infer attribute types.
 
 Render-plan safe tokens are final diagram tokens. The render-plan generator owns
 safe-token generation, and the Mermaid serializer must reuse those tokens without

@@ -159,14 +159,26 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def render_plan_invalid_fixtures
+    render_plan_digest_invalid_fixtures + render_plan_sanitized_invalid_fixtures
+  end
+
+  def render_plan_digest_invalid_fixtures
     %w[
       render_plan/invalid/uppercase_digest.json
       render_plan/invalid/short_digest.json
       render_plan/invalid/long_digest.json
       render_plan/invalid/non_hex_digest.json
       render_plan/invalid/missing_digest.json
+    ]
+  end
+
+  def render_plan_sanitized_invalid_fixtures
+    %w[
+      render_plan/invalid/missing_attribute_type.json
+      render_plan/invalid/unsupported_attribute_type.json
       render_plan/invalid/machine_local_fields.json
       render_plan/invalid/unsanitized_comment.json
+      render_plan/invalid/redacted_key_value_comment.json
     ]
   end
 

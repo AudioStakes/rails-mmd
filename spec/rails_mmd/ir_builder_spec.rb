@@ -33,6 +33,9 @@ RSpec.describe RailsMmd::IrBuilder do
     expect(payload.fetch('entities').last.fetch('attributes').map { |attribute| attribute.fetch('role') }).to eq(
       %w[primary_key foreign_key]
     )
+    expect(payload.fetch('entities').last.fetch('attributes').map { |attribute| attribute.fetch('type') }).to eq(
+      %w[integer integer]
+    )
     expect(payload.fetch('relationships').first).to include(
       'relationship_id' => 'relationships/users/account',
       'association_name' => 'account',
@@ -57,6 +60,23 @@ RSpec.describe RailsMmd::IrBuilder do
 
     expect(result.domains.first.payload.fetch('entities').first.fetch('attributes')).to eq([])
     expect(schema_valid_ir?(result.domains.first.payload)).to be(true)
+  end
+
+  it 'falls back to unknown when selected key column type metadata is unavailable' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [
+        entity('User', 'users', columns: [
+                 RailsMmd::SchemaProbe::Column.new(name: 'id', type: nil, nullable: false)
+               ])
+      ],
+      diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: []).domains.first.payload
+
+    expect(payload.fetch('entities').first.fetch('attributes').first.fetch('type')).to eq('unknown')
+    expect(schema_valid_ir?(payload)).to be(true)
   end
 
   def entity(ruby_constant, table_name, columns: [column('id')])

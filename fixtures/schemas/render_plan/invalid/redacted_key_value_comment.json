@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "class",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [],
+  "relationships": [],
+  "comments": [
+    {
+      "comment_id": "comments/unsafe",
+      "safe_token": "UNSAFE_COMMENT",
+      "text": "[REDACTED_KEY] hunter2"
+    }
+  ],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}
