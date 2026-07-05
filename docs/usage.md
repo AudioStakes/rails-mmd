@@ -54,9 +54,11 @@ Successful domains can publish:
 `global.diagnostics.json` is published only for post-output invocation-scope
 diagnostics when applicable. Empty diagnostics files are omitted.
 
-Blocking diagnostics publish diagnostics JSON when output is available and omit
-the affected Mermaid and render-plan artifacts. Pre-output fatal failures write
-sanitized diagnostics to stderr and write no files.
+Blocking diagnostics usually publish diagnostics JSON when output is available
+and omit the affected Mermaid and render-plan artifacts. Publish failures may
+fall back to sanitized stderr and leave previous managed artifacts intact.
+Pre-output fatal failures write sanitized diagnostics to stderr and write no
+files.
 
 ## Exit Codes
 
