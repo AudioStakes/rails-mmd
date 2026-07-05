@@ -79,7 +79,7 @@ Run these checks from the repository root:
 serena --help
 test -f .serena/project.yml
 grep -Fx 'project_name: "rails-mmd"' .serena/project.yml
-grep -Fx '- ruby' .serena/project.yml
+grep -Fx -- '- ruby' .serena/project.yml
 serena project index
 ```
 
@@ -88,9 +88,14 @@ indexing cannot run in the local environment, record that as
 skipped-environment evidence instead of substituting another tool. For indexing
 failures, record the command, exit status, local Ruby/LSP setup detail when
 shown, and the first relevant error line. During this setup issue, the observed
-local failure was Ruby language-server startup termination before any Ruby
-source existed in the repository; the later Ruby gem bootstrap issue owns the
+local failure was missing Ruby/ruby-lsp version setup followed by Ruby
+language-server startup termination. The later Ruby gem bootstrap issue owns the
 repo Ruby version and first analyzable Ruby files.
+
+When checking Serena ignore behavior with `serena project is_ignored_path`,
+create disposable files first. Serena reports paths that do not exist as not
+ignored, even when the configured pattern would ignore the same path once it
+exists.
 
 ## Versioned And Local State
 
