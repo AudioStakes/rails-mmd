@@ -23,6 +23,7 @@ module RailsMmd
       template = self.class.catalog.fetch(code)
       diagnostic = diagnostic_payload(code, message, template, options)
       validate_metadata_keys!(code, diagnostic.fetch('metadata'))
+      self.class.metadata_shapes.validate!(code, diagnostic.fetch('metadata'))
       diagnostic
     end
 

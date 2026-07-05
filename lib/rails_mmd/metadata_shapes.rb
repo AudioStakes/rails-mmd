@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'json_schemer'
 
 module RailsMmd
   # Reads diagnostic metadata contracts from the diagnostics JSON Schema.
@@ -19,6 +20,13 @@ module RailsMmd
       end
     end
 
+    def validate!(code, metadata)
+      errors = schema(code).validate(metadata).to_a
+      return if errors.empty?
+
+      raise ArgumentError, "invalid diagnostic metadata for #{code}: #{errors.first.fetch('data_pointer')}"
+    end
+
     private
 
     attr_reader :schema_path
@@ -33,6 +41,11 @@ module RailsMmd
 
     def metadata_rules
       definitions.values.select { |definition| definition.dig('then', 'properties', 'metadata', '$ref') }
+    end
+
+    def schema(code)
+      @schemas ||= {}
+      @schemas[code] ||= JSONSchemer.schema(fetch(code).merge('$defs' => definitions))
     end
 
     def definitions

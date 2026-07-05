@@ -110,6 +110,30 @@ RSpec.describe 'runtime primitives' do
       expect do
         diagnostics.build(
           code: 'CONFIG_NOT_FOUND',
+          message: 'missing',
+          metadata: { config_path: 'rails_mmd.yml' },
+          artifact_refs: [{ path: 'log.txt' }]
+        )
+      end.to raise_error(ArgumentError, /missing artifact ref keys/)
+      expect do
+        diagnostics.build(
+          code: 'CONFIG_NOT_FOUND',
+          message: 'missing',
+          metadata: { config_path: 'rails_mmd.yml' },
+          artifact_refs: [{ artifact_kind: 'unknown', domain_id: 'Bad-ID', path: 'log.txt' }]
+        )
+      end.to raise_error(ArgumentError, /invalid artifact_kind/)
+      expect do
+        diagnostics.build(
+          code: 'CONFIG_NOT_FOUND',
+          message: 'missing',
+          metadata: { config_path: 'rails_mmd.yml' },
+          artifact_refs: [{ artifact_kind: 'stderr', domain_id: 'Bad-ID', path: 'log.txt' }]
+        )
+      end.to raise_error(ArgumentError, /invalid artifact domain_id/)
+      expect do
+        diagnostics.build(
+          code: 'CONFIG_NOT_FOUND',
           subject_id: '/tmp/secret',
           message: 'missing',
           metadata: { config_path: 'rails_mmd.yml' }
@@ -122,6 +146,13 @@ RSpec.describe 'runtime primitives' do
           metadata: { field_path: '$.output.directory', reason: ['not', 'a string'] }
         )
       end.to raise_error(ArgumentError, /invalid diagnostic metadata value/)
+      expect do
+        diagnostics.build(
+          code: 'DOMAIN_MODEL_NOT_FOUND',
+          message: 'missing model',
+          metadata: { domain_id: 'Bad-ID', ruby_constant: 'Credential::ApiKey' }
+        )
+      end.to raise_error(ArgumentError, /invalid diagnostic metadata/)
     end
 
     it 'converts exceptions without raw backtraces' do
