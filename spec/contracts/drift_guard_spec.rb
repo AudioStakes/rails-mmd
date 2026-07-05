@@ -138,7 +138,7 @@ RSpec.describe 'repository drift guards' do
   it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do
     text = repository_text('docs/p0-blocking-fixture-matrix.md')
 
-    expect(matrix_codes(text)).to match_array(blocking_diagnostic_codes)
+    expect(blocking_matrix_rows(text)).to eq(blocking_diagnostic_rows)
   end
 
   it 'documents the P0 user-facing exit codes' do
@@ -197,7 +197,11 @@ RSpec.describe 'repository drift guards' do
   end
 
   def blocking_diagnostic_codes
-    diagnostic_catalog_rows.select { |row| blocking_exit_code?(row.fetch(:exit_code)) }.map { |row| row.fetch(:code) }
+    blocking_diagnostic_rows.keys
+  end
+
+  def blocking_diagnostic_rows
+    diagnostic_catalog_rows.select { |_, row| blocking_exit_code?(row.fetch('exit')) }
   end
 
   def blocking_exit_code?(exit_code)
@@ -209,15 +213,33 @@ RSpec.describe 'repository drift guards' do
       cells = markdown_table_cells(line)
       next unless cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
 
-      { code: cells[0].delete('`'), exit_code: cells[2] }
-    end
+      [cells[0].delete('`'), contract_policy_row(cells)]
+    end.to_h
   end
 
-  def matrix_codes(text)
+  def contract_policy_row(cells)
+    {
+      'exit' => cells[2],
+      'attachment' => cells[5],
+      'publication_effect' => cells[6]
+    }
+  end
+
+  def blocking_matrix_rows(text)
     text.lines.filter_map do |line|
       cells = markdown_table_cells(line)
-      cells&.first&.delete('`') if cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
-    end
+      next unless cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
+
+      [cells[0].delete('`'), matrix_policy_row(cells)]
+    end.to_h
+  end
+
+  def matrix_policy_row(cells)
+    {
+      'exit' => cells[3],
+      'attachment' => cells[4],
+      'publication_effect' => cells[5]
+    }
   end
 
   def markdown_table_cells(line)
