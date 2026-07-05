@@ -30,6 +30,14 @@ RSpec.describe RailsMmd::Generate do
     expect(publisher.received.fetch(:artifacts).fetch('core').keys).to eq(%w[er class])
   end
 
+  it 'keeps warning diagnostics successful when fail-on-warning is disabled' do
+    result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
+
+    expect(result.exit_code).to eq(0), result.diagnostics.inspect
+    expect(result.stderr).to be_empty
+    expect(publisher.received.fetch(:diagnostics)).to include(warning_diagnostic)
+  end
+
   it 'includes render-plan diagnostics in published diagnostics and exit policy' do
     render_plan_builder.diagnostics = [safe_token_collision]
 
@@ -102,6 +110,16 @@ RSpec.describe RailsMmd::Generate do
     expect(result.stderr).to include('OUTPUT_WRITE_FAILED')
   end
 
+  it 'preserves explicit publisher stderr on publish failure' do
+    publisher.failure_diagnostics = [output_write_failed]
+    publisher.failure_stderr = 'publish failed'
+
+    result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
+
+    expect(result.exit_code).to eq(4)
+    expect(result.stderr).to eq('publish failed')
+  end
+
   it 'resolves constants with the default model resolver' do
     expect(generate.send(:model_resolver).call('String')).to eq(String)
   end
@@ -168,22 +186,33 @@ RSpec.describe RailsMmd::Generate do
 
   def define_fake_publisher_methods(fake, received, diagnostic)
     failure_diagnostics = {}
+    failure_stderr = {}
     fake.define_singleton_method(:received) { received[:value] }
     fake.define_singleton_method(:failure_diagnostics=) { |diagnostics| failure_diagnostics[:value] = diagnostics }
-    define_fake_publish(fake, received, diagnostic, failure_diagnostics)
+    fake.define_singleton_method(:failure_stderr=) { |stderr| failure_stderr[:value] = stderr }
+    define_fake_publish(fake, received, diagnostic, failure_diagnostics, failure_stderr)
     fake.define_singleton_method(:pre_output_stderr) do |diagnostics|
       diagnostics.map { |item| item.fetch('code') }.join("\n")
     end
   end
 
-  def define_fake_publish(fake, received, diagnostic, failure_diagnostics)
+  def define_fake_publish(fake, received, diagnostic, failure_diagnostics, failure_stderr)
+    result_factory = method(:publisher_result_for)
     fake.define_singleton_method(:publish) do |**kwargs|
       received[:value] = kwargs
-      if failure_diagnostics[:value]
-        Struct.new(:success?, :diagnostics, :stderr).new(false, failure_diagnostics.fetch(:value), '')
-      else
-        Struct.new(:success?, :diagnostics, :stderr).new(true, kwargs.fetch(:diagnostics) + [diagnostic], '')
-      end
+      result_factory.call(kwargs, diagnostic, failure_diagnostics, failure_stderr)
+    end
+  end
+
+  def publisher_result_for(kwargs, diagnostic, failure_diagnostics, failure_stderr)
+    if failure_diagnostics[:value]
+      Struct.new(:success?, :diagnostics, :stderr).new(
+        false,
+        failure_diagnostics.fetch(:value),
+        failure_stderr.fetch(:value, '')
+      )
+    else
+      Struct.new(:success?, :diagnostics, :stderr).new(true, kwargs.fetch(:diagnostics) + [diagnostic], '')
     end
   end
 

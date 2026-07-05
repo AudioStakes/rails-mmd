@@ -127,7 +127,10 @@ RSpec.describe RailsMmd::CLI do
   end
 
   def forbidden_generate_help_pattern
-    /\.erdconfig|--strict|--no-strict|--no-fail-on-warning|--skip-fail-on-warning|--allow-partial|--validate|--cache/
+    Regexp.union(
+      /\.erdconfig/, /--strict/, /--no-strict/, /--no-fail-on-warning/, /--skip-fail-on-warning/,
+      /--fail-on-warning=/, /--allow-partial/, /--validate/, /--cache/
+    )
   end
 
   def stub_generator
