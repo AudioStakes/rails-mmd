@@ -7,8 +7,8 @@
       "ruby_constant": "User",
       "table_name": "users",
       "attributes": [
-        { "attribute_id": "entities/users/attributes/id", "name": "id", "role": "primary_key" },
-        { "attribute_id": "entities/users/attributes/account_id", "name": "account_id", "role": "foreign_key" }
+        { "attribute_id": "entities/users/attributes/id", "name": "id", "role": "primary_key", "type": "bigint" },
+        { "attribute_id": "entities/users/attributes/account_id", "name": "account_id", "role": "foreign_key", "type": "bigint" }
       ]
     },
     {
@@ -16,7 +16,7 @@
       "ruby_constant": "Account",
       "table_name": "accounts",
       "attributes": [
-        { "attribute_id": "entities/accounts/attributes/id", "name": "id", "role": "primary_key" }
+        { "attribute_id": "entities/accounts/attributes/id", "name": "id", "role": "primary_key", "type": "bigint" }
       ]
     }
   ],

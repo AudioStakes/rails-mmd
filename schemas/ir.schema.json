@@ -51,11 +51,12 @@
     "attribute": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attribute_id", "name", "role"],
+      "required": ["attribute_id", "name", "role", "type"],
       "properties": {
         "attribute_id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
-        "role": { "enum": ["primary_key", "foreign_key"] }
+        "role": { "enum": ["primary_key", "foreign_key"] },
+        "type": { "type": "string", "minLength": 1 }
       }
     },
     "relationship": {

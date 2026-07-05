@@ -52,8 +52,12 @@
       "allOf": [
         { "not": { "pattern": "(^|\\s)/(?:Users|tmp|private|var)(?:/|\\s|$)" } },
         { "not": { "pattern": "[A-Za-z]:[\\\\/]" } },
-        { "not": { "pattern": "\\b(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|pid)\\b\\s*[:=]" } }
+        { "not": { "pattern": "\\b(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|pid)\\b\\s*(?::|=|\\s+)\\s*\\S+" } },
+        { "not": { "pattern": "\\[REDACTED_KEY\\]\\s+\\S+" } }
       ]
+    },
+    "attribute_type": {
+      "enum": ["bigint", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "unknown"]
     },
     "entity": {
       "type": "object",
@@ -72,11 +76,12 @@
     "attribute": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attribute_id", "safe_token", "label", "key_marker"],
+      "required": ["attribute_id", "safe_token", "label", "type", "key_marker"],
       "properties": {
         "attribute_id": { "type": "string", "minLength": 1 },
         "safe_token": { "$ref": "#/$defs/safe_token" },
         "label": { "type": "string", "minLength": 1 },
+        "type": { "$ref": "#/$defs/attribute_type" },
         "key_marker": {
           "anyOf": [
             { "type": "null" },

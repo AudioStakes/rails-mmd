@@ -8,3 +8,7 @@ render-plan generation, or Mermaid serialization in this issue.
 Mermaid CLI validation is intentionally deferred. This repository remains
 Ruby-only, and no non-Ruby development dependency has been approved for P0
 contract scaffolding.
+
+Render-plan attribute fixtures must include the serializer-facing lowercase
+`type` field. Serializers consume that field directly and must not infer types
+from IR, schema metadata, or Rails runtime objects.
