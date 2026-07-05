@@ -36,14 +36,25 @@ module RailsMmd
     def resolve_domain(domain, records_by_constant)
       include_records, include_diagnostics = resolve_model_list(domain, domain.include_models, records_by_constant)
       exclude_records, exclude_diagnostics = resolve_model_list(domain, domain.exclude_models, records_by_constant)
-      selected_records = include_records - exclude_records
+      selected_records = selected_records(include_records, exclude_records)
       empty_diagnostic = selected_records.empty? ? [domain_empty(domain.id)] : []
 
       DomainResult.new(
         domain_id: domain.id,
-        records: selected_records.sort_by(&:ruby_constant),
+        records: selected_records,
         diagnostics: include_diagnostics + exclude_diagnostics + empty_diagnostic
       )
+    end
+
+    def selected_records(include_records, exclude_records)
+      excluded = exclude_records.to_set(&:ruby_constant)
+      seen = Set.new
+      include_records.each_with_object([]) do |record, selected|
+        next if excluded.include?(record.ruby_constant) || seen.include?(record.ruby_constant)
+
+        seen << record.ruby_constant
+        selected << record
+      end
     end
 
     def resolve_model_list(domain, ruby_constants, records_by_constant)

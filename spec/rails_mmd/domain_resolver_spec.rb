@@ -41,6 +41,23 @@ RSpec.describe RailsMmd::DomainResolver do
     expect(result.domains.first.records.map(&:ruby_constant)).to eq(['Admin::User'])
   end
 
+  it 'preserves first include order while applying set semantics for duplicates and excludes' do
+    config = config_for({
+                          'core' => {
+                            include: %w[Invoice User Invoice Account User],
+                            exclude: %w[Account Account]
+                          }
+                        })
+
+    result = described_class.new.resolve(
+      config: config,
+      inventory_records: [record('Account'), record('Invoice'), record('User')]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.records.map(&:ruby_constant)).to eq(%w[Invoice User])
+  end
+
   it 'emits schema-valid diagnostics for missing, non-renderable, and empty domains' do
     abstract = record('ApplicationRecord', renderable: false, reason: 'abstract_class')
     sti = record('Dog', renderable: false, reason: 'sti_subclass')

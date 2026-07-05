@@ -53,6 +53,19 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(outside.connection_context_id).to include('outside')
   end
 
+  it 'sanitizes multi-db connection context IDs before diagnostics output' do
+    first = record('User', connection_context_id: '{"name":"/Users/dev/app","role":"writing","shard":"default"}')
+    second = record('Account', connection_context_id: '{"name":"SECRET_TOKEN_1234","role":"writing","shard":"default"}')
+
+    result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(
+      domains: [domain_result('core', [first, second])]
+    )
+
+    ids = result.diagnostics.first.dig('metadata', 'connection_context_ids')
+    expect(ids.join(' ')).not_to include('/Users/dev', 'SECRET_TOKEN_1234')
+    expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
+  end
+
   it 'emits fatal table and primary key diagnostics for selected model failures' do
     missing = model(table_exists: false)
     composite = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: %w[id tenant_id])
@@ -68,6 +81,39 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
     expect(result.domains.first.entities).to eq([])
+  end
+
+  it 'treats required metadata exceptions as fatal selected model diagnostics' do
+    table_error = model(table_exists: -> { raise 'table denied' })
+    column_error = model(table_exists: true, columns: -> { raise 'columns denied' })
+    primary_key_error = model(
+      table_exists: true,
+      columns: [column('id', :integer, false)],
+      primary_key: -> { raise 'primary key denied' }
+    )
+    resolver = { 'TableError' => table_error, 'ColumnError' => column_error, 'PrimaryKeyError' => primary_key_error }
+
+    result = described_class.new(model_resolver: ->(name) { resolver.fetch(name) }).probe(
+      domains: [domain_result('core', [record('TableError'), record('ColumnError'), record('PrimaryKeyError')])]
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[MODEL_TABLE_MISSING MODEL_TABLE_MISSING MODEL_PRIMARY_KEY_UNSUPPORTED]
+    )
+  end
+
+  it 'contains selected model resolver failures as scoped table metadata failures' do
+    domain = domain_result('core', [record('User')])
+
+    result = described_class.new(model_resolver: ->(_name) { raise 'autoload failed at /Users/dev/app' }).probe(
+      domains: [domain]
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'MODEL_TABLE_MISSING')
+    expect(result.diagnostics.first.fetch('message')).not_to include('/Users/dev')
+    expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
   end
 
   it 'degrades optional foreign-key and unique-index metadata without strengthening evidence' do
@@ -95,6 +141,42 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
   end
 
+  it 'degrades missing adapter metadata APIs instead of treating evidence as absent' do
+    user = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id',
+                 foreign_keys: :undefined, indexes: :undefined)
+    domain = domain_result('core', [record('User')])
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(domains: [domain])
+
+    expect(result).to be_success
+    expect(result.domains.first.entities.first.foreign_keys).to eq([])
+    expect(result.domains.first.entities.first.indexes).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
+      .to eq(%w[foreign_key unique_index])
+  end
+
+  it 'reads foreign-key and index metadata from the connection when model APIs are absent' do
+    user = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id',
+                 foreign_keys: :undefined, indexes: :undefined)
+    connection = Struct.new(:foreign_keys_payload, :indexes_payload) do
+      def foreign_keys(_table_name) = foreign_keys_payload
+      def indexes(_table_name) = indexes_payload
+    end.new(
+      [foreign_key('users', 'account_id', 'accounts', 'id')],
+      [index(%w[email], true)]
+    )
+    user.define_singleton_method(:connection) { connection }
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    entity = result.domains.first.entities.first
+    expect(result).to be_success
+    expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
+    expect(entity.indexes.map(&:columns)).to eq([%w[email]])
+  end
+
   def domain_result(domain_id, records)
     RailsMmd::DomainResolver::DomainResult.new(domain_id: domain_id, records: records, diagnostics: [])
   end
@@ -112,16 +194,29 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
 
   def model(table_exists:, columns: [], primary_key: 'id', foreign_keys: [], indexes: [])
+    model_class = base_model(table_exists, columns, primary_key)
+    define_optional_schema_method(model_class, :foreign_keys, foreign_keys)
+    define_optional_schema_method(model_class, :indexes, indexes)
+    model_class
+  end
+
+  def base_model(table_exists, columns, primary_key)
     Class.new do
       define_singleton_method(:table_exists?) { callable_value(table_exists) }
       define_singleton_method(:columns) { callable_value(columns) }
       define_singleton_method(:primary_key) { callable_value(primary_key) }
-      define_singleton_method(:foreign_keys) { callable_value(foreign_keys) }
-      define_singleton_method(:indexes) { callable_value(indexes) }
 
       def self.callable_value(value)
         value.respond_to?(:call) ? value.call : value
       end
+    end
+  end
+
+  def define_optional_schema_method(model_class, method_name, value)
+    return if value == :undefined
+
+    model_class.define_singleton_method(method_name) do
+      model_class.callable_value(value)
     end
   end
 

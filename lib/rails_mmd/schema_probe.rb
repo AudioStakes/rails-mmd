@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/diagnostics'
+require 'rails_mmd/redactor'
 
 module RailsMmd
   # Reads selected-domain-only schema metadata for resolved renderable records.
@@ -28,9 +29,10 @@ module RailsMmd
 
     EXIT_CONTRACT_ERROR = 2
 
-    def initialize(model_resolver:, diagnostics: Diagnostics.new)
+    def initialize(model_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
       @model_resolver = model_resolver
       @diagnostics = diagnostics
+      @redactor = redactor
     end
 
     def probe(domains:)
@@ -42,7 +44,7 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics, :model_resolver
+    attr_reader :diagnostics, :model_resolver, :redactor
 
     def probe_domain(domain)
       connection_diagnostic = multi_db_diagnostic(domain)
@@ -64,7 +66,7 @@ module RailsMmd
     end
 
     def multi_db_diagnostic(domain)
-      connection_context_ids = domain.records.map(&:connection_context_id).uniq.sort
+      connection_context_ids = domain.records.map { |record| redactor.sanitize(record.connection_context_id) }.uniq.sort
       return if connection_context_ids.length < 2
 
       diagnostics.build(
@@ -76,7 +78,9 @@ module RailsMmd
     end
 
     def probe_record(domain_id, record)
-      model = model_resolver.call(record.ruby_constant)
+      model = model_for(record)
+      return invalid_record(domain_id, record, :table) if model.nil?
+
       return invalid_record(domain_id, record, :table) unless table_exists?(model)
 
       columns = read_columns(model)
@@ -89,6 +93,12 @@ module RailsMmd
 
     def exit_code(all_diagnostics)
       all_diagnostics.any? { |diagnostic| diagnostic.fetch('severity') != 'warning' } ? EXIT_CONTRACT_ERROR : 0
+    end
+
+    def model_for(record)
+      model_resolver.call(record.ruby_constant)
+    rescue StandardError
+      nil
     end
 
     def invalid_record(domain_id, record, kind)
@@ -188,7 +198,8 @@ module RailsMmd
     end
 
     def connection_metadata(model, method_name, table_name)
-      return [] unless model.respond_to?(:connection) && model.connection.respond_to?(method_name)
+      raise "#{method_name} metadata unavailable" unless model.respond_to?(:connection)
+      raise "#{method_name} metadata unavailable" unless model.connection.respond_to?(method_name)
 
       model.connection.public_send(method_name, table_name)
     end
