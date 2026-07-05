@@ -3,6 +3,17 @@
 require 'rake'
 
 RSpec.describe Rake::Task do
+  def expected_undercover_command
+    [
+      'bundle', 'exec', 'undercover',
+      '--simplecov', 'coverage/coverage.json',
+      '--include-files', 'lib/**/*.rb,exe/rails-mmd,Rakefile',
+      '--exclude-files', 'spec/**/*.rb',
+      '--max-warnings', '20',
+      '--compare', undercover_compare_ref('HEAD~1')
+    ]
+  end
+
   around do |example|
     previous_application = Rake.application
     Rake.application = Rake::Application.new
@@ -31,5 +42,11 @@ RSpec.describe Rake::Task do
 
   it 'defines explicit advisory data refresh' do
     expect(described_class.task_defined?('bundle:audit:update')).to be(true)
+  end
+
+  it 'builds coverage command as argv-safe undercover options' do
+    command = undercover_command(YAML.safe_load_file('.undercover.yml'))
+
+    expect(command).to match_array(expected_undercover_command)
   end
 end

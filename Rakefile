@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# :nocov:
+
 require 'bundler/gem_tasks'
 require 'rubocop/rake_task'
 require 'rspec/core/rake_task'
@@ -17,6 +19,20 @@ def undercover_compare_ref(default_ref)
   return env_ref if env_ref && git_ref?(env_ref)
 
   [default_ref, 'origin/main', 'main', 'HEAD^'].find { |ref| git_ref?(ref) }
+end
+
+def undercover_command(config)
+  compare_ref = undercover_compare_ref(config.fetch('compare'))
+  abort 'No usable Undercover compare ref found' unless compare_ref
+
+  [
+    'bundle', 'exec', 'undercover',
+    '--simplecov', config.fetch('simplecov'),
+    '--compare', compare_ref,
+    '--include-files', config.fetch('include_files'),
+    '--exclude-files', config.fetch('exclude_files'),
+    '--max-warnings', config.fetch('max_warnings').to_s
+  ]
 end
 
 RSpec::Core::RakeTask.new(:spec)
@@ -49,17 +65,8 @@ end
 desc 'Run coverage and changed-code coverage checks'
 task coverage: :spec do
   config = YAML.safe_load_file('.undercover.yml')
-  compare_ref = undercover_compare_ref(config.fetch('compare'))
-  abort 'No usable Undercover compare ref found' unless compare_ref
-
-  sh(
-    'bundle', 'exec', 'undercover',
-    '--simplecov', config.fetch('simplecov'),
-    '--compare', compare_ref,
-    '--include-files', config.fetch('include_files'),
-    '--exclude-files', config.fetch('exclude_files'),
-    '--max-warnings', config.fetch('max_warnings').to_s
-  )
+  sh(*undercover_command(config))
 end
 
 task default: %i[rubocop spec bundle:audit coverage]
+# :nocov:
