@@ -95,6 +95,36 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(['SAFE_TOKEN_COLLISION'])
   end
 
+  it 'redacts broad secret assignments from comments before schema validation' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/secrets',
+          'text' => 'client_secret=foo credential=abc123 database_url=postgres://u:p@db refresh_token:def456' }
+      ]
+    )
+    comment_text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(comment_text).not_to include('foo', 'abc123', 'postgres://u:p@db', 'def456')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'sanitizes unsafe attribute names before labels and safe-token assignment' do
+    ir = ir_payload
+    ir.fetch('entities').first.fetch('attributes').first['name'] = '/Users/alice/.ssh/id_rsa token=abc123'
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    attribute = result.payload.fetch('entities').find { |entity| entity.fetch('entity_id') == 'entities/users' }
+                                                .fetch('attributes')
+                                                .find { |candidate| candidate.fetch('key_marker') == 'PK' }
+
+    expect(attribute.fetch('label')).not_to include('/Users/alice', 'token=', 'abc123')
+    expect(attribute.fetch('safe_token')).not_to include('USERS', 'ALICE', 'ABC123')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
   it 'preserves probed IR attribute types through render-plan projection' do
     entity = RailsMmd::SchemaProbe::Entity.new(
       ruby_constant: 'User',

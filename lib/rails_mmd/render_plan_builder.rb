@@ -7,7 +7,7 @@ require 'rails_mmd/safe_tokens'
 
 module RailsMmd
   # Projects normalized IR into renderer-only ER or class render plans.
-  # rubocop:disable Layout/LineLength, Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
+  # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
   class RenderPlanBuilder
     DomainResult = Struct.new(:domain_id, :payload, :diagnostics, keyword_init: true)
 
@@ -23,8 +23,9 @@ module RailsMmd
       '0..many' => '0..*',
       '1..many' => '1..*'
     }.freeze
-    COMMENT_SECRET_KEY = /(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|pid)/i
-    COMMENT_FORBIDDEN_ASSIGNMENT = /\b#{COMMENT_SECRET_KEY}\b\s*(?::|=|\s+)\s*\S+/i
+    COMMENT_SECRET_KEY = /(?:#{Redactor::SECRET_KEY_PATTERN}|generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|pid)/ix
+    COMMENT_FORBIDDEN_ASSIGNMENT = /[A-Za-z0-9_-]*#{COMMENT_SECRET_KEY}[A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/ix
+    REDACTED_KEY_ASSIGNMENT = /[A-Za-z0-9_-]*\[REDACTED_KEY\][A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/
 
     def initialize(safe_tokens: SafeTokens.new, redactor: Redactor.new)
       @safe_tokens = safe_tokens
@@ -98,7 +99,7 @@ module RailsMmd
 
     def attribute_subjects(entity)
       entity.fetch('attributes').map do |attribute|
-        subject(attribute.fetch('attribute_id'), attribute.fetch('name'))
+        subject(attribute.fetch('attribute_id'), sanitize_attribute_name(attribute.fetch('name')))
       end
     end
 
@@ -118,7 +119,7 @@ module RailsMmd
         {
           'attribute_id' => attribute.fetch('attribute_id'),
           'safe_token' => token_sets.fetch('attribute').fetch(attribute.fetch('attribute_id')),
-          'label' => attribute.fetch('name'),
+          'label' => sanitize_attribute_name(attribute.fetch('name')),
           'type' => AttributeTypes.normalize(attribute['type']),
           'key_marker' => key_marker(attribute.fetch('role'))
         }
@@ -162,7 +163,11 @@ module RailsMmd
     def sanitize_comment(text)
       redactor.sanitize(
         text.to_s.gsub(COMMENT_FORBIDDEN_ASSIGNMENT, '[REDACTED]')
-      ).gsub(/\[REDACTED_KEY\]\s+\S+/, '[REDACTED]')
+      ).gsub(REDACTED_KEY_ASSIGNMENT, '[REDACTED]')
+    end
+
+    def sanitize_attribute_name(name)
+      sanitize_comment(name)
     end
 
     def diagnostic_ids(ir, available_diagnostic_ids)
@@ -174,5 +179,5 @@ module RailsMmd
       { 'primary_key' => 'PK', 'foreign_key' => 'FK' }.fetch(role)
     end
   end
-  # rubocop:enable Layout/LineLength, Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
+  # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
 end
