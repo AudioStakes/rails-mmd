@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "domains": {
+    "core": {
+      "include_models": ["User", "Account"],
+      "exclude_models": ["LegacyUser"]
+    },
+    "billing_v2": {
+      "include_models": ["Billing::Invoice"]
+    }
+  },
+  "output": {
+    "directory": "docs/rails_mmd",
+    "format": "both",
+    "attributes": "keys",
+    "direction": "LR"
+  }
+}

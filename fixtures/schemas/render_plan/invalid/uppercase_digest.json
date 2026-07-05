@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+}

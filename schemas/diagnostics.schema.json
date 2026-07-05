@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audiostakes.example/schemas/rails-mmd/diagnostics.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scope", "domain_id", "diagnostics", "digest_sha256"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "scope": { "enum": ["global", "domain"] },
+    "domain_id": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/domain_id" }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "digest_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "domain_id": {
+      "type": "string",
+      "allOf": [
+        { "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        { "not": { "pattern": "\\s" } }
+      ]
+    },
+    "diagnostic_code": {
+      "enum": [
+        "CONFIG_NOT_FOUND",
+        "CONFIG_SCHEMA_INVALID",
+        "CONFIG_DOMAIN_NOT_FOUND",
+        "OUTPUT_DIRECTORY_INVALID",
+        "DOMAIN_MODEL_NOT_FOUND",
+        "DOMAIN_MODEL_NOT_RENDERABLE",
+        "DOMAIN_EMPTY",
+        "RAILS_LOAD_FAILED",
+        "RAILS_EAGER_LOAD_FAILED",
+        "MULTI_DB_UNSUPPORTED",
+        "MODEL_TABLE_MISSING",
+        "MODEL_PRIMARY_KEY_UNSUPPORTED",
+        "ASSOCIATION_TARGET_UNRESOLVED",
+        "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED",
+        "ASSOCIATION_POLYMORPHIC_OMITTED",
+        "ASSOCIATION_SCOPED_OMITTED",
+        "ASSOCIATION_COMPOSITE_KEY_OMITTED",
+        "ASSOCIATION_KEY_COLUMN_MISSING",
+        "ASSOCIATION_NON_PRIMARY_KEY_OMITTED",
+        "ASSOCIATION_NAME_UNSUPPORTED_OMITTED",
+        "DOMAIN_RELATIONSHIP_OMITTED",
+        "DB_METADATA_DEGRADED",
+        "SAFE_TOKEN_COLLISION",
+        "MERMAID_SERIALIZATION_FAILED",
+        "OUTPUT_WRITE_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diagnostic_id",
+        "code",
+        "severity",
+        "phase",
+        "scope",
+        "subject_id",
+        "message",
+        "metadata",
+        "artifact_refs",
+        "remediation"
+      ],
+      "properties": {
+        "diagnostic_id": { "type": "string", "minLength": 1 },
+        "code": { "$ref": "#/$defs/diagnostic_code" },
+        "severity": { "enum": ["fatal", "error", "warning"] },
+        "phase": {
+          "enum": [
+            "config",
+            "output_setup",
+            "domain_resolution",
+            "rails_load",
+            "schema_probe",
+            "relationship_build",
+            "tokenization",
+            "serialization",
+            "publish",
+            "internal"
+          ]
+        },
+        "scope": { "enum": ["invocation", "domain", "model", "relationship", "artifact"] },
+        "subject_id": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "string" }
+          ]
+        },
+        "message": { "type": "string" },
+        "metadata": { "type": "object" },
+        "artifact_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact_ref" }
+        },
+        "remediation": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/remediation" }
+          ]
+        }
+      }
+    },
+    "artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_kind", "domain_id"],
+      "properties": {
+        "artifact_kind": { "enum": ["diagnostics", "er", "class", "render_plan", "stderr"] },
+        "domain_id": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_id" }
+          ]
+        },
+        "path": { "type": "string" }
+      }
+    },
+    "remediation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

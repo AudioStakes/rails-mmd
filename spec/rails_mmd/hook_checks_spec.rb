@@ -142,9 +142,10 @@ RSpec.describe RailsMmd::HookChecks do
       .to output("targeted specs: no direct spec files matched\n").to_stdout
   end
 
-  it 'reports pending schema and fixture routing without unrelated checks' do
-    expect { described_class.schema_fixture_pending!(%w[schemas/example.json fixtures/example.mmd]) }
-      .to output("schema/fixture checks pending: schemas/example.json, fixtures/example.mmd\n").to_stdout
+  it 'routes schema and fixture changes to contract specs' do
+    command = pre_commit_commands.fetch('schema-fixture-routing')
+
+    expect(command.fetch('run')).to eq('bundle exec rspec spec/contracts')
   end
 
   it 'separates RuboCop options from staged file arguments' do

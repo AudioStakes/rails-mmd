@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "domain_id": "core",
+  "safe_token": "CORE",
+  "entities": [],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

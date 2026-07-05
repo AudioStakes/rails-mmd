@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audiostakes.example/schemas/rails-mmd/render_plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_kind",
+    "domain_id",
+    "direction",
+    "entities",
+    "relationships",
+    "comments",
+    "diagnostic_ids",
+    "digest_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "artifact_kind": { "enum": ["er", "class"] },
+    "domain_id": { "$ref": "#/$defs/domain_id" },
+    "direction": { "enum": ["TB", "BT", "LR", "RL"] },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entity" }
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relationship" }
+    },
+    "comments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/comment" }
+    },
+    "diagnostic_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "digest_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "domain_id": {
+      "type": "string",
+      "allOf": [
+        { "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        { "not": { "pattern": "\\s" } }
+      ]
+    },
+    "safe_token": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "safe_token", "label", "attributes"],
+      "properties": {
+        "entity_id": { "type": "string", "minLength": 1 },
+        "safe_token": { "$ref": "#/$defs/safe_token" },
+        "label": { "type": "string", "minLength": 1 },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attribute" }
+        }
+      }
+    },
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute_id", "safe_token", "label", "key_marker"],
+      "properties": {
+        "attribute_id": { "type": "string", "minLength": 1 },
+        "safe_token": { "$ref": "#/$defs/safe_token" },
+        "label": { "type": "string", "minLength": 1 },
+        "key_marker": {
+          "anyOf": [
+            { "type": "null" },
+            { "enum": ["PK", "FK"] }
+          ]
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship_id",
+        "safe_token",
+        "owner_safe_token",
+        "target_safe_token",
+        "label",
+        "owner_cardinality",
+        "target_cardinality",
+        "er_left_marker",
+        "er_right_marker",
+        "class_owner_multiplicity",
+        "class_target_multiplicity"
+      ],
+      "properties": {
+        "relationship_id": { "type": "string", "minLength": 1 },
+        "safe_token": { "$ref": "#/$defs/safe_token" },
+        "owner_safe_token": { "$ref": "#/$defs/safe_token" },
+        "target_safe_token": { "$ref": "#/$defs/safe_token" },
+        "label": { "type": "string", "minLength": 1 },
+        "owner_cardinality": { "$ref": "#/$defs/cardinality" },
+        "target_cardinality": { "$ref": "#/$defs/cardinality" },
+        "er_left_marker": { "enum": ["|o", "||", "}o", "}|"] },
+        "er_right_marker": { "enum": ["o|", "||", "o{", "|{"] },
+        "class_owner_multiplicity": { "enum": ["0..1", "1", "0..*", "1..*"] },
+        "class_target_multiplicity": { "enum": ["0..1", "1", "0..*", "1..*"] }
+      }
+    },
+    "comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comment_id", "safe_token", "text"],
+      "properties": {
+        "comment_id": { "type": "string", "minLength": 1 },
+        "safe_token": { "$ref": "#/$defs/safe_token" },
+        "text": { "type": "string" }
+      }
+    },
+    "cardinality": { "enum": ["0..1", "1..1", "0..many", "1..many"] }
+  }
+}
