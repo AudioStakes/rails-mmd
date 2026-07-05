@@ -129,6 +129,24 @@ RSpec.describe 'repository drift guards' do
     expect(text).to include_required_contract_sections
   end
 
+  it 'documents user-facing generate behavior from the README' do
+    readme = repository_text('README.md')
+
+    expect(readme).to include('docs/usage.md', 'docs/p0-blocking-fixture-matrix.md')
+  end
+
+  it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do
+    text = repository_text('docs/p0-blocking-fixture-matrix.md')
+
+    expect(blocking_diagnostic_codes - documented_codes(text)).to be_empty
+  end
+
+  it 'documents the P0 user-facing exit codes' do
+    text = repository_text('docs/usage.md')
+
+    expect(user_facing_exit_codes(text)).to include('0', '1', '2', '3', '4', '99')
+  end
+
   it 'documents superseded invalid issues 1 through 6' do
     text = repository_text('docs/issue-administration.md')
 
@@ -176,6 +194,35 @@ RSpec.describe 'repository drift guards' do
       'stdout' => '',
       'stderr_code' => 'CONFIG_NOT_FOUND'
     }
+  end
+
+  def blocking_diagnostic_codes
+    config_blocking_codes + domain_blocking_codes + runtime_blocking_codes + publish_blocking_codes
+  end
+
+  def config_blocking_codes
+    %w[CONFIG_NOT_FOUND CONFIG_SCHEMA_INVALID CONFIG_DOMAIN_NOT_FOUND OUTPUT_DIRECTORY_INVALID]
+  end
+
+  def domain_blocking_codes
+    %w[DOMAIN_MODEL_NOT_FOUND DOMAIN_MODEL_NOT_RENDERABLE DOMAIN_EMPTY]
+  end
+
+  def runtime_blocking_codes
+    %w[RAILS_LOAD_FAILED RAILS_EAGER_LOAD_FAILED MULTI_DB_UNSUPPORTED MODEL_TABLE_MISSING
+       MODEL_PRIMARY_KEY_UNSUPPORTED SAFE_TOKEN_COLLISION MERMAID_SERIALIZATION_FAILED]
+  end
+
+  def publish_blocking_codes
+    %w[OUTPUT_WRITE_FAILED INTERNAL_ERROR]
+  end
+
+  def documented_codes(text)
+    text.scan(/`([A-Z0-9_]+)`/).flatten
+  end
+
+  def user_facing_exit_codes(text)
+    text.scan(/^\| (\d+) \|/).flatten
   end
 
   def superseded_issue_numbers(text)
