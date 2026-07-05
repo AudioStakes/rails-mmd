@@ -51,16 +51,17 @@ module RailsMmd
 
     def build_record(model)
       table_name, table_error = table_name_for(model)
+      connection_context_id, connection_context_error = connection_context_id_for(model)
       abstract = abstract_class?(model)
       base_model = base_class(model)
-      renderability_reason = renderability_reason(model, abstract, base_model, table_error)
+      renderability_reason = renderability_reason(model, abstract, base_model, table_error, connection_context_error)
 
       Record.new(
         ruby_constant: model.name,
         abstract_class: abstract,
         base_class: base_model&.name,
         table_name: table_name,
-        connection_context_id: connection_context_id(model),
+        connection_context_id: connection_context_id,
         renderable: renderability_reason.nil?,
         renderability_reason: renderability_reason
       )
@@ -80,16 +81,21 @@ module RailsMmd
       [nil, e]
     end
 
-    def renderability_reason(model, abstract, base_model, table_error)
+    def renderability_reason(model, abstract, base_model, table_error, connection_context_error)
       return 'abstract_class' if abstract
       return 'sti_subclass' unless base_model.equal?(model)
       return "table_name_unavailable: #{redactor.sanitize(table_error.message)}" if table_error
+      if connection_context_error
+        return "connection_context_unavailable: #{redactor.sanitize(connection_context_error.message)}"
+      end
 
       nil
     end
 
-    def connection_context_id(model)
-      CanonicalJson.dump(connection_context(model))
+    def connection_context_id_for(model)
+      [CanonicalJson.dump(connection_context(model)), nil]
+    rescue StandardError => e
+      [CanonicalJson.dump('model' => model.name), e]
     end
 
     def connection_context(model)

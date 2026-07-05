@@ -42,6 +42,25 @@ RSpec.describe RailsMmd::RailsLoader do
     expect(application.eager_loaded).to be(true)
   end
 
+  it 'requires execution inside the target application bundle when a Gemfile exists' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+    outside_bundle = Struct.new(:default_gemfile).new(project_root.parent.join('Gemfile'))
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path) = raise('must not load') }.new,
+      bundler: outside_bundle
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'RAILS_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata')).to include(
+      'exception_class' => 'RailsMmd::RailsLoader::BundleContextError',
+      'backtrace' => nil
+    )
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
   it 'returns a schema-valid RAILS_LOAD_FAILED diagnostic for boot failures' do
     kernel = Class.new do
       def load(_path)

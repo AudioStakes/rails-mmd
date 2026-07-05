@@ -15,14 +15,16 @@ module RailsMmd
     EXIT_CONTRACT_ERROR = 2
 
     def initialize(project_root:, kernel: Kernel, rails_provider: -> { Object.const_get(:Rails) },
-                   diagnostics: Diagnostics.new)
+                   diagnostics: Diagnostics.new, bundler: (Bundler if defined?(Bundler)))
       @project_root = Pathname(project_root).expand_path
       @kernel = kernel
       @rails_provider = rails_provider
       @diagnostics = diagnostics
+      @bundler = bundler
     end
 
     def boot
+      validate_bundle_context!
       kernel.load(environment_path.to_s)
       application = rails_provider.call.application
       eager_load(application)
@@ -38,10 +40,24 @@ module RailsMmd
     class EagerLoadError < StandardError
     end
 
-    attr_reader :diagnostics, :kernel, :project_root, :rails_provider
+    class BundleContextError < StandardError
+    end
+
+    attr_reader :bundler, :diagnostics, :kernel, :project_root, :rails_provider
 
     def environment_path
       project_root.join('config/environment.rb')
+    end
+
+    def validate_bundle_context!
+      return unless bundler.respond_to?(:default_gemfile)
+
+      app_gemfile = project_root.join('Gemfile')
+      return unless app_gemfile.file?
+      return if Pathname(bundler.default_gemfile).expand_path == app_gemfile
+
+      raise BundleContextError,
+            'rails-mmd must be run inside the target Rails application bundle'
     end
 
     def eager_load(application)

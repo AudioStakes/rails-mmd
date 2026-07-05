@@ -169,6 +169,36 @@ RSpec.describe RailsMmd::ModelInventory do
     expect(record.renderability_reason).not_to include('/Users/dev')
   end
 
+  it 'contains connection-context failures as non-renderable records with a deterministic fallback' do
+    broken = fake_model('BrokenConnection', connection_error: RuntimeError.new('/Users/dev/password=secret'))
+
+    record = inventory_for([broken], constants: { 'BrokenConnection' => broken }).records.fetch(0)
+
+    expect(record.ruby_constant).to eq('BrokenConnection')
+    expect(record.connection_context_id).to eq(JSON.generate('model' => 'BrokenConnection'))
+    expect(record.renderable).to be(false)
+    expect(record.renderability_reason).to include('connection_context_unavailable')
+    expect(record.renderability_reason).not_to include('/Users/dev', 'secret')
+  end
+
+  it 'still records abstract models when connection context is unavailable' do
+    abstract_model = fake_model(
+      'ApplicationRecord',
+      abstract: true,
+      connection_error: RuntimeError.new('abstract connection unavailable')
+    )
+
+    record = inventory_for(
+      [abstract_model],
+      constants: { 'ApplicationRecord' => abstract_model }
+    ).records.fetch(0)
+
+    expect(record.ruby_constant).to eq('ApplicationRecord')
+    expect(record.connection_context_id).to eq(JSON.generate('model' => 'ApplicationRecord'))
+    expect(record.renderable).to be(false)
+    expect(record.renderability_reason).to eq('abstract_class')
+  end
+
   it 'does not read schema metadata while inventorying models outside any resolved domain' do
     untouched = fake_model('UntouchedModel')
     %i[table_exists? columns indexes foreign_keys primary_key].each do |method_name|
@@ -189,20 +219,32 @@ RSpec.describe RailsMmd::ModelInventory do
 
   # rubocop:disable Metrics/ParameterLists
   def fake_model(name, table_name: default_table_name(name), base_class: nil, abstract: false,
-                 connection_context: { name: 'primary' }, table_error: nil)
+                 connection_context: { name: 'primary' }, connection_error: nil, table_error: nil)
     model = Class.new
     model.define_singleton_method(:name) { name }
     model.define_singleton_method(:abstract_class?) { abstract }
     model.define_singleton_method(:base_class) { base_class || model }
-    model.define_singleton_method(:connection_context) { connection_context }
+    define_connection_context(model, connection_context, connection_error)
+    define_table_name(model, table_name, table_error)
+    model
+  end
+  # rubocop:enable Metrics/ParameterLists
+
+  def define_connection_context(model, connection_context, connection_error)
+    model.define_singleton_method(:connection_context) do
+      raise connection_error if connection_error
+
+      connection_context
+    end
+  end
+
+  def define_table_name(model, table_name, table_error)
     model.define_singleton_method(:table_name) do
       raise table_error if table_error
 
       table_name
     end
-    model
   end
-  # rubocop:enable Metrics/ParameterLists
 
   def fake_model_without_connection_context(name, db_config:)
     model = fake_model(name)
