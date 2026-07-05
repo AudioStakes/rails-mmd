@@ -9,8 +9,8 @@
       "safe_token": "USER",
       "label": "User",
       "attributes": [
-        { "attribute_id": "entities/users/attributes/id", "safe_token": "ID", "label": "id", "key_marker": "PK" },
-        { "attribute_id": "entities/users/attributes/account_id", "safe_token": "ACCOUNT_ID", "label": "account_id", "key_marker": "FK" }
+        { "attribute_id": "entities/users/attributes/id", "safe_token": "ID_H4D273AD96F8C", "label": "id", "type": "bigint", "key_marker": "PK" },
+        { "attribute_id": "entities/users/attributes/account_id", "safe_token": "ACCOUNT_ID", "label": "account_id", "type": "bigint", "key_marker": "FK" }
       ]
     },
     {
@@ -18,7 +18,7 @@
       "safe_token": "ACCOUNT",
       "label": "Account",
       "attributes": [
-        { "attribute_id": "entities/accounts/attributes/id", "safe_token": "ID", "label": "id", "key_marker": "PK" }
+        { "attribute_id": "entities/accounts/attributes/id", "safe_token": "ID_H704E47D169CA", "label": "id", "type": "bigint", "key_marker": "PK" }
       ]
     }
   ],
