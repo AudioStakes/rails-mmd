@@ -41,6 +41,8 @@ Dependency classifications are documented in
 [`docs/development/dependencies.md`](docs/development/dependencies.md).
 Ruby tooling commands are documented in
 [`docs/development/tooling.md`](docs/development/tooling.md).
+Local Git hooks are documented in
+[`docs/development/hooks.md`](docs/development/hooks.md).
 
 ## P0 Contract
 

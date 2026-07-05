@@ -1,0 +1,105 @@
+output:
+  - failure
+
+pre-commit:
+  parallel: false
+  commands:
+    ruby-staged-safety:
+      priority: 1
+      glob:
+        - "*.rb"
+        - "*.rake"
+        - "Rakefile"
+        - "exe/rails-mmd"
+        - "bin/**/*"
+        - "lib/**/*.rb"
+        - "spec/**/*.rb"
+        - "features/**/*.rb"
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_mixed_changes!(ARGV)' -- {staged_files}
+
+    ruby-rubocop-autocorrect:
+      priority: 2
+      glob:
+        - "*.rb"
+        - "*.rake"
+        - "Rakefile"
+        - "exe/rails-mmd"
+        - "bin/**/*"
+        - "lib/**/*.rb"
+        - "spec/**/*.rb"
+        - "features/**/*.rb"
+      run: bundle exec rake rubocop:auto_correct
+
+    ruby-post-repair-diff:
+      priority: 3
+      glob:
+        - "*.rb"
+        - "*.rake"
+        - "Rakefile"
+        - "exe/rails-mmd"
+        - "bin/**/*"
+        - "lib/**/*.rb"
+        - "spec/**/*.rb"
+        - "features/**/*.rb"
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_post_repair_diff!(ARGV)' -- {staged_files}
+
+    ruby-rubocop:
+      priority: 4
+      glob:
+        - "*.rb"
+        - "*.rake"
+        - "Rakefile"
+        - "exe/rails-mmd"
+        - "bin/**/*"
+        - "lib/**/*.rb"
+        - "spec/**/*.rb"
+        - "features/**/*.rb"
+      run: bundle exec rake rubocop
+
+    ruby-targeted-specs:
+      priority: 5
+      glob:
+        - "spec/**/*"
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.run_targeted_specs!(ARGV)' -- {staged_files}
+
+    dependency-setup:
+      priority: 6
+      glob:
+        - "Gemfile"
+        - "Gemfile.lock"
+        - "*.gemspec"
+      run: bundle check && bundle exec rake bundle:audit
+
+    ruby-version-smoke:
+      priority: 7
+      glob:
+        - ".ruby-version"
+      run: ruby -v && bundle exec exe/rails-mmd --version
+
+    rubocop-rspec-coverage-config:
+      priority: 8
+      glob:
+        - ".rubocop.yml"
+        - ".rspec"
+        - ".simplecov"
+        - ".undercover.yml"
+      run: bundle exec rake rubocop && bundle exec rake coverage
+
+    schema-fixture-routing:
+      priority: 9
+      glob:
+        - "schemas/**/*.json"
+        - "fixtures/**/*.json"
+        - "fixtures/**/*.mmd"
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.schema_fixture_pending!(ARGV)' -- {staged_files}
+
+    p0-contract-doc:
+      priority: 10
+      glob:
+        - "docs/p0-contract.md"
+      run: printf '%s\n' 'docs/p0-contract.md changed; no P0 contract verifier exists yet.'
+
+pre-push:
+  commands:
+    ci-equivalent:
+      run: bundle exec rake
