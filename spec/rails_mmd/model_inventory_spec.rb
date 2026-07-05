@@ -123,6 +123,27 @@ RSpec.describe RailsMmd::ModelInventory do
     )
   end
 
+  it 'preserves non-secret database identifiers for connection guard comparisons' do
+    first = fake_model_without_connection_context(
+      'User',
+      db_config: Struct.new(:name, :adapter, :database, :host, :port, :username).new(
+        'primary', 'sqlite3', '/Users/dev/app/db/primary.sqlite3', nil, nil, nil
+      )
+    )
+    second = fake_model_without_connection_context(
+      'Account',
+      db_config: Struct.new(:name, :adapter, :database, :host, :port, :username).new(
+        'primary', 'sqlite3', '/tmp/other.sqlite3', nil, nil, nil
+      )
+    )
+
+    records = inventory_for([first, second], constants: { 'User' => first, 'Account' => second }).records
+
+    expect(records.map(&:connection_context_id).uniq.size).to eq(2)
+    expect(records.first.connection_context_id).to include('/Users/dev/app/db/primary.sqlite3')
+    expect(records.last.connection_context_id).to include('/tmp/other.sqlite3')
+  end
+
   it 'falls back to the model name when no connection context API is available' do
     user = fake_model_without_connection_context('User', db_config: nil)
 
