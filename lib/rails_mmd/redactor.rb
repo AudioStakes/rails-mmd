@@ -5,7 +5,9 @@ require 'uri'
 module RailsMmd
   # Sanitizes free-form text before it can leave the process.
   class Redactor
-    SECRET_KEY_PATTERN = /(?:password|passwd|token|secret|api[_-]?key|credential|database_url)/i
+    SECRET_KEY_PATTERN = /
+      (?:password|passwd|secret|api[_-]?key|credential|database_url|(?:access|auth|refresh)[_-]?token)
+    /ix
     URL_CREDENTIAL_PATTERN = %r{([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@}i
     DRIVE_OR_UNC_PATTERN = %r{\b(?:[A-Za-z]:[\\/]|\\\\[^\\/\s]+[\\/][^\\/\s]+)}
 
@@ -31,7 +33,7 @@ module RailsMmd
       when Array
         value.map { |item| sanitize_object(item) }
       when Hash
-        value.transform_values { |item| sanitize_object(item) }
+        sanitize_hash(value)
       else
         value
       end
@@ -40,6 +42,12 @@ module RailsMmd
     private
 
     attr_reader :project_root, :env_values
+
+    def sanitize_hash(value)
+      value.to_h do |key, item|
+        [sanitize(key), sanitize_object(item)]
+      end
+    end
 
     def redact_env_values(text)
       env_values.reduce(text) { |output, value| output.gsub(value, '[REDACTED]') }

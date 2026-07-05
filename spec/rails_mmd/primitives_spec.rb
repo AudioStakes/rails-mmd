@@ -28,6 +28,8 @@ RSpec.describe 'runtime primitives' do
       expect(redactor.sanitize(text)).not_to include(Dir.pwd, '/tmp/outside.yml', 'user:pass', 'super-secret-value',
                                                      'api_key')
       expect(redactor.sanitize_object(['super-secret-value'])).to eq(['[REDACTED]'])
+      expect(redactor.sanitize_object('api_key' => 'super-secret-value')).to eq('[REDACTED_KEY]' => '[REDACTED]')
+      expect(redactor.sanitize_object(42)).to eq(42)
     end
   end
 
@@ -56,7 +58,9 @@ RSpec.describe 'runtime primitives' do
       )
 
       expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document([diagnostic]))).to be(true)
+      expect(diagnostic.fetch('artifact_refs')).to eq([])
       expect(diagnostic.fetch('message')).not_to include(Dir.pwd)
+      expect(structured_identifier_metadata.fetch('ruby_constant')).to eq('Credential::ApiKey')
       expect do
         described_class.new.build(
           code: 'CONFIG_NOT_FOUND',
@@ -67,6 +71,22 @@ RSpec.describe 'runtime primitives' do
       expect do
         described_class.new.build(code: 'CONFIG_NOT_FOUND', message: 'missing', metadata: {})
       end.to raise_error(ArgumentError, /missing diagnostic metadata/)
+    end
+
+    it 'normalizes diagnostic ids after redaction and validates artifact refs' do
+      diagnostics = described_class.new
+
+      expect(machine_local_config_id).to eq(relative_config_id)
+      expect(structured_subject_id).to eq('core:Credential::ApiKey:password_digest')
+      expect(free_text_array_metadata).to eq(['log.txt', 12])
+      expect do
+        diagnostics.build(
+          code: 'SAFE_TOKEN_COLLISION',
+          message: 'collision',
+          metadata: safe_token_metadata(token_kind: 'entity'),
+          artifact_refs: [{ artifact_kind: 'stderr', domain_id: nil, path: '/tmp/rails-mmd/stderr.log' }]
+        )
+      end.to raise_error(ArgumentError, /invalid artifact path/)
     end
 
     it 'converts exceptions without raw backtraces' do
@@ -113,19 +133,38 @@ RSpec.describe 'runtime primitives' do
       expect(result).to eq(tokens: { 'model:User' => 'USER' }, diagnostics: [])
     end
 
-    it 'raises when suffix expansion cannot resolve a collision' do
+    it 'emits a fatal diagnostic when suffix expansion cannot resolve a collision' do
       tokens = described_class.new
       allow(tokens).to receive(:collision_digest).and_return('A' * 64)
 
-      expect do
-        tokens.assign(
+      result = tokens.assign(
+        [
+          { source: 'User', identity: 'model:User' },
+          { source: 'User', identity: 'model:UserDuplicate' }
+        ],
+        scope: { artifact_kind: 'er', domain_id: 'core', token_kind: 'entity' }
+      )
+
+      expect(result.fetch(:diagnostics).first).to include(
+        'code' => 'SAFE_TOKEN_COLLISION',
+        'severity' => 'fatal'
+      )
+      expect(result.fetch(:diagnostics).first.dig('metadata', 'resolved')).to be(false)
+    end
+
+    it 'emits schema-valid collision diagnostics for every supported token kind' do
+      token_kinds = %w[entity attribute relationship diagnostic comment]
+      diagnostics = token_kinds.map do |token_kind|
+        described_class.new.assign(
           [
-            { source: 'User', identity: 'model:User' },
-            { source: 'User', identity: 'model:UserDuplicate' }
+            { source: 'User', identity: "first:#{token_kind}" },
+            { source: 'User', identity: "second:#{token_kind}" }
           ],
-          scope: { artifact_kind: 'er', domain_id: 'core', token_kind: 'entity' }
-        )
-      end.to raise_error(ArgumentError, /unresolved safe-token collision/)
+          scope: { artifact_kind: 'er', domain_id: 'core', token_kind: token_kind }
+        ).fetch(:diagnostics).first
+      end
+
+      expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document(diagnostics))).to be(true)
     end
   end
 
@@ -134,12 +173,24 @@ RSpec.describe 'runtime primitives' do
       expect(described_class.by_key([{ 'id' => 'b' }, { 'id' => 'a' }], 'id')).to eq([{ 'id' => 'a' }, { 'id' => 'b' }])
 
       diagnostics = [
+        { 'severity' => 'fatal', 'phase' => 'tokenization', 'code' => 'SAFE_TOKEN_COLLISION', 'subject_id' => 'c',
+          'diagnostic_id' => '3' },
         { 'severity' => 'warning', 'phase' => 'tokenization', 'code' => 'SAFE_TOKEN_COLLISION', 'subject_id' => 'b',
           'diagnostic_id' => '2' },
         { 'severity' => 'error', 'phase' => 'config', 'code' => 'CONFIG_NOT_FOUND', 'subject_id' => 'a',
           'diagnostic_id' => '1' }
       ]
-      expect(described_class.diagnostics(diagnostics).first.fetch('code')).to eq('CONFIG_NOT_FOUND')
+      expect(described_class.diagnostics(diagnostics).map { |diagnostic| diagnostic.fetch('severity') })
+        .to eq(%w[fatal error warning])
+
+      phase_conflict = [
+        { 'severity' => 'error', 'phase' => 'a', 'code' => 'OUTPUT_WRITE_FAILED', 'subject_id' => 'b',
+          'diagnostic_id' => '2' },
+        { 'severity' => 'error', 'phase' => 'z', 'code' => 'CONFIG_NOT_FOUND', 'subject_id' => 'b',
+          'diagnostic_id' => '1' }
+      ]
+      expect(described_class.diagnostics(phase_conflict).map { |diagnostic| diagnostic.fetch('code') })
+        .to eq(%w[CONFIG_NOT_FOUND OUTPUT_WRITE_FAILED])
     end
   end
 
@@ -155,6 +206,58 @@ RSpec.describe 'runtime primitives' do
       'diagnostics' => diagnostics
     }
     payload.merge('digest_sha256' => RailsMmd::CanonicalJson.digest_sha256(payload))
+  end
+
+  def structured_identifier_metadata
+    RailsMmd::Diagnostics.new.build(
+      code: 'DOMAIN_MODEL_NOT_FOUND',
+      message: 'missing model',
+      metadata: { domain_id: 'core', ruby_constant: 'Credential::ApiKey' }
+    ).fetch('metadata')
+  end
+
+  def machine_local_config_id
+    RailsMmd::Diagnostics.new.build(
+      code: 'CONFIG_NOT_FOUND',
+      message: 'missing',
+      metadata: { config_path: "#{Dir.pwd}/rails_mmd.yml" }
+    ).fetch('diagnostic_id')
+  end
+
+  def relative_config_id
+    RailsMmd::Diagnostics.new.build(
+      code: 'CONFIG_NOT_FOUND',
+      message: 'missing',
+      metadata: { config_path: 'rails_mmd.yml' }
+    ).fetch('diagnostic_id')
+  end
+
+  def structured_subject_id
+    RailsMmd::Diagnostics.new.build(
+      code: 'DOMAIN_MODEL_NOT_FOUND',
+      subject_id: 'core:Credential::ApiKey:password_digest',
+      message: 'missing model',
+      metadata: { domain_id: 'core', ruby_constant: 'Credential::ApiKey' }
+    ).fetch('subject_id')
+  end
+
+  def free_text_array_metadata
+    RailsMmd::Diagnostics.new.build(
+      code: 'OUTPUT_DIRECTORY_INVALID',
+      message: 'bad output',
+      metadata: { field_path: '$.output.directory', reason: ["#{Dir.pwd}/log.txt", 12] }
+    ).fetch('metadata').fetch('reason')
+  end
+
+  def safe_token_metadata(token_kind:)
+    {
+      artifact_kind: 'er',
+      domain_id: 'core',
+      token_kind: token_kind,
+      base_safe_token: 'USER',
+      collision_subject_count: 2,
+      resolved: true
+    }
   end
 end
 # rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations

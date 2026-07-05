@@ -3,6 +3,8 @@
 module RailsMmd
   # Stable ordering helpers used by later pipeline slices.
   module Ordering
+    SEVERITY_RANK = { 'fatal' => 0, 'error' => 1, 'warning' => 2 }.freeze
+
     module_function
 
     def by_key(records, key)
@@ -12,8 +14,7 @@ module RailsMmd
     def diagnostics(records)
       records.sort_by do |diagnostic|
         [
-          diagnostic.fetch('severity'),
-          diagnostic.fetch('phase'),
+          SEVERITY_RANK.fetch(diagnostic.fetch('severity')),
           diagnostic.fetch('code'),
           diagnostic.fetch('subject_id').to_s,
           diagnostic.fetch('diagnostic_id')

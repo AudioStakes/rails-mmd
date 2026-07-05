@@ -322,7 +322,7 @@
       "properties": {
         "artifact_kind": { "enum": ["er", "class"] },
         "domain_id": { "$ref": "#/$defs/domain_id" },
-        "token_kind": { "enum": ["entity", "attribute", "relationship", "comment"] },
+        "token_kind": { "enum": ["entity", "attribute", "relationship", "diagnostic", "comment"] },
         "base_safe_token": { "$ref": "#/$defs/safe_token" },
         "collision_subject_count": { "type": "integer", "minimum": 2 },
         "resolved": { "type": "boolean" }

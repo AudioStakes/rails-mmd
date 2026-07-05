@@ -50,21 +50,21 @@ module RailsMmd
           next
         end
 
-        resolve_group(scope, base, group, tokens)
-        collision_diagnostic(scope, base, group)
+        resolved = resolve_group?(scope, base, group, tokens)
+        collision_diagnostic(scope, base, group, resolved: resolved)
       end
     end
 
-    def resolve_group(scope, base, group, tokens)
+    def resolve_group?(scope, base, group, tokens)
       suffix_length = 12
       loop do
-        return if merge_unique_candidates?(scope, base, group, tokens, suffix_length)
+        return true if merge_unique_candidates?(scope, base, group, tokens, suffix_length)
 
         suffix_length += 4
         break if suffix_length > 64
       end
 
-      raise ArgumentError, 'unresolved safe-token collision'
+      false
     end
 
     def merge_unique_candidates?(scope, base, group, tokens, suffix_length)
@@ -94,24 +94,30 @@ module RailsMmd
       CanonicalJson.digest_sha256(payload).upcase
     end
 
-    def collision_diagnostic(scope, base, group)
+    def collision_diagnostic(scope, base, group, resolved:)
       diagnostics.build(
         code: 'SAFE_TOKEN_COLLISION',
         subject_id: "#{scope.fetch(:artifact_kind)}:#{scope.fetch(:domain_id)}:#{scope.fetch(:token_kind)}:#{base}",
-        message: "Safe-token collision resolved for #{base}",
-        metadata: collision_metadata(scope, base, group)
+        message: collision_message(base, resolved),
+        severity: resolved ? 'warning' : 'fatal',
+        metadata: collision_metadata(scope, base, group, resolved: resolved)
       )
     end
 
-    def collision_metadata(scope, base, group)
+    def collision_metadata(scope, base, group, resolved:)
       {
         artifact_kind: scope.fetch(:artifact_kind),
         domain_id: scope.fetch(:domain_id),
         token_kind: scope.fetch(:token_kind),
         base_safe_token: base,
         collision_subject_count: group.length,
-        resolved: true
+        resolved: resolved
       }
+    end
+
+    def collision_message(base, resolved)
+      state = resolved ? 'resolved' : 'unresolved'
+      "Safe-token collision #{state} for #{base}"
     end
   end
 end
