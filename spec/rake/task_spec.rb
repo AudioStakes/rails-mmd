@@ -1,16 +1,17 @@
 # frozen_string_literal: true
 
 require 'rake'
+require 'rails_mmd/tooling_tasks'
 
 RSpec.describe Rake::Task do
   def expected_undercover_command
     [
       'bundle', 'exec', 'undercover',
       '--simplecov', 'coverage/coverage.json',
-      '--include-files', 'lib/**/*.rb,exe/rails-mmd,Rakefile',
+      '--include-files', 'lib/**/*.rb,exe/rails-mmd',
       '--exclude-files', 'spec/**/*.rb',
       '--max-warnings', '20',
-      '--compare', undercover_compare_ref('HEAD~1')
+      '--compare', RailsMmd::ToolingTasks.undercover_compare_ref('HEAD~1')
     ]
   end
 
@@ -37,7 +38,7 @@ RSpec.describe Rake::Task do
   end
 
   it 'checks bundle audit without updating advisory data' do
-    expect(BUNDLE_AUDIT_COMMAND).to eq(%w[bundle exec bundler-audit check --no-update])
+    expect(RailsMmd::ToolingTasks::BUNDLE_AUDIT_COMMAND).to eq(%w[bundle exec bundler-audit check --no-update])
   end
 
   it 'defines explicit advisory data refresh' do
@@ -45,7 +46,7 @@ RSpec.describe Rake::Task do
   end
 
   it 'builds coverage command as argv-safe undercover options' do
-    command = undercover_command(YAML.safe_load_file('.undercover.yml'))
+    command = RailsMmd::ToolingTasks.undercover_command(YAML.safe_load_file('.undercover.yml'))
 
     expect(command).to match_array(expected_undercover_command)
   end

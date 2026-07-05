@@ -11,6 +11,6 @@ SimpleCov::Configuration.const_set(:Coverage, Coverage) unless SimpleCov::Config
 SimpleCov.formatter = SimpleCov::Formatter::Undercover
 
 SimpleCov.start do
-  track_files '{lib/**/*.rb,exe/rails-mmd,Rakefile}'
+  track_files '{lib/**/*.rb,exe/rails-mmd}'
   add_filter '/spec/'
 end
