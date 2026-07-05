@@ -1,8 +1,7 @@
 # Setup Guards
 
-This repository is still in pre-runtime setup mode. The contract specs include
-drift guards that fail loudly when future changes move the project away from the
-agreed Ruby-only, repair-first, P0-scoped setup.
+This repository keeps contract specs that fail loudly when changes move the
+project away from the agreed Ruby-only, repair-first, P0-scoped setup.
 
 ## Repair-First Loop
 
@@ -19,14 +18,13 @@ before the hook is run again.
 
 ## rails-mmd generate guard release condition
 
-`rails-mmd generate` is intentionally unroutable before the P0 implementation
-slices land. A later config, diagnostic, or artifact implementation issue may
-update or remove the generate guard only in the same PR that adds the matching
-contract specs and the corresponding P0 implementation slice.
+`rails-mmd generate` is routed only after the internal P0 implementation slices
+land. The guard now expects the command to exist and to return current-contract
+pre-output diagnostics for a missing config.
 
-The guard must fail if `rails-mmd generate` appears in help, routes to a stub,
-returns success, writes artifacts, or exposes pre-P0 behavior before that
-release condition is met.
+The guard must fail if `rails-mmd generate` routes to a stub, returns success
+without valid input, writes artifacts for pre-output fatal diagnostics, or
+exposes non-P0 behavior.
 
 ## Future P0 Sequence
 
@@ -46,5 +44,4 @@ The future implementation sequence from `docs/p0-contract.md` is:
 12. Atomic artifact publishing.
 13. CLI integration.
 
-This setup guard documentation does not authorize implementing those tasks in
-the setup PR.
+The CLI integration slice owns releasing the generate guard.

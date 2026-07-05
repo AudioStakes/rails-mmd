@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open3'
+require 'json'
 require 'rails_mmd/cli'
 require 'yaml'
 
@@ -112,7 +113,7 @@ RSpec.describe 'repository drift guards' do
     expect(excluded_help_terms.select { |term| normalized_help.include?(term) }).to be_empty
   end
 
-  it 'keeps generate unroutable until the P0 implementation slice lands' do
+  it 'keeps generate routed to the P0 implementation slice' do
     expect(generate_guard_result).to eq(expected_generate_guard_result)
   end
 
@@ -164,16 +165,16 @@ RSpec.describe 'repository drift guards' do
       'command_defined' => RailsMmd::CLI.commands.key?('generate'),
       'success' => status.success?,
       'stdout' => stdout,
-      'stderr_mentions_generate' => stderr.match?(/Could not find command .*generate/i)
+      'stderr_code' => JSON.parse(stderr).fetch('diagnostics').first.fetch('code')
     }
   end
 
   def expected_generate_guard_result
     {
-      'command_defined' => false,
+      'command_defined' => true,
       'success' => false,
       'stdout' => '',
-      'stderr_mentions_generate' => true
+      'stderr_code' => 'CONFIG_NOT_FOUND'
     }
   end
 
