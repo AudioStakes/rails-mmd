@@ -12,6 +12,9 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   issue explicitly changes the project model.
 - Do not create generated Node package-manager manifests or lockfiles.
 - Do not apply monorepo policy assumptions from other AudioStakes repositories.
+- Treat `docs/p0-contract.md` as the source of truth for P0 implementation
+  scope. Do not rely on chat history, local attachments, or local-only paths for
+  P0 behavior.
 
 ## Serena Workflow
 
@@ -39,3 +42,12 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   human-approved issue explicitly approves that operating model.
 - Keep Serena tool approvals narrow unless the current trusted task intentionally
   requires file-modifying or shell-executing tools.
+
+## Verification Workflow
+
+- Use the local `pre-commit` and `pre-push` hooks as final evidence before
+  claiming a setup or implementation PR is ready.
+- Use direct Rake tasks for diagnosis, narrowing failures, or reproducing hook
+  output before rerunning the hook.
+- Preserve the repair-first loop: run/autocorrect first, inspect the diff, stage
+  explicit repairs, then let read-only checks run.

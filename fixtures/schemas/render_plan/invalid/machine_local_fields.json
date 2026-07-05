@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "generated_at": "2026-07-05T00:00:00Z",
+  "absolute_path": "/tmp/project/core.er.mmd",
+  "temp_path": "/var/folders/tmp",
+  "process_id": 1234,
+  "random_seed": 42,
+  "raw_exception_backtrace": ["lib/rails_mmd.rb:1"],
+  "entities": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

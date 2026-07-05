@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "domains": {
+    "api2": {
+      "include_models": ["ApiClient"]
+    }
+  },
+  "output": {
+    "format": "class",
+    "direction": "BT"
+  }
+}
