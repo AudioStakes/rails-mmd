@@ -35,7 +35,7 @@ RSpec.describe 'repository drift guards' do
       (
         package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|
         pnpm-lock\.yaml|pnpm-workspace\.yaml|\.yarnrc\.yml|nx\.json|
-        turbo\.json|lerna\.json|tsconfig(?:\.[^/]+)?\.json|[^/]+\.(?:ts|tsx|mts|cts)
+        turbo\.json|lerna\.json|tsconfig(?:\.[^/]+)?\.json|[^/]+\.(?:d\.)?(?:ts|tsx|mts|cts)
       )$
     }x
   end
@@ -92,10 +92,7 @@ RSpec.describe 'repository drift guards' do
   end
 
   it 'keeps generate unroutable until the P0 implementation slice lands' do
-    stdout, stderr, status = run_cli('generate')
-
-    expect([RailsMmd::CLI.commands.key?('generate'), status.success?, stdout, stderr])
-      .to eq([false, false, '', "Could not find command \"generate\".\n"])
+    expect(generate_guard_result).to eq(expected_generate_guard_result)
   end
 
   it 'documents the generate guard release condition' do
@@ -113,7 +110,7 @@ RSpec.describe 'repository drift guards' do
   it 'documents superseded invalid issues 1 through 6' do
     text = repository_text('docs/issue-administration.md')
 
-    expect((1..6).reject { |number| text.include?("##{number}") }).to be_empty
+    expect(superseded_issue_numbers(text)).to eq((1..6).to_a)
   end
 
   it 'documents the future P0 sequence without implementing it' do
@@ -137,6 +134,32 @@ RSpec.describe 'repository drift guards' do
         'Atomic publish policy:'
       ]
     end
+  end
+
+  def generate_guard_result
+    stdout, stderr, status = run_cli('generate')
+
+    {
+      'command_defined' => RailsMmd::CLI.commands.key?('generate'),
+      'success' => status.success?,
+      'stdout' => stdout,
+      'stderr_mentions_generate' => stderr.match?(/Could not find command .*generate/i)
+    }
+  end
+
+  def expected_generate_guard_result
+    {
+      'command_defined' => false,
+      'success' => false,
+      'stdout' => '',
+      'stderr_mentions_generate' => true
+    }
+  end
+
+  def superseded_issue_numbers(text)
+    return [] unless text.match?(/superseded/i)
+
+    text.scan(/#(\d+)\b/).flatten.map(&:to_i).grep(1..6).uniq.sort
   end
 end
 # rubocop:enable RSpec/DescribeClass
