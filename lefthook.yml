@@ -32,7 +32,7 @@ pre-commit:
         - "spec/**/*.rb"
         - "features/*.rb"
         - "features/**/*.rb"
-      run: bundle exec rubocop --autocorrect-all --force-exclusion {staged_files}
+      run: bundle exec rubocop --autocorrect-all --force-exclusion -- {staged_files}
 
     ruby-post-repair-diff:
       priority: 3
@@ -62,7 +62,7 @@ pre-commit:
         - "spec/**/*.rb"
         - "features/*.rb"
         - "features/**/*.rb"
-      run: bundle exec rubocop --force-exclusion {staged_files}
+      run: bundle exec rubocop --force-exclusion -- {staged_files}
 
     ruby-targeted-specs:
       priority: 5

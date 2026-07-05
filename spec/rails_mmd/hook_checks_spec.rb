@@ -90,6 +90,10 @@ RSpec.describe RailsMmd::HookChecks do
     repair_first_commands.map { |command| pre_commit_commands.fetch(command).fetch('priority') }
   end
 
+  def rubocop_command(name)
+    pre_commit_commands.fetch(name).fetch('run')
+  end
+
   it 'fails before repair when a staged file also has unstaged changes' do
     in_git_repository do
       commit_example_file
@@ -141,6 +145,11 @@ RSpec.describe RailsMmd::HookChecks do
   it 'reports pending schema and fixture routing without unrelated checks' do
     expect { described_class.schema_fixture_pending!(%w[schemas/example.json fixtures/example.mmd]) }
       .to output("schema/fixture checks pending: schemas/example.json, fixtures/example.mmd\n").to_stdout
+  end
+
+  it 'separates RuboCop options from staged file arguments' do
+    expect(%w[ruby-rubocop-autocorrect ruby-rubocop].map { |name| rubocop_command(name) })
+      .to all(include('--force-exclusion -- {staged_files}'))
   end
 
   it 'keeps the pre-commit hook order repair-first without automatic restaging' do
