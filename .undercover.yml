@@ -1,0 +1,5 @@
+simplecov: coverage/undercover.json
+compare: HEAD~1
+include_files: lib/**/*.rb,exe/rails-mmd
+exclude_files: spec/**/*.rb
+max_warnings: 20
