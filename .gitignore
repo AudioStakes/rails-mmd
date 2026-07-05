@@ -22,3 +22,4 @@
 # Ruby build artifacts
 pkg/
 *.gem
+coverage/

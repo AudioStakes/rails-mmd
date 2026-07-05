@@ -39,6 +39,8 @@ future implementation issue adds the command with matching contract coverage.
 
 Dependency classifications are documented in
 [`docs/development/dependencies.md`](docs/development/dependencies.md).
+Ruby tooling commands are documented in
+[`docs/development/tooling.md`](docs/development/tooling.md).
 
 ## P0 Contract
 
