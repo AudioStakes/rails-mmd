@@ -25,6 +25,7 @@ RSpec.describe RailsMmd::Generate do
     result = generate.run(cli_options: RailsMmd::Config::CliOptions.new, fail_on_warning: true)
 
     expect(result.exit_code).to eq(1), result.diagnostics.inspect
+    expect(result.stderr).to be_empty
     expect(publisher.received.fetch(:selected_domain_ids)).to eq(['core'])
     expect(publisher.received.fetch(:artifacts).fetch('core').keys).to eq(%w[er class])
   end
@@ -38,6 +39,15 @@ RSpec.describe RailsMmd::Generate do
     expect(publisher.received.fetch(:diagnostics)).to include(safe_token_collision)
   end
 
+  it 'maps Mermaid serialization fatal diagnostics through the pipeline exit policy' do
+    mermaid_serializer.diagnostics = [mermaid_serialization_failed]
+
+    result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
+
+    expect(result.exit_code).to eq(3)
+    expect(publisher.received.fetch(:diagnostics)).to include(mermaid_serialization_failed)
+  end
+
   it 'returns pre-output diagnostics without running later pipeline stages when config fails' do
     config_loader.result = failure_result([warning_diagnostic.merge('code' => 'CONFIG_NOT_FOUND')], 2)
 
@@ -45,6 +55,16 @@ RSpec.describe RailsMmd::Generate do
 
     expect(result.exit_code).to eq(2)
     expect(result.stderr).to include('CONFIG_NOT_FOUND')
+    expect(publisher.received).to be_nil
+  end
+
+  it 'returns pre-output diagnostics without publishing when Rails boot fails' do
+    rails_loader.result = failure_result([warning_diagnostic.merge('code' => 'RAILS_LOAD_FAILED')], 2)
+
+    result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
+
+    expect(result.exit_code).to eq(2)
+    expect(result.stderr).to include('RAILS_LOAD_FAILED')
     expect(publisher.received).to be_nil
   end
 
@@ -224,6 +244,15 @@ RSpec.describe RailsMmd::Generate do
     {
       'diagnostic_id' => 'collision',
       'code' => 'SAFE_TOKEN_COLLISION',
+      'severity' => 'fatal',
+      'subject_id' => 'core:er'
+    }
+  end
+
+  def mermaid_serialization_failed
+    {
+      'diagnostic_id' => 'serialization',
+      'code' => 'MERMAID_SERIALIZATION_FAILED',
       'severity' => 'fatal',
       'subject_id' => 'core:er'
     }
