@@ -133,6 +133,9 @@ Top-level keys:
 - `version`: required integer, exactly `1`.
 - `domains`: required object, non-empty.
 - `output`: optional object, defaults field-by-field.
+- Unknown top-level keys are `CONFIG_SCHEMA_INVALID`.
+- Configured domain IDs must match the domain ID grammar below. Invalid domain
+  IDs are `CONFIG_SCHEMA_INVALID`.
 
 Domain keys:
 
@@ -168,6 +171,8 @@ Reject with `OUTPUT_DIRECTORY_INVALID`:
 - Paths that normalize to `.`.
 - Paths that escape the project root via `..`.
 - Paths containing NUL.
+- Paths containing backslash (`\`). P0 treats backslash as unsafe rather than as
+  an alternate separator.
 - Drive or UNC forms.
 - Symlink escapes after resolving existing path components.
 
@@ -225,6 +230,12 @@ Inventory records exactly:
 - `renderability_reason`
 
 Inventory must not read table existence, columns, indexes, or foreign keys.
+
+Inventory includes only named ActiveRecord descendants whose Ruby constant can be
+resolved back to the same class object. Anonymous descendants and descendants
+whose `name` is nil, blank, or not constant-resolvable are ignored by inventory,
+are never domain-selectable, and do not produce diagnostics unless explicitly
+named in config, in which case they are unresolved constants.
 
 Renderable means:
 
@@ -293,6 +304,15 @@ Selected renderable entities must use exactly one connection context. Two or
 more selected connection contexts produce `MULTI_DB_UNSUPPORTED`.
 Domain-outside connection contexts are ignored.
 
+`connection_context_id` is the canonical JSON serialization of the selected
+model connection's Rails `connection_db_config.name`, role, shard, adapter name,
+database identifier, host, port, and username after redaction of secret values.
+Role and shard always participate. Two Rails configs that point at the same
+physical database but have different config names, roles, shards, adapters,
+database identifiers, hosts, ports, or usernames are distinct contexts. Secret
+connection material such as passwords, URLs with credentials, tokens, and raw DSN
+strings never participate in emitted IDs.
+
 ## Relationship Eligibility
 
 A relationship is eligible only when all conditions hold:
@@ -326,6 +346,20 @@ Omitted relationship diagnostics:
 
 P0 emits no warnings for non-`belongs_to` associations.
 
+For P0, scoped `belongs_to` means the association reflection itself has a scope
+lambda or proc (`reflection.scope.present?`). A target model `default_scope` does
+not by itself make an otherwise unscoped `belongs_to` scoped for this rule.
+
+Relationship labels are derived from the association name exactly as declared.
+Accepted association names match
+`\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z`; the optional trailing `?`, `!`, or `=`
+is removed before rendering. Labels use the sanitized association name without
+that suffix, are non-empty, and are emitted as Mermaid text labels after comment
+sanitization. Examples: `account` and `billing_account` are accepted; `Account`,
+`billing-account`, `billing account`, `_account`, `account_`, `account__owner`,
+`account/name`, and `account\nname` are unsafe and produce
+`ASSOCIATION_NAME_UNSUPPORTED_OMITTED`.
+
 ## Redaction
 
 Redact before external output:
@@ -352,7 +386,8 @@ Path handling:
 Secret handling:
 
 - Environment variable values are never emitted to stderr or artifacts.
-- Credential-looking keys are never emitted to stderr or artifacts.
+- Credential-looking free-text keys and metadata keys are never emitted to stderr
+  or artifacts.
 - URL credentials are never emitted to stderr or artifacts.
 - Passwords, tokens, API keys, database URLs, and raw connection strings are
   never emitted to stderr or artifacts.
@@ -376,6 +411,13 @@ and syntax sanitization. They do not pass through free-text redaction:
 - Table names.
 - Column names.
 
+Schema identifiers such as table names, column names, Rails constants, and
+association names remain allowed structured identifiers even when their literal
+names contain credential-looking substrings such as `api_key` or
+`password_digest`. They must still pass the relevant syntax/safe-token rules and
+must not include values. Free-text diagnostic messages and metadata keys do not
+get this exemption.
+
 ## Diagnostics
 
 Diagnostic object fields:
@@ -392,6 +434,42 @@ Diagnostic object fields:
 - `remediation`
 
 `metadata` must be sanitized and schema-closed per diagnostic code.
+
+All diagnostic objects include every listed field. When no structured metadata is
+available, `metadata` is `{}`. When no artifact reference applies,
+`artifact_refs` is `[]`. When no remediation is known, `remediation` is `null`.
+`artifact_refs[]` objects are closed and contain `artifact_kind` (`diagnostics`,
+`er`, `class`, `render_plan`, or `stderr`), optional `domain_id` (`null` for
+global), and optional project-root-relative `path`. `remediation`, when present,
+is a closed object with `summary` and optional `steps[]`, all sanitized strings.
+
+Per-code metadata schemas are intentionally small and closed:
+
+- Config/output codes: `CONFIG_NOT_FOUND` has `config_path`; `CONFIG_SCHEMA_INVALID`
+  has `config_path` and `field_path`; `CONFIG_DOMAIN_NOT_FOUND` has `domain_id`;
+  `OUTPUT_DIRECTORY_INVALID` has `field_path` and `reason`.
+- Domain/model codes: `DOMAIN_MODEL_NOT_FOUND` has `domain_id` and
+  `ruby_constant`; `DOMAIN_MODEL_NOT_RENDERABLE` has `domain_id`,
+  `ruby_constant`, and `renderability_reason`; `DOMAIN_EMPTY` has `domain_id`;
+  `MODEL_TABLE_MISSING` has `domain_id`, `ruby_constant`, and `table_name`;
+  `MODEL_PRIMARY_KEY_UNSUPPORTED` has `domain_id`, `ruby_constant`, and
+  `table_name`.
+- Rails load codes: `RAILS_LOAD_FAILED` and `RAILS_EAGER_LOAD_FAILED` have
+  `exception_class`, `exception_summary`, and `backtrace` fixed to `null`.
+- Connection/schema degradation codes: `MULTI_DB_UNSUPPORTED` has `domain_id`
+  and `connection_context_ids[]`; `DB_METADATA_DEGRADED` has `domain_id`,
+  `ruby_constant`, `metadata_kind`, and `reason`.
+- Association omission codes have `domain_id`, `owner_constant`,
+  `association_name`, and optional `target_constant`.
+- Token/serialization/publish/internal codes: `SAFE_TOKEN_COLLISION` has
+  `artifact_kind`, `domain_id`, `token_kind`, `base_safe_token`,
+  `collision_subject_count`, and `resolved`; `MERMAID_SERIALIZATION_FAILED` has
+  `artifact_kind`, `domain_id`, and `reason`; `OUTPUT_WRITE_FAILED` has
+  `operation` and optional `path`; `INTERNAL_ERROR` has `exception_class`,
+  `exception_summary`, and `backtrace` fixed to `null`.
+
+Fields not listed for a diagnostic code are forbidden. Optional fields may be
+omitted, but present fields must use the listed sanitized shape.
 
 Closed diagnostic codes:
 
@@ -512,12 +590,17 @@ Diagnostics JSON top-level shape:
 ```json
 {
   "schema_version": 1,
-  "scope": "global|domain",
-  "domain_id": "core|null-for-global",
+  "scope": "global",
+  "domain_id": null,
   "diagnostics": [],
   "digest_sha256": "lowercase-64-hex"
 }
 ```
+
+For `<domain>.diagnostics.json`, `scope` is `"domain"` and `domain_id` is the
+configured domain ID string, for example `"core"`. For `global.diagnostics.json`
+and pre-output fatal stderr diagnostics, `scope` is `"global"` and `domain_id` is
+JSON `null`.
 
 Render-plan JSON top-level shape:
 
@@ -542,6 +625,11 @@ sanitization, and deterministic ordering keys. They must not include raw Rails
 objects, absolute paths, timestamps, process IDs, random seeds, or raw exception
 data.
 
+Render-plan safe tokens are final diagram tokens. The render-plan generator owns
+safe-token generation, and the Mermaid serializer must reuse those tokens without
+re-tokenizing. Token collision scope uses the render plan's final artifact kind
+(`er` or `class`).
+
 Pre-output fatal publish policy:
 
 - `CONFIG_NOT_FOUND`, `CONFIG_SCHEMA_INVALID`, `CONFIG_DOMAIN_NOT_FOUND`, and
@@ -552,21 +640,36 @@ Pre-output fatal publish policy:
 Atomic publish policy:
 
 1. Validate output directory.
-2. Create a temporary directory under the output directory.
-3. Generate all selected outputs into the temporary directory.
-4. Validate JSON schemas.
-5. Validate every render-plan `diagnostic_ids[]` exists in global or matching
+2. Re-check the resolved output directory path immediately before creating the
+   temporary directory; refuse symlink targets or paths that now resolve outside
+   the project root.
+3. Create a temporary directory inside the already-validated output directory
+   using no-follow filesystem operations where the platform supports them.
+4. Generate all selected outputs into the temporary directory.
+5. Validate JSON schemas.
+6. Validate every render-plan `diagnostic_ids[]` exists in global or matching
    domain diagnostics.
-6. If any fatal or error diagnostic exists, publish diagnostics only and do not
-   publish selected `.mmd` or render-plan JSON.
-7. If no fatal or error diagnostic exists, publish all selected `.mmd`,
-   render-plan JSON, and non-empty diagnostics files.
-8. Remove the temporary directory on success or failure.
+7. Invocation-scope fatal or error diagnostics block all selected `.mmd` and
+   render-plan artifacts.
+8. Domain, model, relationship, and artifact fatal or error diagnostics block
+   only the matching domain's `.mmd` and render-plan artifacts; unaffected
+   selected domains still publish when they have no fatal or error diagnostics.
+9. Publish non-empty diagnostics files for scopes that have diagnostics.
+10. Publish `.mmd` and render-plan JSON only for unblocked selected domains.
+11. Reconcile managed artifacts atomically within the already-validated output
+    directory: the invocation's managed artifact set replaces the previous
+    managed set for the selected domains, and stale managed `.mmd`, render-plan,
+    and diagnostics files for those selected domains are removed.
+12. Re-check final target paths during replacement, refuse symlink targets, and
+    perform replacement inside the validated output directory.
+13. Remove the temporary directory on success or failure.
 
-Invocation-level publish:
+Publish gating:
 
-- A single fatal or error diagnostic prevents all selected `.mmd` and
-  render-plan artifacts for that invocation from being published.
+- A single invocation-scope fatal or error diagnostic prevents all selected
+  `.mmd` and render-plan artifacts for that invocation from being published.
+- A domain-scoped fatal or error diagnostic prevents only that domain's `.mmd`
+  and render-plan artifacts from being published.
 - Diagnostics may still be published after the output directory is known and
   safe.
 
@@ -651,7 +754,7 @@ Examples:
 
 Collision scope fields are `{artifact_kind, domain_id, token_kind}`:
 
-- `artifact_kind`: `er`, `class`, or `render_plan`.
+- `artifact_kind`: `er` or `class`.
 - `domain_id`: configured domain ID or `global`.
 - `token_kind`: `entity`, `attribute`, `relationship`, `diagnostic`, or
   `comment`.
@@ -688,9 +791,12 @@ Suffix-collision retry:
 - If collision remains at 64, emit fatal `SAFE_TOKEN_COLLISION` and do not
   publish `.mmd` or render-plan artifacts.
 
-`SAFE_TOKEN_COLLISION` fires when two or more distinct structured subjects
-produce the same scoped base safe token before suffixing. Suffixing makes
-outputs deterministic but must not suppress the diagnostic.
+`SAFE_TOKEN_COLLISION` uses the same code for warning and fatal outcomes. Emit it
+as a warning when two or more distinct structured subjects produce the same
+scoped base safe token and suffixing resolves the final tokens; set metadata
+`resolved: true`. Emit it as fatal with exit `3` only when suffixing cannot
+resolve a collision after full 64-hex expansion; set `resolved: false` and do not
+publish `.mmd` or render-plan artifacts.
 
 ## Determinism And Digests
 
