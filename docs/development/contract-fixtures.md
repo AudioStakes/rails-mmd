@@ -12,3 +12,8 @@ contract scaffolding.
 Render-plan attribute fixtures must include the serializer-facing lowercase
 `type` field. Serializers consume that field directly and must not infer types
 from IR, schema metadata, or Rails runtime objects.
+
+Blocking behavior is tracked in
+[`../p0-blocking-fixture-matrix.md`](../p0-blocking-fixture-matrix.md). Any new
+blocking diagnostic fixture should state its exit code, stderr behavior, and
+artifact publication effect there.
