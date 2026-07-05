@@ -52,6 +52,7 @@
       "allOf": [
         { "not": { "pattern": "(^|\\s)/(?:Users|tmp|private|var)(?:/|\\s|$)" } },
         { "not": { "pattern": "[A-Za-z]:[\\\\/]" } },
+        { "not": { "pattern": "[\\r\\n]" } },
         { "not": { "pattern": "[A-Za-z0-9_-]*(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|passwd|credential|database_url|(?:access|auth|refresh)[_-]?token|pid)[A-Za-z0-9_-]*\\s*(?::|=|\\s+)\\s*\\S+" } },
         { "not": { "pattern": "\\[REDACTED_KEY\\]\\s*(?::|=|\\s+)\\s*\\S+" } }
       ]

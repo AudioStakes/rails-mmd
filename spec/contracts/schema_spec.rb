@@ -176,6 +176,7 @@ RSpec.describe 'P0 contract schemas' do
   def render_plan_sanitized_invalid_fixtures
     %w[
       render_plan/invalid/missing_attribute_type.json
+      render_plan/invalid/multiline_comment.json
       render_plan/invalid/unsupported_attribute_type.json
       render_plan/invalid/machine_local_fields.json
       render_plan/invalid/unsanitized_comment.json

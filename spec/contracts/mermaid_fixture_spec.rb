@@ -80,7 +80,7 @@ RSpec.describe 'P0 Mermaid golden fixtures' do
     <<~MMD
       classDiagram
         direction LR
-        %% sanitized comment without secrets or paths
+        %% sanitized comment without sensitive data or paths
         class USER
         class ACCOUNT
     MMD
