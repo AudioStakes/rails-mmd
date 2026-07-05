@@ -1,0 +1,21 @@
+{
+  "positive": ["core", "billing_v2", "admin", "api2"],
+  "negative": [
+    "Core",
+    "billing-v2",
+    "_internal",
+    "2core",
+    "billing_",
+    "billing__core",
+    "core/api",
+    "core.api",
+    "顧客",
+    "",
+    "core\n",
+    "core\r\n",
+    "core\napi",
+    "core\t",
+    " core",
+    "core "
+  ]
+}

@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audiostakes.example/schemas/rails-mmd/diagnostics.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scope", "domain_id", "diagnostics", "digest_sha256"],
+  "allOf": [
+    {
+      "if": { "properties": { "scope": { "const": "global" } }, "required": ["scope"] },
+      "then": { "properties": { "domain_id": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "scope": { "const": "domain" } }, "required": ["scope"] },
+      "then": { "properties": { "domain_id": { "$ref": "#/$defs/domain_id" } } }
+    }
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "scope": { "enum": ["global", "domain"] },
+    "domain_id": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/domain_id" }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "digest_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "domain_id": {
+      "type": "string",
+      "allOf": [
+        { "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        { "not": { "pattern": "\\s" } }
+      ]
+    },
+    "ruby_constant": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*$"
+    },
+    "safe_token": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "structured_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$",
+      "not": { "pattern": "^[A-Za-z]:[\\\\/]" }
+    },
+    "sanitized_string": {
+      "type": "string",
+      "allOf": [
+        { "not": { "pattern": "(^|\\s)/(?:Users|tmp|private|var)(?:/|\\s|$)" } },
+        { "not": { "pattern": "[A-Za-z]:[\\\\/]" } },
+        { "not": { "pattern": "\\b(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password)\\b\\s*[:=]" } }
+      ]
+    },
+    "diagnostic_code": {
+      "enum": [
+        "CONFIG_NOT_FOUND",
+        "CONFIG_SCHEMA_INVALID",
+        "CONFIG_DOMAIN_NOT_FOUND",
+        "OUTPUT_DIRECTORY_INVALID",
+        "DOMAIN_MODEL_NOT_FOUND",
+        "DOMAIN_MODEL_NOT_RENDERABLE",
+        "DOMAIN_EMPTY",
+        "RAILS_LOAD_FAILED",
+        "RAILS_EAGER_LOAD_FAILED",
+        "MULTI_DB_UNSUPPORTED",
+        "MODEL_TABLE_MISSING",
+        "MODEL_PRIMARY_KEY_UNSUPPORTED",
+        "ASSOCIATION_TARGET_UNRESOLVED",
+        "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED",
+        "ASSOCIATION_POLYMORPHIC_OMITTED",
+        "ASSOCIATION_SCOPED_OMITTED",
+        "ASSOCIATION_COMPOSITE_KEY_OMITTED",
+        "ASSOCIATION_KEY_COLUMN_MISSING",
+        "ASSOCIATION_NON_PRIMARY_KEY_OMITTED",
+        "ASSOCIATION_NAME_UNSUPPORTED_OMITTED",
+        "DOMAIN_RELATIONSHIP_OMITTED",
+        "DB_METADATA_DEGRADED",
+        "SAFE_TOKEN_COLLISION",
+        "MERMAID_SERIALIZATION_FAILED",
+        "OUTPUT_WRITE_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diagnostic_id",
+        "code",
+        "severity",
+        "phase",
+        "scope",
+        "subject_id",
+        "message",
+        "metadata",
+        "artifact_refs",
+        "remediation"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/metadata_for_config_not_found" },
+        { "$ref": "#/$defs/metadata_for_config_schema_invalid" },
+        { "$ref": "#/$defs/metadata_for_config_domain_not_found" },
+        { "$ref": "#/$defs/metadata_for_output_directory_invalid" },
+        { "$ref": "#/$defs/metadata_for_domain_model_not_found" },
+        { "$ref": "#/$defs/metadata_for_domain_model_not_renderable" },
+        { "$ref": "#/$defs/metadata_for_domain_empty" },
+        { "$ref": "#/$defs/metadata_for_rails_load_failed" },
+        { "$ref": "#/$defs/metadata_for_rails_eager_load_failed" },
+        { "$ref": "#/$defs/metadata_for_multi_db_unsupported" },
+        { "$ref": "#/$defs/metadata_for_model_table_missing" },
+        { "$ref": "#/$defs/metadata_for_model_primary_key_unsupported" },
+        { "$ref": "#/$defs/metadata_for_association_target_unresolved" },
+        { "$ref": "#/$defs/metadata_for_association_target_not_renderable_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_polymorphic_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_scoped_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_composite_key_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_key_column_missing" },
+        { "$ref": "#/$defs/metadata_for_association_non_primary_key_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_name_unsupported_omitted" },
+        { "$ref": "#/$defs/metadata_for_domain_relationship_omitted" },
+        { "$ref": "#/$defs/metadata_for_db_metadata_degraded" },
+        { "$ref": "#/$defs/metadata_for_safe_token_collision" },
+        { "$ref": "#/$defs/metadata_for_mermaid_serialization_failed" },
+        { "$ref": "#/$defs/metadata_for_output_write_failed" },
+        { "$ref": "#/$defs/metadata_for_internal_error" }
+      ],
+      "properties": {
+        "diagnostic_id": { "type": "string", "minLength": 1 },
+        "code": { "$ref": "#/$defs/diagnostic_code" },
+        "severity": { "enum": ["fatal", "error", "warning"] },
+        "phase": {
+          "enum": [
+            "config",
+            "output_setup",
+            "domain_resolution",
+            "rails_load",
+            "schema_probe",
+            "relationship_build",
+            "tokenization",
+            "serialization",
+            "publish",
+            "internal"
+          ]
+        },
+        "scope": { "enum": ["invocation", "domain", "model", "relationship", "artifact"] },
+        "subject_id": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/sanitized_string" }
+          ]
+        },
+        "message": { "$ref": "#/$defs/sanitized_string" },
+        "metadata": { "type": "object" },
+        "artifact_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact_ref" }
+        },
+        "remediation": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/remediation" }
+          ]
+        }
+      }
+    },
+    "artifact_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_kind", "domain_id"],
+      "properties": {
+        "artifact_kind": { "enum": ["diagnostics", "er", "class", "render_plan", "stderr"] },
+        "domain_id": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_id" }
+          ]
+        },
+        "path": { "$ref": "#/$defs/relative_path" }
+      }
+    },
+    "remediation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "properties": {
+        "summary": { "$ref": "#/$defs/sanitized_string" },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sanitized_string" }
+        }
+      }
+    },
+    "metadata_shape_config_not_found": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_path"],
+      "properties": { "config_path": { "$ref": "#/$defs/relative_path" } }
+    },
+    "metadata_shape_config_schema_invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config_path", "field_path"],
+      "properties": {
+        "config_path": { "$ref": "#/$defs/relative_path" },
+        "field_path": { "$ref": "#/$defs/sanitized_string" }
+      }
+    },
+    "metadata_shape_config_domain_not_found": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id"],
+      "properties": { "domain_id": { "$ref": "#/$defs/domain_id" } }
+    },
+    "metadata_shape_output_directory_invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_path", "reason"],
+      "properties": {
+        "field_path": { "$ref": "#/$defs/sanitized_string" },
+        "reason": { "$ref": "#/$defs/sanitized_string" }
+      }
+    },
+    "metadata_shape_domain_model_not_found": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "ruby_constant"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" }
+      }
+    },
+    "metadata_shape_domain_model_not_renderable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "ruby_constant", "renderability_reason"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" },
+        "renderability_reason": { "$ref": "#/$defs/sanitized_string" }
+      }
+    },
+    "metadata_shape_domain_empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id"],
+      "properties": { "domain_id": { "$ref": "#/$defs/domain_id" } }
+    },
+    "metadata_shape_exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exception_class", "exception_summary", "backtrace"],
+      "properties": {
+        "exception_class": { "$ref": "#/$defs/ruby_constant" },
+        "exception_summary": { "$ref": "#/$defs/sanitized_string" },
+        "backtrace": { "type": "null" }
+      }
+    },
+    "metadata_shape_multi_db_unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "connection_context_ids"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "connection_context_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/structured_id" }
+        }
+      }
+    },
+    "metadata_shape_model_table_missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "ruby_constant", "table_name"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" },
+        "table_name": { "$ref": "#/$defs/structured_id" }
+      }
+    },
+    "metadata_shape_association": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "owner_constant", "association_name"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "owner_constant": { "$ref": "#/$defs/ruby_constant" },
+        "association_name": { "$ref": "#/$defs/sanitized_string" },
+        "target_constant": { "$ref": "#/$defs/ruby_constant" }
+      }
+    },
+    "metadata_shape_db_metadata_degraded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "ruby_constant", "metadata_kind", "reason"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" },
+        "metadata_kind": {
+          "enum": ["foreign_key", "foreign_key_nullability", "unique_index", "cardinality"]
+        },
+        "reason": { "$ref": "#/$defs/sanitized_string" }
+      }
+    },
+    "metadata_shape_safe_token_collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "domain_id",
+        "token_kind",
+        "base_safe_token",
+        "collision_subject_count",
+        "resolved"
+      ],
+      "properties": {
+        "artifact_kind": { "enum": ["er", "class"] },
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "token_kind": { "enum": ["entity", "attribute", "relationship", "comment"] },
+        "base_safe_token": { "$ref": "#/$defs/safe_token" },
+        "collision_subject_count": { "type": "integer", "minimum": 2 },
+        "resolved": { "type": "boolean" }
+      }
+    },
+    "metadata_shape_mermaid_serialization_failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_kind", "domain_id", "reason"],
+      "properties": {
+        "artifact_kind": { "enum": ["er", "class"] },
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "reason": { "$ref": "#/$defs/sanitized_string" }
+      }
+    },
+    "metadata_shape_output_write_failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": {
+        "operation": { "enum": ["mkdir", "write", "rename", "remove"] },
+        "path": { "$ref": "#/$defs/relative_path" }
+      }
+    },
+    "metadata_for_config_not_found": {
+      "if": { "properties": { "code": { "const": "CONFIG_NOT_FOUND" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_not_found" } } }
+    },
+    "metadata_for_config_schema_invalid": {
+      "if": { "properties": { "code": { "const": "CONFIG_SCHEMA_INVALID" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_schema_invalid" } } }
+    },
+    "metadata_for_config_domain_not_found": {
+      "if": { "properties": { "code": { "const": "CONFIG_DOMAIN_NOT_FOUND" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_domain_not_found" } } }
+    },
+    "metadata_for_output_directory_invalid": {
+      "if": { "properties": { "code": { "const": "OUTPUT_DIRECTORY_INVALID" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_directory_invalid" } } }
+    },
+    "metadata_for_domain_model_not_found": {
+      "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_FOUND" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_found" } } }
+    },
+    "metadata_for_domain_model_not_renderable": {
+      "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_RENDERABLE" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_renderable" } } }
+    },
+    "metadata_for_domain_empty": {
+      "if": { "properties": { "code": { "const": "DOMAIN_EMPTY" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_empty" } } }
+    },
+    "metadata_for_rails_load_failed": {
+      "if": { "properties": { "code": { "const": "RAILS_LOAD_FAILED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
+    },
+    "metadata_for_rails_eager_load_failed": {
+      "if": { "properties": { "code": { "const": "RAILS_EAGER_LOAD_FAILED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
+    },
+    "metadata_for_multi_db_unsupported": {
+      "if": { "properties": { "code": { "const": "MULTI_DB_UNSUPPORTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_multi_db_unsupported" } } }
+    },
+    "metadata_for_model_table_missing": {
+      "if": { "properties": { "code": { "const": "MODEL_TABLE_MISSING" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } }
+    },
+    "metadata_for_model_primary_key_unsupported": {
+      "if": { "properties": { "code": { "const": "MODEL_PRIMARY_KEY_UNSUPPORTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } }
+    },
+    "metadata_for_association_target_unresolved": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_UNRESOLVED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_target_not_renderable_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_polymorphic_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_POLYMORPHIC_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_scoped_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_SCOPED_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_composite_key_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_COMPOSITE_KEY_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_key_column_missing": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_KEY_COLUMN_MISSING" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_non_primary_key_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_NON_PRIMARY_KEY_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_association_name_unsupported_omitted": {
+      "if": { "properties": { "code": { "const": "ASSOCIATION_NAME_UNSUPPORTED_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_domain_relationship_omitted": {
+      "if": { "properties": { "code": { "const": "DOMAIN_RELATIONSHIP_OMITTED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
+    },
+    "metadata_for_db_metadata_degraded": {
+      "if": { "properties": { "code": { "const": "DB_METADATA_DEGRADED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_db_metadata_degraded" } } }
+    },
+    "metadata_for_safe_token_collision": {
+      "if": { "properties": { "code": { "const": "SAFE_TOKEN_COLLISION" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_safe_token_collision" } } }
+    },
+    "metadata_for_mermaid_serialization_failed": {
+      "if": { "properties": { "code": { "const": "MERMAID_SERIALIZATION_FAILED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_mermaid_serialization_failed" } } }
+    },
+    "metadata_for_output_write_failed": {
+      "if": { "properties": { "code": { "const": "OUTPUT_WRITE_FAILED" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_write_failed" } } }
+    },
+    "metadata_for_internal_error": {
+      "if": { "properties": { "code": { "const": "INTERNAL_ERROR" } }, "required": ["code"] },
+      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
+    }
+  }
+}

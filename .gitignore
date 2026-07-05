@@ -1,0 +1,25 @@
+# Serena user-local state
+.serena/project.local.yml
+.serena/cache/
+.serena/caches/
+.serena/logs/
+.serena/tmp/
+.serena/temp/
+.serena/language_servers/
+.serena/language-server/
+.serena/language-server-installs/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Ruby build artifacts
+pkg/
+*.gem
+coverage/

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "core",
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_safe_token_collision",
+      "code": "SAFE_TOKEN_COLLISION",
+      "severity": "warning",
+      "phase": "tokenization",
+      "scope": "artifact",
+      "subject_id": "core:er",
+      "message": "token collision resolved",
+      "metadata": {
+        "artifact_kind": "er",
+        "domain_id": "core",
+        "token_kind": "entity",
+        "base_safe_token": "USER",
+        "collision_subject_count": 2,
+        "resolved": true
+      },
+      "artifact_refs": [
+        { "artifact_kind": "stderr", "domain_id": null, "path": "/tmp/rails-mmd/stderr.log" }
+      ],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
