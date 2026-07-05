@@ -5,7 +5,7 @@ require 'rails_mmd/redactor'
 
 module RailsMmd
   # Builds schema-free ActiveRecord model inventory records.
-  # rubocop:disable Metrics/MethodLength
+  # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
   class ModelInventory
     Record = Struct.new(
       :ruby_constant,
@@ -17,6 +17,7 @@ module RailsMmd
       :renderability_reason,
       keyword_init: true
     )
+    CONNECTION_CONTEXT_KEYS = %w[name role shard adapter database host port username].freeze
 
     def initialize(active_record_base:, constant_resolver: method(:default_constant_resolver),
                    redactor: Redactor.new)
@@ -42,7 +43,9 @@ module RailsMmd
       return false unless name.is_a?(String) && !name.empty?
 
       constant_resolver.call(name).equal?(model)
-    rescue NameError
+    rescue Exception => e # rubocop:disable Lint/RescueException
+      raise if e.is_a?(Interrupt) || e.is_a?(SystemExit)
+
       false
     end
 
@@ -103,30 +106,41 @@ module RailsMmd
       db_config = model.connection_db_config
       {
         'name' => value_from(db_config, :name),
-        'role' => value_from(model, :current_role),
-        'shard' => value_from(model, :current_shard),
+        'role' => value_from(model, :current_role) || 'default',
+        'shard' => value_from(model, :current_shard) || 'default',
         'adapter' => value_from(db_config, :adapter),
         'database' => value_from(db_config, :database),
         'host' => value_from(db_config, :host),
         'port' => value_from(db_config, :port),
         'username' => value_from(db_config, :username)
-      }.compact
+      }
     end
 
     def sanitize_context(context)
-      context.to_h.transform_keys(&:to_s).transform_values { |value| redactor.sanitize(value) }
+      raw_context = context.to_h.transform_keys(&:to_s)
+      CONNECTION_CONTEXT_KEYS.to_h do |key|
+        [key, sanitize_context_value(raw_context.fetch(key, default_context_value(key)))]
+      end
+    end
+
+    def sanitize_context_value(value)
+      value.is_a?(String) ? redactor.sanitize(value) : value
+    end
+
+    def default_context_value(key)
+      %w[role shard].include?(key) ? 'default' : nil
     end
 
     def value_from(object, method_name)
       return unless object.respond_to?(method_name)
 
       value = object.public_send(method_name)
-      value.is_a?(String) ? redactor.sanitize(value) : value
+      sanitize_context_value(value)
     end
 
     def default_constant_resolver(name)
       name.split('::').reduce(Object) { |namespace, const_name| namespace.const_get(const_name, false) }
     end
   end
-  # rubocop:enable Metrics/MethodLength
+  # rubocop:enable Metrics/ClassLength, Metrics/MethodLength
 end

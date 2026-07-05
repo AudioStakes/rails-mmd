@@ -29,7 +29,7 @@ module RailsMmd
       Result.new(application: application, diagnostics: [], exit_code: 0)
     rescue EagerLoadError => e
       failure('RAILS_EAGER_LOAD_FAILED', e.cause || e)
-    rescue StandardError => e
+    rescue LoadError, SyntaxError, StandardError => e
       failure('RAILS_LOAD_FAILED', e)
     end
 
@@ -45,8 +45,10 @@ module RailsMmd
     end
 
     def eager_load(application)
+      raise EagerLoadError, 'Rails application does not expose eager_load!' unless application.respond_to?(:eager_load!)
+
       application.eager_load! if application.respond_to?(:eager_load!)
-    rescue StandardError => e
+    rescue LoadError, SyntaxError, StandardError => e
       raise EagerLoadError, e.message
     end
 

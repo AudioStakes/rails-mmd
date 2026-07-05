@@ -62,6 +62,23 @@ RSpec.describe RailsMmd::RailsLoader do
     expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 
+  it 'returns RAILS_LOAD_FAILED for load and syntax errors' do
+    [LoadError, SyntaxError].each do |error_class|
+      kernel = Class.new do
+        define_method(:load) do |_path|
+          raise error_class, '/Users/dev/app failed'
+        end
+      end.new
+
+      result = described_class.new(project_root: project_root, kernel: kernel).boot
+
+      expect(result).not_to be_success
+      expect(result.diagnostics.first).to include('code' => 'RAILS_LOAD_FAILED')
+      expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/Users/dev')
+      expect_schema_valid_diagnostic(result.diagnostics.first)
+    end
+  end
+
   it 'returns a schema-valid RAILS_EAGER_LOAD_FAILED diagnostic for eager-load failures' do
     application = Class.new do
       def eager_load!
@@ -84,6 +101,40 @@ RSpec.describe RailsMmd::RailsLoader do
       'backtrace' => nil
     )
     expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/tmp/app')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'returns RAILS_EAGER_LOAD_FAILED when eager_load! is unavailable' do
+    rails = Struct.new(:application).new(Object.new)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path); end }.new,
+      rails_provider: -> { rails }
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'RAILS_EAGER_LOAD_FAILED')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'returns RAILS_EAGER_LOAD_FAILED for eager-load load errors' do
+    application = Class.new do
+      def eager_load!
+        raise LoadError, '/Users/dev/eager failed'
+      end
+    end.new
+    rails = Struct.new(:application).new(application)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path); end }.new,
+      rails_provider: -> { rails }
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'RAILS_EAGER_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/Users/dev')
     expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 

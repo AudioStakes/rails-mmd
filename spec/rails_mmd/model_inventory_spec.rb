@@ -20,6 +20,23 @@ RSpec.describe RailsMmd::ModelInventory do
     expect(records.map(&:ruby_constant)).to eq(['User'])
   end
 
+  it 'ignores descendants whose constant resolution raises load failures' do
+    user = fake_model('User')
+    broken = fake_model('BrokenAutoload')
+    resolver = lambda do |name|
+      raise LoadError, name if name == 'BrokenAutoload'
+
+      user
+    end
+
+    records = described_class.new(
+      active_record_base: Struct.new(:descendants).new([user, broken]),
+      constant_resolver: resolver
+    ).records
+
+    expect(records.map(&:ruby_constant)).to eq(['User'])
+  end
+
   it 'records exactly the contract inventory fields for renderable base models' do
     user = fake_model(
       'User',
@@ -48,6 +65,78 @@ RSpec.describe RailsMmd::ModelInventory do
     )
     expect(record.connection_context_id).to include('primary', 'writing')
     expect(record.connection_context_id).not_to include('secret')
+  end
+
+  it 'uses only the contract key set for connection context IDs' do
+    first = fake_model(
+      'User',
+      connection_context: {
+        name: 'primary',
+        role: 'writing',
+        adapter: 'postgresql',
+        database: 'app',
+        password: 'secret-one',
+        replica: true
+      }
+    )
+    second = fake_model(
+      'Account',
+      connection_context: {
+        name: 'primary',
+        role: 'writing',
+        adapter: 'postgresql',
+        database: 'app',
+        password: 'secret-two',
+        replica: false
+      }
+    )
+
+    records = inventory_for([first, second], constants: { 'User' => first, 'Account' => second }).records
+    payload = JSON.parse(records.first.connection_context_id)
+
+    expect(payload.keys).to eq(%w[adapter database host name port role shard username])
+    expect(payload).to include('role' => 'writing', 'shard' => 'default')
+    expect(records.map(&:connection_context_id).uniq.size).to eq(1)
+    expect(records.first.connection_context_id).not_to include('password', 'secret', 'replica')
+  end
+
+  it 'builds connection context IDs from db config when no explicit context exists' do
+    user = fake_model_without_connection_context(
+      'User',
+      db_config: Struct.new(:name, :adapter, :database, :host, :port, :username).new(
+        'primary', 'postgresql', 'app', 'localhost', 5432, 'app_user'
+      )
+    )
+
+    record = inventory_for([user], constants: { 'User' => user }).records.fetch(0)
+    payload = JSON.parse(record.connection_context_id)
+
+    expect(payload).to eq(
+      'adapter' => 'postgresql',
+      'database' => 'app',
+      'host' => 'localhost',
+      'name' => 'primary',
+      'port' => 5432,
+      'role' => 'default',
+      'shard' => 'default',
+      'username' => 'app_user'
+    )
+  end
+
+  it 'falls back to the model name when no connection context API is available' do
+    user = fake_model_without_connection_context('User', db_config: nil)
+
+    record = inventory_for([user], constants: { 'User' => user }).records.fetch(0)
+
+    expect(JSON.parse(record.connection_context_id)).to eq('model' => 'User')
+  end
+
+  it 'resolves constants through Object by default' do
+    stub_const('InventorySpecModel', fake_model('InventorySpecModel'))
+
+    records = described_class.new(active_record_base: Struct.new(:descendants).new([InventorySpecModel])).records
+
+    expect(records.map(&:ruby_constant)).to eq(['InventorySpecModel'])
   end
 
   it 'marks abstract models and STI subclasses non-renderable when observable' do
@@ -114,6 +203,15 @@ RSpec.describe RailsMmd::ModelInventory do
     model
   end
   # rubocop:enable Metrics/ParameterLists
+
+  def fake_model_without_connection_context(name, db_config:)
+    model = fake_model(name)
+    class << model
+      remove_method :connection_context
+    end
+    model.define_singleton_method(:connection_db_config) { db_config } if db_config
+    model
+  end
 
   def default_table_name(name)
     return nil unless name
