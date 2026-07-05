@@ -81,6 +81,23 @@ RSpec.describe RailsMmd::SchemaProbe do
       .not_to include('/Users/dev', '/tmp')
   end
 
+  it 'detects multi-db after inventory preserves distinct structured database identifiers' do
+    user = inventory_model('User', database: '/Users/dev/app/db/primary.sqlite3')
+    account = inventory_model('Account', database: '/tmp/other.sqlite3')
+    inventory_records = RailsMmd::ModelInventory.new(
+      active_record_base: Struct.new(:descendants).new([user, account]),
+      constant_resolver: ->(name) { { 'User' => user, 'Account' => account }.fetch(name) }
+    ).records
+    domain = domain_result('core', inventory_records)
+
+    result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(domains: [domain])
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'MULTI_DB_UNSUPPORTED')
+    expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').join(' '))
+      .not_to include('/Users/dev', '/tmp')
+  end
+
   it 'emits fatal table and primary key diagnostics for selected model failures' do
     missing = model(table_exists: false)
     composite = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: %w[id tenant_id])
@@ -187,6 +204,27 @@ RSpec.describe RailsMmd::SchemaProbe do
     end
   end
 
+  it 'degrades adapter NotImplementedError from optional foreign-key and index metadata' do
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false)],
+      primary_key: 'id',
+      foreign_keys: -> { raise NotImplementedError, 'foreign keys unsupported' },
+      indexes: -> { raise NotImplementedError, 'indexes unsupported' }
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[DB_METADATA_DEGRADED DB_METADATA_DEGRADED]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
+      .to eq(%w[foreign_key unique_index])
+  end
+
   it 'degrades missing adapter metadata APIs instead of treating evidence as absent' do
     user = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id',
                  foreign_keys: :undefined, indexes: :undefined)
@@ -276,6 +314,24 @@ RSpec.describe RailsMmd::SchemaProbe do
 
   def index(columns, unique)
     Struct.new(:columns, :unique).new(columns, unique)
+  end
+
+  def inventory_model(name, database:)
+    model = Class.new
+    model.define_singleton_method(:name) { name }
+    model.define_singleton_method(:abstract_class?) { false }
+    model.define_singleton_method(:base_class) { model }
+    model.define_singleton_method(:table_name) { "#{name.downcase}s" }
+    define_db_config(model, database)
+    model
+  end
+
+  def define_db_config(model, database)
+    model.define_singleton_method(:connection_db_config) do
+      Struct.new(:name, :adapter, :database, :host, :port, :username).new(
+        'primary', 'sqlite3', database, nil, nil, nil
+      )
+    end
   end
 
   def schema_valid_diagnostic?(diagnostic)

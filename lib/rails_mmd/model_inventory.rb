@@ -130,7 +130,7 @@ module RailsMmd
     end
 
     def sanitize_context_value(value)
-      value.is_a?(String) ? redactor.sanitize(value) : value
+      value
     end
 
     def default_context_value(key)

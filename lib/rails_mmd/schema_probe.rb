@@ -168,7 +168,7 @@ module RailsMmd
 
     def degradable_metadata(domain_id, record, metadata_kind)
       [yield, nil]
-    rescue LoadError, SyntaxError, StandardError => e
+    rescue LoadError, NotImplementedError, SyntaxError, StandardError => e
       [[], metadata_degraded(domain_id, record, metadata_kind, e.message)]
     end
 
