@@ -28,7 +28,7 @@ pre-commit:
         - "lib/**/*.rb"
         - "spec/**/*.rb"
         - "features/**/*.rb"
-      run: bundle exec rake rubocop:auto_correct
+      run: bundle exec rubocop --autocorrect-all --force-exclusion {staged_files}
 
     ruby-post-repair-diff:
       priority: 3
@@ -41,7 +41,7 @@ pre-commit:
         - "lib/**/*.rb"
         - "spec/**/*.rb"
         - "features/**/*.rb"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_post_repair_diff!(ARGV)' -- {staged_files}
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_post_repair_diff!'
 
     ruby-rubocop:
       priority: 4
@@ -54,7 +54,7 @@ pre-commit:
         - "lib/**/*.rb"
         - "spec/**/*.rb"
         - "features/**/*.rb"
-      run: bundle exec rake rubocop
+      run: bundle exec rubocop --force-exclusion {staged_files}
 
     ruby-targeted-specs:
       priority: 5

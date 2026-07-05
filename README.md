@@ -5,7 +5,7 @@ from Rails and ActiveRecord applications.
 
 The repository is currently in setup mode. It contains project operating
 contracts, local development-tooling documentation, and a minimal Ruby gem/CLI
-shell. It does not yet include Rails loading, diagram generation, hooks, or CI.
+shell. It does not yet include Rails loading, diagram generation, or CI.
 
 ## Project Model
 

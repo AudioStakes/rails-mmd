@@ -20,10 +20,8 @@ module RailsMmd
       exit 1
     end
 
-    def ensure_no_post_repair_diff!(paths)
-      paths = normalize_paths(paths)
-      return puts('post-repair diff: no matching staged files') if paths.empty?
-      return puts('post-repair diff: no tracked repair diff') if git_success?('diff', '--quiet', '--', *paths)
+    def ensure_no_post_repair_diff!
+      return puts('post-repair diff: no tracked repair diff') if git_success?('diff', '--quiet')
 
       warn 'pre-commit blocked: repair changed tracked files.'
       warn 'Inspect the deterministic repair diff, then stage the intended changes.'
@@ -34,7 +32,7 @@ module RailsMmd
       specs = normalize_paths(paths).grep(%r{\Aspec/.+_spec\.rb\z})
       return puts('targeted specs: no direct spec files matched') if specs.empty?
 
-      exec 'bundle', 'exec', 'rspec', *specs
+      Kernel.exec 'bundle', 'exec', 'rspec', *specs
     end
 
     def schema_fixture_pending!(paths)
@@ -43,7 +41,7 @@ module RailsMmd
     end
 
     def normalize_paths(paths)
-      paths.flatten.compact.flat_map { |path| path.to_s.split(/\s+/) }.reject(&:empty?).uniq
+      paths.flatten.compact.map(&:to_s).reject(&:empty?).uniq
     end
 
     def unstaged_changed_paths(paths)

@@ -32,6 +32,34 @@ RSpec.describe RailsMmd::HookChecks do
     File.write('example.rb', "puts 'unstaged'\n")
   end
 
+  def commit_spaced_file
+    File.write('space name.rb', "puts 'original'\n")
+    system!('git', 'add', 'space name.rb')
+    system!('git', 'commit', '-m', 'spaced')
+  end
+
+  def stage_then_edit_spaced_file
+    File.write('space name.rb', "puts 'staged'\n")
+    system!('git', 'add', 'space name.rb')
+    File.write('space name.rb', "puts 'unstaged'\n")
+  end
+
+  def commit_other_file
+    File.write('other.rb', "puts 'original'\n")
+    system!('git', 'add', 'other.rb')
+    system!('git', 'commit', '-m', 'other')
+  end
+
+  def modify_other_file
+    File.write('other.rb', "puts 'repair'\n")
+  end
+
+  def create_other_file_repair_drift
+    commit_example_file
+    commit_other_file
+    modify_other_file
+  end
+
   def command_names
     YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands').keys
   end
@@ -71,13 +99,48 @@ RSpec.describe RailsMmd::HookChecks do
     end
   end
 
+  it 'preserves spaced filenames when checking mixed changes' do
+    in_git_repository do
+      commit_spaced_file
+      stage_then_edit_spaced_file
+
+      expect { described_class.ensure_no_mixed_changes!(['space name.rb']) }.to raise_error(SystemExit)
+    end
+  end
+
   it 'fails after repair when tracked files changed without staging' do
     in_git_repository do
       commit_example_file
       File.write('example.rb', "puts 'repair'\n")
 
-      expect { described_class.ensure_no_post_repair_diff!(%w[example.rb]) }.to raise_error(SystemExit)
+      expect { described_class.ensure_no_post_repair_diff! }.to raise_error(SystemExit)
     end
+  end
+
+  it 'fails after repair when a tracked file outside the staged list changed' do
+    in_git_repository do
+      create_other_file_repair_drift
+
+      expect { described_class.ensure_no_post_repair_diff! }.to raise_error(SystemExit)
+    end
+  end
+
+  it 'runs direct spec files when staged specs are present' do
+    allow(Kernel).to receive(:exec)
+
+    described_class.run_targeted_specs!(%w[spec/example_spec.rb lib/example.rb])
+
+    expect(Kernel).to have_received(:exec).with('bundle', 'exec', 'rspec', 'spec/example_spec.rb')
+  end
+
+  it 'reports when no direct spec files are present' do
+    expect { described_class.run_targeted_specs!(%w[lib/example.rb]) }
+      .to output("targeted specs: no direct spec files matched\n").to_stdout
+  end
+
+  it 'reports pending schema and fixture routing without unrelated checks' do
+    expect { described_class.schema_fixture_pending!(%w[schemas/example.json fixtures/example.mmd]) }
+      .to output("schema/fixture checks pending: schemas/example.json, fixtures/example.mmd\n").to_stdout
   end
 
   it 'keeps the pre-commit hook order repair-first without automatic restaging' do
