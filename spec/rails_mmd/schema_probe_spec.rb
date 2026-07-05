@@ -3,6 +3,7 @@
 require 'rails_mmd/canonical_json'
 require 'rails_mmd/domain_resolver'
 require 'rails_mmd/model_inventory'
+require 'rails_mmd/relationship_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
@@ -11,7 +12,7 @@ RSpec.describe RailsMmd::SchemaProbe do
   it 'reads table, column, primary-key, foreign-key, and unique-index metadata for selected entities only' do
     user = model(
       table_exists: true,
-      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      columns: [column('id', :integer, false), column('account_id', :integer, true), column('email', :string, true)],
       primary_key: 'id',
       foreign_keys: [foreign_key('users', 'account_id', 'accounts', 'id')],
       indexes: [index(%w[email], true)]
@@ -27,7 +28,7 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result.diagnostics).to eq([])
     expect(result.domains.first.entities.map(&:ruby_constant)).to eq(['User'])
     entity = result.domains.first.entities.first
-    expect(entity.columns.map(&:name)).to eq(%w[id account_id])
+    expect(entity.columns.map(&:name)).to eq(%w[id account_id email])
     expect(entity.primary_key).to eq('id')
     expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
     expect(entity.indexes.map(&:unique)).to eq([true])
@@ -226,7 +227,8 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
 
   it 'degrades missing adapter metadata APIs instead of treating evidence as absent' do
-    user = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id',
+    user = model(table_exists: true, columns: [column('id', :integer, false), column('email', :string, true)],
+                 primary_key: 'id',
                  foreign_keys: :undefined, indexes: :undefined)
     domain = domain_result('core', [record('User')])
 
@@ -240,7 +242,8 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
 
   it 'reads foreign-key and index metadata from the connection when model APIs are absent' do
-    user = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id',
+    user = model(table_exists: true, columns: [column('id', :integer, false), column('email', :string, true)],
+                 primary_key: 'id',
                  foreign_keys: :undefined, indexes: :undefined)
     connection = Struct.new(:foreign_keys_payload, :indexes_payload) do
       def foreign_keys(_table_name) = foreign_keys_payload
@@ -259,6 +262,146 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result).to be_success
     expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
     expect(entity.indexes.map(&:columns)).to eq([%w[email]])
+  end
+
+  it 'degrades inconsistent foreign-key and index metadata instead of handing it to relationship cardinality' do
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false)],
+      primary_key: 'id',
+      foreign_keys: [foreign_key('users', nil, 'accounts', 'id')],
+      indexes: [index(['account_id'], nil)]
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.entities.first.foreign_keys).to eq([])
+    expect(result.domains.first.entities.first.indexes).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[DB_METADATA_DEGRADED DB_METADATA_DEGRADED]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
+      .to eq(%w[foreign_key unique_index])
+  end
+
+  it 'preserves optional plain and partial index evidence as closed scalar metadata' do
+    indexes = [
+      index(['account_id'], true, using: :btree),
+      index(['account_id'], true, where: 'deleted_at IS NULL'),
+      index(['account_id'], true, expression: 'account_id')
+    ]
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      primary_key: 'id',
+      indexes: indexes
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.entities.first.indexes.map(&:where)).to eq([nil, 'deleted_at IS NULL', nil])
+    expect(result.domains.first.entities.first.indexes.map(&:using)).to eq(['btree', nil, nil])
+    expect(result.domains.first.entities.first.indexes.map(&:expression)).to eq([nil, nil, 'account_id'])
+  end
+
+  it 'degrades expression-column and non-scalar index metadata instead of leaking raw adapter values' do
+    indexes = [
+      index(['LOWER(account_id)'], true),
+      index(['account_id'], true, expression: Object.new)
+    ]
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      primary_key: 'id',
+      indexes: indexes
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.entities.first.indexes).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') }).to eq(
+      ['unique_index']
+    )
+  end
+
+  it 'keeps valid metadata records when unrelated optional records are malformed' do
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      primary_key: 'id',
+      foreign_keys: [
+        foreign_key('users', 'account_id', 'accounts', 'id'),
+        foreign_key('users', nil, 'accounts', 'id')
+      ],
+      indexes: [
+        index(['account_id'], true, using: :btree),
+        index(['LOWER(account_id)'], true)
+      ]
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { user }).probe(
+      domains: [domain_result('core', [record('User')])]
+    )
+
+    entity = result.domains.first.entities.first
+    expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
+    expect(entity.indexes.map(&:columns)).to eq([['account_id']])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
+      .to eq(%w[foreign_key unique_index])
+  end
+
+  it 'keeps probe-to-relationship cardinality weak for partial index evidence' do
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      primary_key: 'id',
+      indexes: [index(['account_id'], true, where: 'deleted_at IS NULL')]
+    )
+    account = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id')
+    probe_result = described_class.new(model_resolver: lambda { |name|
+      { 'User' => user, 'Account' => account }.fetch(name)
+    })
+                                  .probe(domains: [domain_result('core', [record('User'), record('Account')])])
+    user_owner = owner_model(belongs_to('account'))
+    account_target = relationship_target_model('Account', 'accounts')
+
+    relationship = RailsMmd::RelationshipBuilder.new(
+      model_resolver: ->(name) { { 'User' => user_owner, 'Account' => account_target }.fetch(name) }
+    ).build(domains: probe_result.domains).domains.first.relationships.first
+
+    expect(relationship.owner_cardinality).to eq('0..many')
+  end
+
+  it 'keeps probe-to-relationship cardinality weak for non-btree index evidence' do
+    user = model(
+      table_exists: true,
+      columns: [column('id', :integer, false), column('account_id', :integer, true)],
+      primary_key: 'id',
+      indexes: [index(['account_id'], true, using: :gin)]
+    )
+    account = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: 'id')
+    probe_result = described_class.new(model_resolver: lambda { |name|
+      { 'User' => user, 'Account' => account }.fetch(name)
+    })
+                                  .probe(domains: [domain_result('core', [record('User'), record('Account')])])
+    user_owner = owner_model(belongs_to('account'))
+    account_target = relationship_target_model('Account', 'accounts')
+
+    relationship = RailsMmd::RelationshipBuilder.new(
+      model_resolver: ->(name) { { 'User' => user_owner, 'Account' => account_target }.fetch(name) }
+    ).build(domains: probe_result.domains).domains.first.relationships.first
+
+    expect(relationship.owner_cardinality).to eq('0..many')
   end
 
   def domain_result(domain_id, records)
@@ -312,8 +455,35 @@ RSpec.describe RailsMmd::SchemaProbe do
     Struct.new(:from_table, :column, :to_table, :primary_key).new(from_table, column, to_table, primary_key)
   end
 
-  def index(columns, unique)
-    Struct.new(:columns, :unique).new(columns, unique)
+  def index(columns, unique, where: nil, using: nil, expression: nil)
+    Struct.new(:columns, :unique, :where, :using, :expression).new(columns, unique, where, using, expression)
+  end
+
+  def owner_model(*reflections)
+    Class.new do
+      define_singleton_method(:reflect_on_all_associations) do |macro|
+        raise 'only belongs_to should be requested' unless macro == :belongs_to
+
+        reflections
+      end
+    end
+  end
+
+  def belongs_to(name)
+    Struct.new(:name, :macro, :foreign_key, :association_primary_key, :class_name) do
+      def polymorphic? = false
+
+      def scope = nil
+    end.new(name, :belongs_to, "#{name}_id", 'id', name.capitalize)
+  end
+
+  def relationship_target_model(name, table_name)
+    model = Class.new
+    model.define_singleton_method(:name) { name }
+    model.define_singleton_method(:abstract_class?) { false }
+    model.define_singleton_method(:base_class) { model }
+    model.define_singleton_method(:table_name) { table_name }
+    model
   end
 
   def inventory_model(name, database:)
