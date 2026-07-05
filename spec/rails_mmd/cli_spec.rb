@@ -83,6 +83,13 @@ RSpec.describe RailsMmd::CLI do
     expect_generator_fail_on_warning(generator, true)
   end
 
+  it 'passes all P0 generate options through Thor in process' do
+    generator = stub_generator
+
+    expect { described_class.start(p0_generate_args) }.to raise_error(SystemExit)
+    expect_generator_p0_options(generator)
+  end
+
   it 'ignores non-true fail-on-warning values through Thor in process' do
     generator = stub_generator
 
@@ -142,6 +149,22 @@ RSpec.describe RailsMmd::CLI do
       cli_options: have_attributes(config_path: 'config.yml'),
       fail_on_warning: value
     )
+  end
+
+  def expect_generator_p0_options(generator)
+    expect(generator).to have_received(:run).with(
+      cli_options: have_attributes(
+        config_path: 'config.yml',
+        output_dir: 'docs/diagrams',
+        domain: 'billing',
+        format: 'class'
+      ),
+      fail_on_warning: true
+    )
+  end
+
+  def p0_generate_args
+    %w[generate --config config.yml --output-dir docs/diagrams --domain billing --format class --fail-on-warning]
   end
 
   def expect_config_not_found(stdout, stderr, status)

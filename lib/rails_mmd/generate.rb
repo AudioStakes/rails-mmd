@@ -114,7 +114,10 @@ module RailsMmd
     end
 
     def publish_stderr(result)
-      result.stderr.to_s.empty? ? publisher.pre_output_stderr(result.diagnostics) : result.stderr.to_s
+      return result.stderr.to_s unless result.stderr.to_s.empty?
+      return '' if result.success?
+
+      publisher.pre_output_stderr(result.diagnostics)
     end
 
     def artifact_kinds(config)
