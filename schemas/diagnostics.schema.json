@@ -270,7 +270,7 @@
         "domain_id": { "$ref": "#/$defs/domain_id" },
         "connection_context_ids": {
           "type": "array",
-          "items": { "$ref": "#/$defs/structured_id" }
+          "items": { "$ref": "#/$defs/sanitized_string" }
         }
       }
     },
@@ -347,109 +347,31 @@
         "path": { "$ref": "#/$defs/relative_path" }
       }
     },
-    "metadata_for_config_not_found": {
-      "if": { "properties": { "code": { "const": "CONFIG_NOT_FOUND" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_not_found" } } }
-    },
-    "metadata_for_config_schema_invalid": {
-      "if": { "properties": { "code": { "const": "CONFIG_SCHEMA_INVALID" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_schema_invalid" } } }
-    },
-    "metadata_for_config_domain_not_found": {
-      "if": { "properties": { "code": { "const": "CONFIG_DOMAIN_NOT_FOUND" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_domain_not_found" } } }
-    },
-    "metadata_for_output_directory_invalid": {
-      "if": { "properties": { "code": { "const": "OUTPUT_DIRECTORY_INVALID" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_directory_invalid" } } }
-    },
-    "metadata_for_domain_model_not_found": {
-      "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_FOUND" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_found" } } }
-    },
-    "metadata_for_domain_model_not_renderable": {
-      "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_RENDERABLE" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_renderable" } } }
-    },
-    "metadata_for_domain_empty": {
-      "if": { "properties": { "code": { "const": "DOMAIN_EMPTY" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_empty" } } }
-    },
-    "metadata_for_rails_load_failed": {
-      "if": { "properties": { "code": { "const": "RAILS_LOAD_FAILED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
-    },
-    "metadata_for_rails_eager_load_failed": {
-      "if": { "properties": { "code": { "const": "RAILS_EAGER_LOAD_FAILED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
-    },
-    "metadata_for_multi_db_unsupported": {
-      "if": { "properties": { "code": { "const": "MULTI_DB_UNSUPPORTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_multi_db_unsupported" } } }
-    },
-    "metadata_for_model_table_missing": {
-      "if": { "properties": { "code": { "const": "MODEL_TABLE_MISSING" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } }
-    },
-    "metadata_for_model_primary_key_unsupported": {
-      "if": { "properties": { "code": { "const": "MODEL_PRIMARY_KEY_UNSUPPORTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } }
-    },
-    "metadata_for_association_target_unresolved": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_UNRESOLVED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_target_not_renderable_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_polymorphic_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_POLYMORPHIC_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_scoped_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_SCOPED_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_composite_key_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_COMPOSITE_KEY_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_key_column_missing": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_KEY_COLUMN_MISSING" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_non_primary_key_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_NON_PRIMARY_KEY_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_association_name_unsupported_omitted": {
-      "if": { "properties": { "code": { "const": "ASSOCIATION_NAME_UNSUPPORTED_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_domain_relationship_omitted": {
-      "if": { "properties": { "code": { "const": "DOMAIN_RELATIONSHIP_OMITTED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } }
-    },
-    "metadata_for_db_metadata_degraded": {
-      "if": { "properties": { "code": { "const": "DB_METADATA_DEGRADED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_db_metadata_degraded" } } }
-    },
-    "metadata_for_safe_token_collision": {
-      "if": { "properties": { "code": { "const": "SAFE_TOKEN_COLLISION" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_safe_token_collision" } } }
-    },
-    "metadata_for_mermaid_serialization_failed": {
-      "if": { "properties": { "code": { "const": "MERMAID_SERIALIZATION_FAILED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_mermaid_serialization_failed" } } }
-    },
-    "metadata_for_output_write_failed": {
-      "if": { "properties": { "code": { "const": "OUTPUT_WRITE_FAILED" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_write_failed" } } }
-    },
-    "metadata_for_internal_error": {
-      "if": { "properties": { "code": { "const": "INTERNAL_ERROR" } }, "required": ["code"] },
-      "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } }
-    }
+    "metadata_for_config_not_found": { "if": { "properties": { "code": { "const": "CONFIG_NOT_FOUND" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_not_found" } } } },
+    "metadata_for_config_schema_invalid": { "if": { "properties": { "code": { "const": "CONFIG_SCHEMA_INVALID" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_schema_invalid" } } } },
+    "metadata_for_config_domain_not_found": { "if": { "properties": { "code": { "const": "CONFIG_DOMAIN_NOT_FOUND" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_config_domain_not_found" } } } },
+    "metadata_for_output_directory_invalid": { "if": { "properties": { "code": { "const": "OUTPUT_DIRECTORY_INVALID" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_directory_invalid" } } } },
+    "metadata_for_domain_model_not_found": { "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_FOUND" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_found" } } } },
+    "metadata_for_domain_model_not_renderable": { "if": { "properties": { "code": { "const": "DOMAIN_MODEL_NOT_RENDERABLE" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_model_not_renderable" } } } },
+    "metadata_for_domain_empty": { "if": { "properties": { "code": { "const": "DOMAIN_EMPTY" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_domain_empty" } } } },
+    "metadata_for_rails_load_failed": { "if": { "properties": { "code": { "const": "RAILS_LOAD_FAILED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } } },
+    "metadata_for_rails_eager_load_failed": { "if": { "properties": { "code": { "const": "RAILS_EAGER_LOAD_FAILED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } } },
+    "metadata_for_multi_db_unsupported": { "if": { "properties": { "code": { "const": "MULTI_DB_UNSUPPORTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_multi_db_unsupported" } } } },
+    "metadata_for_model_table_missing": { "if": { "properties": { "code": { "const": "MODEL_TABLE_MISSING" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } } },
+    "metadata_for_model_primary_key_unsupported": { "if": { "properties": { "code": { "const": "MODEL_PRIMARY_KEY_UNSUPPORTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_model_table_missing" } } } },
+    "metadata_for_association_target_unresolved": { "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_UNRESOLVED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_target_not_renderable_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_polymorphic_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_POLYMORPHIC_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_scoped_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_SCOPED_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_composite_key_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_COMPOSITE_KEY_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_key_column_missing": { "if": { "properties": { "code": { "const": "ASSOCIATION_KEY_COLUMN_MISSING" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_non_primary_key_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_NON_PRIMARY_KEY_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_name_unsupported_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_NAME_UNSUPPORTED_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_domain_relationship_omitted": { "if": { "properties": { "code": { "const": "DOMAIN_RELATIONSHIP_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_db_metadata_degraded": { "if": { "properties": { "code": { "const": "DB_METADATA_DEGRADED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_db_metadata_degraded" } } } },
+    "metadata_for_safe_token_collision": { "if": { "properties": { "code": { "const": "SAFE_TOKEN_COLLISION" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_safe_token_collision" } } } },
+    "metadata_for_mermaid_serialization_failed": { "if": { "properties": { "code": { "const": "MERMAID_SERIALIZATION_FAILED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_mermaid_serialization_failed" } } } },
+    "metadata_for_output_write_failed": { "if": { "properties": { "code": { "const": "OUTPUT_WRITE_FAILED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_output_write_failed" } } } },
+    "metadata_for_internal_error": { "if": { "properties": { "code": { "const": "INTERNAL_ERROR" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_exception" } } } }
   }
 }
