@@ -18,3 +18,7 @@
 .DS_Store
 *.swp
 *.swo
+
+# Ruby build artifacts
+pkg/
+*.gem

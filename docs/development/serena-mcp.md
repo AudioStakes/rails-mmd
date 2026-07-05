@@ -87,10 +87,21 @@ If Serena is unavailable, if the local client cannot report MCP status, or if
 indexing cannot run in the local environment, record that as
 skipped-environment evidence instead of substituting another tool. For indexing
 failures, record the command, exit status, local Ruby/LSP setup detail when
-shown, and the first relevant error line. During this setup issue, the observed
-local failure was missing Ruby/ruby-lsp version setup followed by Ruby
-language-server startup termination. The later Ruby gem bootstrap issue owns the
-repo Ruby version and first analyzable Ruby files.
+shown, and the first relevant error line.
+
+This repository now pins Ruby in `.ruby-version`. If Serena indexing reports
+that it cannot detect a supported Ruby version manager, verify that the shell
+used to start Serena can resolve Ruby through the same version manager used for
+the repository, for example:
+
+```sh
+asdf install ruby 4.0.5
+asdf local ruby 4.0.5
+asdf exec ruby -v
+```
+
+If Serena still falls back to system Ruby or the Ruby language server terminates,
+record that as local environment evidence in the relevant PR.
 
 When checking Serena ignore behavior with `serena project is_ignored_path`,
 create disposable files first. Serena reports paths that do not exist as not

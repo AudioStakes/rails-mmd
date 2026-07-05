@@ -25,9 +25,15 @@ current stable release.
 The current CLI shell supports only help and version smoke behavior:
 
 ```sh
+asdf install ruby 4.0.5
+asdf local ruby 4.0.5
+asdf exec bundle install
 bundle exec ruby -Ilib exe/rails-mmd --help
 bundle exec ruby -Ilib exe/rails-mmd --version
 ```
+
+If your shell does not already resolve `ruby` and `bundle` through the pinned
+toolchain, prefix the smoke commands with `asdf exec`.
 
 `rails-mmd generate` and all P0 feature options are intentionally absent until a
 future implementation issue adds the command with matching contract coverage.
