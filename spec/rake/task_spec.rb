@@ -24,4 +24,12 @@ RSpec.describe Rake::Task do
   it 'keeps autocorrect out of read-only diagnostics' do
     expect(described_class[:default].prerequisites).not_to include('rubocop:auto_correct')
   end
+
+  it 'checks bundle audit without updating advisory data' do
+    expect(BUNDLE_AUDIT_COMMAND).to eq(%w[bundle exec bundler-audit check --no-update])
+  end
+
+  it 'defines explicit advisory data refresh' do
+    expect(described_class.task_defined?('bundle:audit:update')).to be(true)
+  end
 end
