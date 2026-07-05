@@ -1,0 +1,102 @@
+# frozen_string_literal: true
+
+require 'rails_mmd/canonical_json'
+require 'rails_mmd/ir_builder'
+require 'rails_mmd/relationship_builder'
+require 'rails_mmd/schema_probe'
+require 'rails_mmd/schema_validator'
+
+# rubocop:disable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations
+RSpec.describe RailsMmd::IrBuilder do
+  it 'normalizes selected entities and relationships into schema-valid deterministic IR' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [
+        entity('User', 'users', columns: [column('id'), column('account_id')]),
+        entity('Account', 'accounts')
+      ],
+      diagnostics: [diagnostic('d_db_metadata_degraded')]
+    )
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core',
+      relationships: [
+        relationship('relationships/users/account', 'entities/users', 'entities/accounts', 'account')
+      ],
+      diagnostics: [diagnostic('d_relationship_warning')]
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+
+    expect(payload.fetch('entities').map { |entity_payload| entity_payload.fetch('entity_id') }).to eq(
+      %w[entities/accounts entities/users]
+    )
+    expect(payload.fetch('entities').last.fetch('attributes').map { |attribute| attribute.fetch('role') }).to eq(
+      %w[primary_key foreign_key]
+    )
+    expect(payload.fetch('relationships').first).to include(
+      'relationship_id' => 'relationships/users/account',
+      'association_name' => 'account',
+      'owner_cardinality' => '0..many',
+      'target_cardinality' => '1..1'
+    )
+    expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
+    expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
+    expect(schema_valid_ir?(payload)).to be(true)
+    expect(payload.fetch('digest_sha256')).to eq(
+      RailsMmd::CanonicalJson.digest_sha256(payload.merge('digest_sha256' => nil))
+    )
+  end
+
+  it 'supports attributes none without changing relationship serialization' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [entity('User', 'users', columns: [column('id'), column('account_id')])],
+      diagnostics: []
+    )
+    result = described_class.new(attributes: :none).build(domains: [domain], relationship_domains: [])
+
+    expect(result.domains.first.payload.fetch('entities').first.fetch('attributes')).to eq([])
+    expect(schema_valid_ir?(result.domains.first.payload)).to be(true)
+  end
+
+  def entity(ruby_constant, table_name, columns: [column('id')])
+    RailsMmd::SchemaProbe::Entity.new(
+      ruby_constant: ruby_constant,
+      table_name: table_name,
+      connection_context_id: '{"name":"primary"}',
+      columns: columns,
+      primary_key: 'id',
+      foreign_keys: [],
+      indexes: []
+    )
+  end
+
+  def column(name)
+    RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: false)
+  end
+
+  def relationship(id, owner_id, target_id, name)
+    RailsMmd::RelationshipBuilder::Relationship.new(
+      relationship_id: id,
+      owner_entity_id: owner_id,
+      target_entity_id: target_id,
+      association_name: name,
+      owner_foreign_key_column: 'account_id',
+      target_primary_key_column: 'id',
+      owner_fk_unique: false,
+      db_foreign_key: true,
+      owner_fk_nullable: false,
+      owner_cardinality: '0..many',
+      target_cardinality: '1..1'
+    )
+  end
+
+  def diagnostic(id)
+    { 'diagnostic_id' => id }
+  end
+
+  def schema_valid_ir?(payload)
+    RailsMmd::SchemaValidator.new.valid?(:ir, payload)
+  end
+end
+# rubocop:enable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations

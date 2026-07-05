@@ -20,7 +20,16 @@ module RailsMmd
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
     ForeignKey = Struct.new(:from_table, :column, :to_table, :primary_key, keyword_init: true)
-    Index = Struct.new(:columns, :unique, keyword_init: true)
+    Index = Struct.new(:columns, :unique, :where, :using, :expression, keyword_init: true)
+    # Carries valid metadata records when only some optional adapter rows degrade.
+    class PartialMetadataDegraded < StandardError
+      attr_reader :records
+
+      def initialize(records:, message:)
+        @records = records
+        super(message)
+      end
+    end
     Result = Struct.new(:domains, :diagnostics, :exit_code, keyword_init: true) do
       def success?
         diagnostics.none? { |diagnostic| diagnostic.fetch('severity') != 'warning' }
@@ -168,6 +177,8 @@ module RailsMmd
 
     def degradable_metadata(domain_id, record, metadata_kind)
       [yield, nil]
+    rescue PartialMetadataDegraded => e
+      [e.records, metadata_degraded(domain_id, record, metadata_kind, e.message)]
     rescue LoadError, NotImplementedError, SyntaxError, StandardError => e
       [[], metadata_degraded(domain_id, record, metadata_kind, e.message)]
     end
@@ -178,14 +189,10 @@ module RailsMmd
                      else
                        connection_metadata(model, :foreign_keys, table_name)
                      end
-      Array(foreign_keys).map do |foreign_key|
-        ForeignKey.new(
-          from_table: value_from(foreign_key, :from_table),
-          column: value_from(foreign_key, :column),
-          to_table: value_from(foreign_key, :to_table),
-          primary_key: value_from(foreign_key, :primary_key)
-        )
-      end
+      valid_records = valid_metadata_records(Array(foreign_keys)) { |foreign_key| foreign_key_record(foreign_key) }
+      return valid_records if valid_records.length == Array(foreign_keys).length
+
+      raise PartialMetadataDegraded.new(records: valid_records, message: 'foreign_key metadata inconsistent')
     end
 
     def read_indexes(model, table_name)
@@ -194,9 +201,78 @@ module RailsMmd
                 else
                   connection_metadata(model, :indexes, table_name)
                 end
-      Array(indexes).map do |index|
-        Index.new(columns: value_from(index, :columns), unique: value_from(index, :unique))
+      column_names = model.columns.map { |column| value_from(column, :name) }
+      valid_records = valid_metadata_records(Array(indexes)) { |index| index_record(index, column_names) }
+      return valid_records if valid_records.length == Array(indexes).length
+
+      raise PartialMetadataDegraded.new(records: valid_records, message: 'unique_index metadata inconsistent')
+    end
+
+    def valid_metadata_records(records)
+      records.filter_map do |record|
+        yield record
+      rescue ArgumentError
+        nil
       end
+    end
+
+    def foreign_key_record(foreign_key)
+      record = ForeignKey.new(
+        from_table: value_from(foreign_key, :from_table),
+        column: value_from(foreign_key, :column),
+        to_table: value_from(foreign_key, :to_table),
+        primary_key: value_from(foreign_key, :primary_key)
+      )
+      return record if [record.from_table, record.column, record.to_table, record.primary_key].all? do |value|
+        value.is_a?(String) && !value.empty?
+      end
+
+      raise ArgumentError, 'foreign_key metadata inconsistent'
+    end
+
+    def index_record(index, column_names)
+      record = Index.new(
+        columns: value_from(index, :columns),
+        unique: value_from(index, :unique),
+        where: value_from(index, :where),
+        using: normalized_index_using(value_from(index, :using)),
+        expression: value_from(index, :expression)
+      )
+      return record if index_record_valid?(record, column_names)
+
+      raise ArgumentError, 'unique_index metadata inconsistent'
+    end
+
+    def index_record_valid?(record, column_names)
+      index_columns_valid?(record.columns, column_names) &&
+        boolean?(record.unique) &&
+        optional_index_fields_valid?(record)
+    end
+
+    def index_columns_valid?(columns, column_names)
+      columns.is_a?(Array) &&
+        columns.all? { |column| column.is_a?(String) && !column.empty? } &&
+        columns.all? { |column| column_names.include?(column) }
+    end
+
+    def boolean?(value)
+      [true, false].include?(value)
+    end
+
+    def optional_index_fields_valid?(record)
+      optional_string_or_nil?(record.where) &&
+        optional_string_or_nil?(record.expression) &&
+        optional_string_or_nil?(record.using)
+    end
+
+    def optional_string_or_nil?(value)
+      value.nil? || value.is_a?(String)
+    end
+
+    def normalized_index_using(value)
+      return value.to_s if value.is_a?(Symbol)
+
+      value
     end
 
     def connection_metadata(model, method_name, table_name)
