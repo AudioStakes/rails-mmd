@@ -96,8 +96,7 @@ the repository, for example:
 
 ```sh
 asdf install ruby 4.0.5
-asdf local ruby 4.0.5
-asdf exec ruby -v
+ASDF_RUBY_VERSION=4.0.5 asdf exec ruby -v
 ```
 
 If Serena still falls back to system Ruby or the Ruby language server terminates,

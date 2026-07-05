@@ -5,7 +5,7 @@ require 'rails_mmd/version'
 
 RSpec.describe 'rails-mmd executable' do
   def run_cli(*)
-    Open3.capture3(RbConfig.ruby, '-Ilib', 'exe/rails-mmd', *)
+    Open3.capture3('bundle', 'exec', 'exe/rails-mmd', *)
   end
 
   it 'prints help without exposing P0 commands' do
