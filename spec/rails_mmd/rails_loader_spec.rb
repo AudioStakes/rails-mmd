@@ -61,6 +61,47 @@ RSpec.describe RailsMmd::RailsLoader do
     expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 
+  it 'fails closed when a target Gemfile exists without a Bundler context' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new do
+        def load(_path) = raise('must not load')
+      end.new,
+      bundler: nil
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'RAILS_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata'))
+      .to include('exception_class' => 'RailsMmd::RailsLoader::BundleContextError')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'fails closed when Bundler cannot identify the current Gemfile' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+    missing_bundle = Class.new do
+      def default_gemfile
+        raise Bundler::GemfileNotFound
+      end
+    end.new
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new do
+        def load(_path) = raise('must not load')
+      end.new,
+      bundler: missing_bundle
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'RAILS_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata'))
+      .to include('exception_class' => 'RailsMmd::RailsLoader::BundleContextError')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
   it 'returns a schema-valid RAILS_LOAD_FAILED diagnostic for boot failures' do
     kernel = Class.new do
       def load(_path)

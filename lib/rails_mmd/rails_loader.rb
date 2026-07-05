@@ -50,14 +50,22 @@ module RailsMmd
     end
 
     def validate_bundle_context!
-      return unless bundler.respond_to?(:default_gemfile)
-
       app_gemfile = project_root.join('Gemfile')
       return unless app_gemfile.file?
-      return if Pathname(bundler.default_gemfile).expand_path == app_gemfile
+
+      current_gemfile = current_bundle_gemfile
+      return if current_gemfile && Pathname(current_gemfile).expand_path == app_gemfile
 
       raise BundleContextError,
             'rails-mmd must be run inside the target Rails application bundle'
+    end
+
+    def current_bundle_gemfile
+      return unless bundler.respond_to?(:default_gemfile)
+
+      bundler.default_gemfile
+    rescue LoadError, StandardError
+      nil
     end
 
     def eager_load(application)
