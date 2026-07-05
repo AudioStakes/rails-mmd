@@ -270,7 +270,7 @@
         "domain_id": { "$ref": "#/$defs/domain_id" },
         "connection_context_ids": {
           "type": "array",
-          "items": { "$ref": "#/$defs/structured_id" }
+          "items": { "$ref": "#/$defs/sanitized_string" }
         }
       }
     },
