@@ -63,8 +63,8 @@ RSpec.describe 'P0 contract schemas' do
       expect_valid('diagnostics', 'diagnostics/valid/catalog.json')
     end
 
-    it 'rejects diagnostics outside the closed catalog' do
-      expect_invalid('diagnostics', 'diagnostics/invalid/unknown_code.json')
+    it 'rejects diagnostics outside the closed catalog and sanitized boundary' do
+      diagnostics_invalid_fixtures.each { |path| expect_invalid('diagnostics', path) }
     end
 
     it 'covers every diagnostic code from the P0 catalog fixture' do
@@ -98,6 +98,12 @@ RSpec.describe 'P0 contract schemas' do
     end
   end
 
+  it 'rejects whitespace and line terminators in every domain-scoped schema domain ID' do
+    invalid_ids = fixture('config/domain_id_examples.json').fetch('negative').grep(/\s/)
+
+    expect(domain_schema_acceptances(invalid_ids)).to all(eq([]))
+  end
+
   def config_valid_fixtures
     %w[
       config/valid/full.json
@@ -127,6 +133,31 @@ RSpec.describe 'P0 contract schemas' do
     ]
   end
 
+  def diagnostics_invalid_fixtures
+    diagnostics_digest_invalid_fixtures + diagnostics_sanitized_invalid_fixtures
+  end
+
+  def diagnostics_digest_invalid_fixtures
+    %w[
+      diagnostics/invalid/unknown_code.json
+      diagnostics/invalid/uppercase_digest.json
+      diagnostics/invalid/short_digest.json
+      diagnostics/invalid/long_digest.json
+      diagnostics/invalid/non_hex_digest.json
+      diagnostics/invalid/missing_digest.json
+    ]
+  end
+
+  def diagnostics_sanitized_invalid_fixtures
+    %w[
+      diagnostics/invalid/invalid_domain_id.json
+      diagnostics/invalid/global_domain_mismatch.json
+      diagnostics/invalid/machine_local_metadata.json
+      diagnostics/invalid/absolute_artifact_path.json
+      diagnostics/invalid/raw_backtrace.json
+    ]
+  end
+
   def render_plan_invalid_fixtures
     %w[
       render_plan/invalid/uppercase_digest.json
@@ -135,6 +166,7 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/invalid/non_hex_digest.json
       render_plan/invalid/missing_digest.json
       render_plan/invalid/machine_local_fields.json
+      render_plan/invalid/unsanitized_comment.json
     ]
   end
 
@@ -146,6 +178,14 @@ RSpec.describe 'P0 contract schemas' do
     domain_ids.select { |domain_id| domain_id_valid?(domain_id) }
   end
 
+  def domain_schema_acceptances(domain_ids)
+    [
+      domain_ids.select { |domain_id| diagnostics_domain_id_valid?(domain_id) },
+      domain_ids.select { |domain_id| ir_domain_id_valid?(domain_id) },
+      domain_ids.select { |domain_id| render_plan_domain_id_valid?(domain_id) }
+    ]
+  end
+
   def domain_id_valid?(domain_id)
     data = {
       'version' => 1,
@@ -155,6 +195,54 @@ RSpec.describe 'P0 contract schemas' do
     }
 
     schema('config').valid?(data)
+  end
+
+  def diagnostics_domain_id_valid?(domain_id)
+    data = {
+      'schema_version' => 1,
+      'scope' => 'domain',
+      'domain_id' => domain_id,
+      'diagnostics' => [],
+      'digest_sha256' => digest('a')
+    }
+
+    schema('diagnostics').valid?(data)
+  end
+
+  def ir_domain_id_valid?(domain_id)
+    data = {
+      'schema_version' => 1,
+      'domain_id' => domain_id,
+      'entities' => [],
+      'relationships' => [],
+      'diagnostic_ids' => [],
+      'digest_sha256' => digest('b')
+    }
+
+    schema('ir').valid?(data)
+  end
+
+  def render_plan_domain_id_valid?(domain_id)
+    schema('render_plan').valid?(render_plan_with_domain_id(domain_id))
+  end
+
+  def render_plan_with_domain_id(domain_id)
+    render_plan_base.merge('domain_id' => domain_id)
+  end
+
+  def render_plan_base
+    {
+      'schema_version' => 1, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
+      'entities' => [],
+      'relationships' => [],
+      'comments' => [],
+      'diagnostic_ids' => [],
+      'digest_sha256' => digest('c')
+    }
+  end
+
+  def digest(character)
+    character * 64
   end
 
   def diagnostic_codes_from_schema
