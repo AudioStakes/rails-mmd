@@ -41,3 +41,5 @@ The `pre-push` hook runs the CI-equivalent default Rake task:
 ```sh
 ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec lefthook run pre-push
 ```
+
+GitHub Actions runs the same default Rake verification contract.
