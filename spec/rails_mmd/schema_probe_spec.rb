@@ -66,6 +66,21 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
   end
 
+  it 'detects multi-db even when redaction collapses distinct context IDs' do
+    first = record('User', connection_context_id: '{"database":"/Users/dev/app_one"}')
+    second = record('Account', connection_context_id: '{"database":"/tmp/app_two"}')
+
+    result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(
+      domains: [domain_result('core', [first, second])]
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first).to include('code' => 'MULTI_DB_UNSUPPORTED')
+    expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').length).to eq(2)
+    expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').join(' '))
+      .not_to include('/Users/dev', '/tmp')
+  end
+
   it 'emits fatal table and primary key diagnostics for selected model failures' do
     missing = model(table_exists: false)
     composite = model(table_exists: true, columns: [column('id', :integer, false)], primary_key: %w[id tenant_id])
@@ -116,6 +131,18 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
   end
 
+  it 'contains selected model load and syntax errors as scoped table metadata failures' do
+    [LoadError, SyntaxError].each do |error_class|
+      result = described_class.new(
+        model_resolver: ->(_name) { raise error_class, '/Users/dev/app failed' }
+      ).probe(domains: [domain_result('core', [record('User')])])
+
+      expect(result).not_to be_success
+      expect(result.diagnostics.first).to include('code' => 'MODEL_TABLE_MISSING')
+      expect(result.diagnostics.first.fetch('message')).not_to include('/Users/dev')
+    end
+  end
+
   it 'degrades optional foreign-key and unique-index metadata without strengthening evidence' do
     user = model(
       table_exists: true,
@@ -139,6 +166,25 @@ RSpec.describe RailsMmd::SchemaProbe do
       .to eq(%w[foreign_key unique_index])
     expect(result.diagnostics.first.dig('metadata', 'reason')).not_to include('/Users/dev')
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
+  end
+
+  it 'degrades optional metadata load and syntax errors without leaking raw paths' do
+    [LoadError, SyntaxError].each do |error_class|
+      user = model(
+        table_exists: true,
+        columns: [column('id', :integer, false)],
+        primary_key: 'id',
+        foreign_keys: -> { raise error_class, '/Users/dev/fk failed' }
+      )
+
+      result = described_class.new(model_resolver: ->(_name) { user }).probe(
+        domains: [domain_result('core', [record('User')])]
+      )
+
+      expect(result).to be_success
+      expect(result.diagnostics.first).to include('code' => 'DB_METADATA_DEGRADED')
+      expect(result.diagnostics.first.dig('metadata', 'reason')).not_to include('/Users/dev')
+    end
   end
 
   it 'degrades missing adapter metadata APIs instead of treating evidence as absent' do

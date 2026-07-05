@@ -66,8 +66,10 @@ module RailsMmd
     end
 
     def multi_db_diagnostic(domain)
-      connection_context_ids = domain.records.map { |record| redactor.sanitize(record.connection_context_id) }.uniq.sort
-      return if connection_context_ids.length < 2
+      raw_context_ids = domain.records.map(&:connection_context_id)
+      return if raw_context_ids.uniq.length < 2
+
+      connection_context_ids = raw_context_ids.map { |context_id| redactor.sanitize(context_id) }.sort
 
       diagnostics.build(
         code: 'MULTI_DB_UNSUPPORTED',
@@ -97,7 +99,7 @@ module RailsMmd
 
     def model_for(record)
       model_resolver.call(record.ruby_constant)
-    rescue StandardError
+    rescue LoadError, SyntaxError, StandardError
       nil
     end
 
@@ -136,7 +138,7 @@ module RailsMmd
       return true unless model.respond_to?(:table_exists?)
 
       model.table_exists?
-    rescue StandardError
+    rescue LoadError, SyntaxError, StandardError
       false
     end
 
@@ -150,13 +152,13 @@ module RailsMmd
           nullable: value_from(column, :null)
         )
       end
-    rescue StandardError
+    rescue LoadError, SyntaxError, StandardError
       nil
     end
 
     def read_primary_key(model)
       model.respond_to?(:primary_key) ? model.primary_key : nil
-    rescue StandardError
+    rescue LoadError, SyntaxError, StandardError
       nil
     end
 
@@ -166,7 +168,7 @@ module RailsMmd
 
     def degradable_metadata(domain_id, record, metadata_kind)
       [yield, nil]
-    rescue StandardError => e
+    rescue LoadError, SyntaxError, StandardError => e
       [[], metadata_degraded(domain_id, record, metadata_kind, e.message)]
     end
 
