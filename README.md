@@ -15,6 +15,12 @@ hooks, or CI.
 - No `packages/rails-mmd/` nesting.
 - Serena is local development tooling only and is not a runtime dependency.
 
+## P0 Contract
+
+The P0 implementation contract is documented in
+[`docs/p0-contract.md`](docs/p0-contract.md). Future implementation work should
+read that file instead of relying on chat history or local design attachments.
+
 ## Serena Setup
 
 Local setup for Codex and Serena MCP is documented in

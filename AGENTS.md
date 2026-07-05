@@ -12,6 +12,9 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   issue explicitly changes the project model.
 - Do not create generated Node package-manager manifests or lockfiles.
 - Do not apply monorepo policy assumptions from other AudioStakes repositories.
+- Treat `docs/p0-contract.md` as the source of truth for P0 implementation
+  scope. Do not rely on chat history, local attachments, or local-only paths for
+  P0 behavior.
 
 ## Serena Workflow
 
