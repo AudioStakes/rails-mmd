@@ -37,6 +37,9 @@ toolchain, prefix commands with `ASDF_RUBY_VERSION=4.0.5 asdf exec`.
 `rails-mmd generate` exposes only P0 options: `--config`, `--output-dir`,
 `--domain`, `--format`, and `--fail-on-warning`.
 
+User-facing command behavior, artifact names, and exit codes are documented in
+[`docs/usage.md`](docs/usage.md).
+
 Dependency classifications are documented in
 [`docs/development/dependencies.md`](docs/development/dependencies.md).
 Ruby tooling commands are documented in
@@ -47,6 +50,8 @@ The no-hosted-CI local verification policy is documented in
 [`docs/development/ci.md`](docs/development/ci.md).
 P0 schema and Mermaid fixture scaffolding is documented in
 [`docs/development/contract-fixtures.md`](docs/development/contract-fixtures.md).
+The P0 blocking fixture matrix is documented in
+[`docs/p0-blocking-fixture-matrix.md`](docs/p0-blocking-fixture-matrix.md).
 Repository drift guards and setup-mode release conditions are documented in
 [`docs/development/setup-guards.md`](docs/development/setup-guards.md).
 
