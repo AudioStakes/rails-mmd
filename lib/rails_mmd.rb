@@ -2,3 +2,5 @@
 
 require_relative 'rails_mmd/version'
 require_relative 'rails_mmd/config'
+require_relative 'rails_mmd/model_inventory'
+require_relative 'rails_mmd/rails_loader'

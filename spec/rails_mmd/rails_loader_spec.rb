@@ -1,0 +1,102 @@
+# frozen_string_literal: true
+
+require 'tmpdir'
+require 'rails_mmd/canonical_json'
+require 'rails_mmd/rails_loader'
+require 'rails_mmd/schema_validator'
+
+# rubocop:disable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
+RSpec.describe RailsMmd::RailsLoader do
+  around do |example|
+    Dir.mktmpdir do |root|
+      @project_root = Pathname(root)
+      project_root.join('config').mkpath
+      example.run
+    end
+  end
+
+  let(:project_root) { @project_root }
+
+  it 'loads the Rails environment from the project root and eager-loads the application' do
+    kernel = Class.new do
+      attr_reader :loaded_path
+
+      def load(path)
+        @loaded_path = path
+      end
+    end.new
+    application = Class.new do
+      attr_reader :eager_loaded
+
+      def eager_load!
+        @eager_loaded = true
+      end
+    end.new
+    rails = Struct.new(:application).new(application)
+
+    result = described_class.new(project_root: project_root, kernel: kernel, rails_provider: -> { rails }).boot
+
+    expect(result).to be_success
+    expect(kernel.loaded_path).to eq(project_root.join('config/environment.rb').to_s)
+    expect(result.application).to be(application)
+    expect(application.eager_loaded).to be(true)
+  end
+
+  it 'returns a schema-valid RAILS_LOAD_FAILED diagnostic for boot failures' do
+    kernel = Class.new do
+      def load(_path)
+        raise 'secret=/Users/dev/app failed'
+      end
+    end.new
+
+    result = described_class.new(project_root: project_root, kernel: kernel).boot
+
+    expect(result).not_to be_success
+    expect(result.exit_code).to eq(2)
+    expect(result.diagnostics.first).to include('code' => 'RAILS_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata')).to include(
+      'exception_class' => 'RuntimeError',
+      'backtrace' => nil
+    )
+    expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/Users/dev/app')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'returns a schema-valid RAILS_EAGER_LOAD_FAILED diagnostic for eager-load failures' do
+    application = Class.new do
+      def eager_load!
+        raise 'password=/tmp/app failed'
+      end
+    end.new
+    rails = Struct.new(:application).new(application)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path); end }.new,
+      rails_provider: -> { rails }
+    ).boot
+
+    expect(result).not_to be_success
+    expect(result.exit_code).to eq(2)
+    expect(result.diagnostics.first).to include('code' => 'RAILS_EAGER_LOAD_FAILED')
+    expect(result.diagnostics.first.fetch('metadata')).to include(
+      'exception_class' => 'RuntimeError',
+      'backtrace' => nil
+    )
+    expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/tmp/app')
+    expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  def expect_schema_valid_diagnostic(diagnostic)
+    envelope = {
+      'schema_version' => 1,
+      'scope' => 'global',
+      'domain_id' => nil,
+      'diagnostics' => [diagnostic],
+      'digest_sha256' => RailsMmd::CanonicalJson.digest_sha256(diagnostic)
+    }
+
+    expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, envelope)).to be(true)
+  end
+end
+# rubocop:enable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
