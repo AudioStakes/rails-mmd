@@ -24,12 +24,12 @@ RSpec::Core::RakeTask.new(:spec)
 RuboCop::RakeTask.new(:rubocop)
 
 namespace :rubocop do
-  RuboCop::RakeTask.new(:autocorrect_all) do |task|
-    task.options = ['--autocorrect-all']
-  end
+  Rake::Task['rubocop:auto_correct'].clear if Rake::Task.task_defined?('rubocop:auto_correct')
 
   desc 'Autocorrect Ruby style offenses'
-  task auto_correct: :autocorrect_all
+  task :auto_correct do
+    sh 'bundle', 'exec', 'rubocop', '--autocorrect-all'
+  end
 end
 
 namespace :bundle do
