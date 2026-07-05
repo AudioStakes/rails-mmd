@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/users",
+      "ruby_constant": "User",
+      "table_name": "users",
+      "attributes": [
+        { "attribute_id": "entities/users/attributes/id", "name": "id", "role": "primary_key" }
+      ]
+    }
+  ],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

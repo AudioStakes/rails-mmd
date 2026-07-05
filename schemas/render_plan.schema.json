@@ -52,8 +52,8 @@
       "allOf": [
         { "not": { "pattern": "(^|\\s)/(?:Users|tmp|private|var)(?:/|\\s|$)" } },
         { "not": { "pattern": "[A-Za-z]:[\\\\/]" } },
-        { "not": { "pattern": "\\b(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|pid)\\b\\s*(?::|=|\\s+)\\s*\\S+" } },
-        { "not": { "pattern": "\\[REDACTED_KEY\\]\\s+\\S+" } }
+        { "not": { "pattern": "[A-Za-z0-9_-]*(?:generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|api[_-]?key|password|passwd|credential|database_url|(?:access|auth|refresh)[_-]?token|pid)[A-Za-z0-9_-]*\\s*(?::|=|\\s+)\\s*\\S+" } },
+        { "not": { "pattern": "\\[REDACTED_KEY\\]\\s*(?::|=|\\s+)\\s*\\S+" } }
       ]
     },
     "attribute_type": {
@@ -66,7 +66,7 @@
       "properties": {
         "entity_id": { "type": "string", "minLength": 1 },
         "safe_token": { "$ref": "#/$defs/safe_token" },
-        "label": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/sanitized_comment" },
         "attributes": {
           "type": "array",
           "items": { "$ref": "#/$defs/attribute" }
@@ -80,7 +80,7 @@
       "properties": {
         "attribute_id": { "type": "string", "minLength": 1 },
         "safe_token": { "$ref": "#/$defs/safe_token" },
-        "label": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/sanitized_comment" },
         "type": { "$ref": "#/$defs/attribute_type" },
         "key_marker": {
           "anyOf": [
@@ -111,7 +111,7 @@
         "safe_token": { "$ref": "#/$defs/safe_token" },
         "owner_safe_token": { "$ref": "#/$defs/safe_token" },
         "target_safe_token": { "$ref": "#/$defs/safe_token" },
-        "label": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/sanitized_comment" },
         "owner_cardinality": { "$ref": "#/$defs/cardinality" },
         "target_cardinality": { "$ref": "#/$defs/cardinality" },
         "er_left_marker": { "enum": ["|o", "||", "}o", "}|"] },

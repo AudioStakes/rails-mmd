@@ -129,6 +129,7 @@ RSpec.describe 'P0 contract schemas' do
       ir/invalid/long_digest.json
       ir/invalid/non_hex_digest.json
       ir/invalid/missing_digest.json
+      ir/invalid/missing_attribute_type.json
       ir/invalid/machine_local_fields.json
     ]
   end
