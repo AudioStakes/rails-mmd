@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/users",
+      "ruby_constant": "User",
+      "table_name": "users",
+      "attributes": [
+        { "attribute_id": "entities/users/attributes/id", "name": "id", "role": "primary_key" },
+        { "attribute_id": "entities/users/attributes/account_id", "name": "account_id", "role": "foreign_key" }
+      ]
+    },
+    {
+      "entity_id": "entities/accounts",
+      "ruby_constant": "Account",
+      "table_name": "accounts",
+      "attributes": [
+        { "attribute_id": "entities/accounts/attributes/id", "name": "id", "role": "primary_key" }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "relationships/users/account",
+      "owner_entity_id": "entities/users",
+      "target_entity_id": "entities/accounts",
+      "association_name": "account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1"
+    }
+  ],
+  "diagnostic_ids": ["d_db_metadata_degraded"],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

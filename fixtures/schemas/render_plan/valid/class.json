@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "class",
+  "domain_id": "core",
+  "direction": "BT",
+  "entities": [
+    { "entity_id": "entities/orders", "safe_token": "ORDER", "label": "Order", "attributes": [] },
+    { "entity_id": "entities/accounts", "safe_token": "ACCOUNT", "label": "Account", "attributes": [] }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "relationships/orders/account",
+      "safe_token": "ORDER_ACCOUNT",
+      "owner_safe_token": "ORDER",
+      "target_safe_token": "ACCOUNT",
+      "label": "billing_account",
+      "owner_cardinality": "0..1",
+      "target_cardinality": "0..many",
+      "er_left_marker": "|o",
+      "er_right_marker": "o{",
+      "class_owner_multiplicity": "0..1",
+      "class_target_multiplicity": "0..*"
+    }
+  ],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

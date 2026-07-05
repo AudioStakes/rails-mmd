@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "domains": {
+    "core": {
+      "include_models": ["User"]
+    }
+  },
+  "output": {
+    "format": "both",
+    "theme": "forest"
+  }
+}

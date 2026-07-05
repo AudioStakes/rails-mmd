@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "scope": "global",
+  "domain_id": null,
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_internal_error",
+      "code": "INTERNAL_ERROR",
+      "severity": "error",
+      "phase": "internal",
+      "scope": "invocation",
+      "subject_id": null,
+      "message": "internal error",
+      "metadata": {
+        "exception_class": "RuntimeError",
+        "exception_summary": "unexpected",
+        "backtrace": null,
+        "process_id": 1234,
+        "raw_exception_backtrace": ["/tmp/app.rb:1"]
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

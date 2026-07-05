@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/users",
+      "safe_token": "USER",
+      "label": "User",
+      "attributes": [
+        { "attribute_id": "entities/users/attributes/id", "safe_token": "ID", "label": "id", "key_marker": "PK" },
+        { "attribute_id": "entities/users/attributes/account_id", "safe_token": "ACCOUNT_ID", "label": "account_id", "key_marker": "FK" }
+      ]
+    },
+    {
+      "entity_id": "entities/accounts",
+      "safe_token": "ACCOUNT",
+      "label": "Account",
+      "attributes": [
+        { "attribute_id": "entities/accounts/attributes/id", "safe_token": "ID", "label": "id", "key_marker": "PK" }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "relationships/users/account",
+      "safe_token": "USER_ACCOUNT",
+      "owner_safe_token": "USER",
+      "target_safe_token": "ACCOUNT",
+      "label": "account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1"
+    }
+  ],
+  "comments": [
+    { "comment_id": "comments/redacted", "safe_token": "COMMENT_REDACTED", "text": "sanitized comment" }
+  ],
+  "diagnostic_ids": ["d_db_metadata_degraded"],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

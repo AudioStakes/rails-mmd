@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audiostakes.example/schemas/rails-mmd/ir.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "domain_id", "entities", "relationships", "diagnostic_ids", "digest_sha256"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "domain_id": { "$ref": "#/$defs/domain_id" },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entity" }
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relationship" }
+    },
+    "diagnostic_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "digest_sha256": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "domain_id": {
+      "type": "string",
+      "allOf": [
+        { "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        { "not": { "pattern": "\\s" } }
+      ]
+    },
+    "ruby_constant": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*$"
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "ruby_constant", "table_name", "attributes"],
+      "properties": {
+        "entity_id": { "type": "string", "minLength": 1 },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" },
+        "table_name": { "type": "string", "minLength": 1 },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attribute" }
+        }
+      }
+    },
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute_id", "name", "role"],
+      "properties": {
+        "attribute_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["primary_key", "foreign_key"] }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship_id",
+        "owner_entity_id",
+        "target_entity_id",
+        "association_name",
+        "owner_cardinality",
+        "target_cardinality"
+      ],
+      "properties": {
+        "relationship_id": { "type": "string", "minLength": 1 },
+        "owner_entity_id": { "type": "string", "minLength": 1 },
+        "target_entity_id": { "type": "string", "minLength": 1 },
+        "association_name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?$" },
+        "owner_cardinality": { "$ref": "#/$defs/cardinality" },
+        "target_cardinality": { "$ref": "#/$defs/cardinality" }
+      }
+    },
+    "cardinality": { "enum": ["0..1", "1..1", "0..many", "1..many"] }
+  }
+}

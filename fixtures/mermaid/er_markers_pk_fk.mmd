@@ -1,0 +1,10 @@
+erDiagram
+  direction LR
+  USER }o..|| ACCOUNT : account
+  USER {
+    bigint id PK
+    bigint account_id FK
+  }
+  ACCOUNT {
+    bigint id PK
+  }
