@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open3'
+require 'json'
 require 'rails_mmd/cli'
 require 'yaml'
 
@@ -112,7 +113,7 @@ RSpec.describe 'repository drift guards' do
     expect(excluded_help_terms.select { |term| normalized_help.include?(term) }).to be_empty
   end
 
-  it 'keeps generate unroutable until the P0 implementation slice lands' do
+  it 'keeps generate routed to the P0 implementation slice' do
     expect(generate_guard_result).to eq(expected_generate_guard_result)
   end
 
@@ -126,6 +127,24 @@ RSpec.describe 'repository drift guards' do
     text = repository_text('docs/p0-contract.md')
 
     expect(text).to include_required_contract_sections
+  end
+
+  it 'documents user-facing generate behavior from the README' do
+    readme = repository_text('README.md')
+
+    expect(readme).to include('docs/usage.md', 'docs/p0-blocking-fixture-matrix.md')
+  end
+
+  it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do
+    text = repository_text('docs/p0-blocking-fixture-matrix.md')
+
+    expect(blocking_matrix_rows(text)).to eq(blocking_diagnostic_rows)
+  end
+
+  it 'documents the P0 user-facing exit codes' do
+    text = repository_text('docs/usage.md')
+
+    expect(user_facing_exit_rows(text)).to eq(expected_user_facing_exit_rows)
   end
 
   it 'documents superseded invalid issues 1 through 6' do
@@ -164,16 +183,86 @@ RSpec.describe 'repository drift guards' do
       'command_defined' => RailsMmd::CLI.commands.key?('generate'),
       'success' => status.success?,
       'stdout' => stdout,
-      'stderr_mentions_generate' => stderr.match?(/Could not find command .*generate/i)
+      'stderr_code' => JSON.parse(stderr).fetch('diagnostics').first.fetch('code')
     }
   end
 
   def expected_generate_guard_result
     {
-      'command_defined' => false,
+      'command_defined' => true,
       'success' => false,
       'stdout' => '',
-      'stderr_mentions_generate' => true
+      'stderr_code' => 'CONFIG_NOT_FOUND'
+    }
+  end
+
+  def blocking_diagnostic_codes
+    blocking_diagnostic_rows.keys
+  end
+
+  def blocking_diagnostic_rows
+    diagnostic_catalog_rows.select { |_, row| blocking_exit_code?(row.fetch('exit')) }
+  end
+
+  def blocking_exit_code?(exit_code)
+    exit_code.split(/\s+or\s+/).intersect?(%w[2 3 4 99])
+  end
+
+  def diagnostic_catalog_rows
+    repository_text('docs/p0-contract.md').lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      next unless cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
+
+      [cells[0].delete('`'), contract_policy_row(cells)]
+    end.to_h
+  end
+
+  def contract_policy_row(cells)
+    {
+      'exit' => cells[2],
+      'attachment' => cells[5],
+      'publication_effect' => cells[6]
+    }
+  end
+
+  def blocking_matrix_rows(text)
+    text.lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      next unless cells&.first&.match?(/\A`[A-Z0-9_]+`\z/)
+
+      [cells[0].delete('`'), matrix_policy_row(cells)]
+    end.to_h
+  end
+
+  def matrix_policy_row(cells)
+    {
+      'exit' => cells[3],
+      'attachment' => cells[4],
+      'publication_effect' => cells[5]
+    }
+  end
+
+  def markdown_table_cells(line)
+    return unless line.start_with?('|')
+
+    line.split('|')[1..-2]&.map(&:strip)
+  end
+
+  def user_facing_exit_rows(text)
+    text.lines.filter_map do |line|
+      cells = markdown_table_cells(line)
+      [cells[0], cells[1]] if cells&.first&.match?(/\A\d+\z/)
+    end.to_h
+  end
+
+  def expected_user_facing_exit_rows
+    {
+      '0' => 'success, including warning diagnostics when `--fail-on-warning` is absent',
+      '1' => 'warning diagnostics were present and `--fail-on-warning` was set',
+      '2' => 'config, output setup, Rails boot, domain, or schema probe error',
+      '3' => 'Mermaid serialization failure or unresolved safe-token collision',
+      '4' => 'output write or atomic publish failure',
+      '99' => 'internal error'
     }
   end
 

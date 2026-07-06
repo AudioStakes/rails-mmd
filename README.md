@@ -1,11 +1,10 @@
 # rails-mmd
 
-`rails-mmd` is a planned standalone Ruby CLI/gem for generating Mermaid diagrams
-from Rails and ActiveRecord applications.
+`rails-mmd` is a standalone Ruby CLI/gem for generating Mermaid diagrams from
+Rails and ActiveRecord applications.
 
-The repository is currently in setup mode. It contains project operating
-contracts, local development-tooling documentation, and a minimal Ruby gem/CLI
-shell. It does not yet include Rails loading or diagram generation.
+The repository contains the P0 Ruby pipeline for loading a Rails app, producing
+render plans, serializing Mermaid, and publishing local artifacts.
 
 ## Project Model
 
@@ -22,20 +21,24 @@ selected as the available `4.0` patch at this issue-plan revision time. This is
 not based on a claim that a downloads page alone labels `4.0.5` as the only
 current stable release.
 
-The current CLI shell supports only help and version smoke behavior:
+The CLI supports help, version, and P0 generation:
 
 ```sh
 asdf install ruby 4.0.5
 ASDF_RUBY_VERSION=4.0.5 asdf exec bundle install
 ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd --help
 ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd --version
+ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd generate --help
 ```
 
 If your shell does not already resolve `ruby` and `bundle` through the pinned
 toolchain, prefix commands with `ASDF_RUBY_VERSION=4.0.5 asdf exec`.
 
-`rails-mmd generate` and all P0 feature options are intentionally absent until a
-future implementation issue adds the command with matching contract coverage.
+`rails-mmd generate` exposes only P0 options: `--config`, `--output-dir`,
+`--domain`, `--format`, and `--fail-on-warning`.
+
+User-facing command behavior, artifact names, and exit codes are documented in
+[`docs/usage.md`](docs/usage.md).
 
 Dependency classifications are documented in
 [`docs/development/dependencies.md`](docs/development/dependencies.md).
@@ -47,6 +50,8 @@ The no-hosted-CI local verification policy is documented in
 [`docs/development/ci.md`](docs/development/ci.md).
 P0 schema and Mermaid fixture scaffolding is documented in
 [`docs/development/contract-fixtures.md`](docs/development/contract-fixtures.md).
+The P0 blocking fixture matrix is documented in
+[`docs/p0-blocking-fixture-matrix.md`](docs/p0-blocking-fixture-matrix.md).
 Repository drift guards and setup-mode release conditions are documented in
 [`docs/development/setup-guards.md`](docs/development/setup-guards.md).
 
