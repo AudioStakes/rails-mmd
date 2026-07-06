@@ -641,6 +641,14 @@ safe-token generation, and the Mermaid serializer must reuse those tokens withou
 re-tokenizing. Token collision scope uses the render plan's final artifact kind
 (`er` or `class`).
 
+Rails constants, association names, table names, and column names are structured
+identifiers. Render-plan builder normalization may remove NUL bytes, replace
+control characters with spaces, collapse whitespace, and apply deterministic
+schema-safe fallbacks, but it must not apply free-text credential-key redaction
+to valid structured identifier substrings such as `ApiKey`, `api_key`,
+`password_digest`, or `access_token`. Free-text redaction remains required for
+comments and diagnostic free-form text.
+
 Pre-output fatal publish policy:
 
 - `CONFIG_NOT_FOUND`, `CONFIG_SCHEMA_INVALID`, `CONFIG_DOMAIN_NOT_FOUND`, and
