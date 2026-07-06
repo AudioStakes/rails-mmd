@@ -723,6 +723,15 @@ ClassDiagram relationship syntax:
 OWNER "<owner multiplicity>" --> "<target multiplicity>" TARGET : <label>
 ```
 
+ClassDiagram attributes use class member syntax and do not emit ER key tags:
+
+```text
++<type> <label>
+```
+
+For example, `+integer id` and `+integer account_id` are valid classDiagram
+attributes; `integer id PK` and `integer account_id FK` are ER-only syntax.
+
 Class multiplicity mapping:
 
 | cardinality | classDiagram multiplicity |

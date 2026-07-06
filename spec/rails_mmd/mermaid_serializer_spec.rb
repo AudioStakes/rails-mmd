@@ -35,7 +35,7 @@ RSpec.describe RailsMmd::MermaidSerializer do
     result = serializer.serialize(render_plan: class_attributes_plan)
 
     expect(result.text).to include(
-      "  class USER {\n    bigint id PK\n    bigint account_id FK\n  }\n"
+      "  class USER {\n    +bigint id\n    +bigint account_id\n  }\n"
     )
   end
 

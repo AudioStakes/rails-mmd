@@ -95,7 +95,7 @@ module RailsMmd
 
       [
         "  #{entity.fetch('safe_token')} {",
-        *entity.fetch('attributes').map { |attribute| "    #{attribute_line(attribute)}" },
+        *entity.fetch('attributes').map { |attribute| "    #{er_attribute_line(attribute)}" },
         '  }'
       ]
     end
@@ -105,17 +105,21 @@ module RailsMmd
 
       [
         "  class #{entity.fetch('safe_token')} {",
-        *entity.fetch('attributes').map { |attribute| "    #{attribute_line(attribute)}" },
+        *entity.fetch('attributes').map { |attribute| "    #{class_attribute_line(attribute)}" },
         '  }'
       ]
     end
 
-    def attribute_line(attribute)
+    def er_attribute_line(attribute)
       [
         attribute.fetch('type'),
         line_text(attribute.fetch('label'), field: 'attribute label'),
         attribute['key_marker']
       ].compact.join(' ')
+    end
+
+    def class_attribute_line(attribute)
+      "+#{attribute.fetch('type')} #{line_text(attribute.fetch('label'), field: 'attribute label')}"
     end
 
     def non_empty_label(relationship)

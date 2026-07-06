@@ -70,13 +70,15 @@ module RailsMmd
     end
 
     def render_domain_artifacts(config, domain, diagnostics)
-      artifact_kinds(config).to_h do |kind|
+      artifact_kinds(config).each_with_object({}) do |kind, artifacts|
         render_plan_result = render_plan_for(config, domain, kind, diagnostics)
         render_plan = render_plan_result.payload
         diagnostics.concat(render_plan_result.diagnostics)
         serialized = mermaid_serializer.serialize(render_plan: render_plan)
         diagnostics.concat(serialized.diagnostics)
-        [kind, { render_plan: render_plan, mermaid: serialized.text.to_s }]
+        next unless serialized.diagnostics.empty?
+
+        artifacts[kind] = { render_plan: render_plan, mermaid: serialized.text }
       end
     end
 
