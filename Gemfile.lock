@@ -101,7 +101,7 @@ GEM
       regexp_parser (~> 2.0)
       simpleidn (~> 0.2)
     language_server-protocol (3.17.0.6)
-    lefthook (2.1.9)
+    lefthook (2.1.10)
     lint_roller (1.1.0)
     logger (1.7.0)
     memoist3 (1.0.0)
@@ -279,7 +279,7 @@ CHECKSUMS
   json-canonicalization (1.0.0) sha256=d4848a8cca7534455c6721f2d9fc9e5e9adca49486864a898810024f67d59446
   json_schemer (2.5.0) sha256=2f01fb4cce721a4e08dd068fc2030cffd0702a7f333f1ea2be6e8991f00ae396
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
-  lefthook (2.1.9) sha256=2d4d2e028d4ac4b265675c1180fe1f7c50230200630e65c3aff7d3ed90a1a334
+  lefthook (2.1.10) sha256=cc9c06bd8ea689e8b8016eab9769e54d696d07951860c1c6d28e8f6812e61b65
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
   logger (1.7.0) sha256=196edec7cc44b66cfb40f9755ce11b392f21f7967696af15d274dde7edff0203
   memoist3 (1.0.0) sha256=686e42402cf150a362050c23143dc57b0ef88f8c344943ff8b7845792b50d56f
