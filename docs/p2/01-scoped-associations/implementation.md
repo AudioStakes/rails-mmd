@@ -1,6 +1,6 @@
 # P2-01 Scoped Associations Implementation
 
-Status: TDD implementation under specialist review correction
+Status: TDD implementation reviewed and verified
 
 ## TDD evidence
 
@@ -39,9 +39,9 @@ Status: TDD implementation under specialist review correction
 | 1 | Rails runtime | Real matrix covered scoped `belongs_to` only, leaving real through, HABTM, and polymorphic reflection behavior unverified | Added raising scoped through, HABTM, and polymorphic inverse declarations with exact metadata oracles on every pair |
 | 1 | Correctness / security | None | — |
 | 1 | QA / TDD | No confirmed defect; recommended explicit unscoped-absence and closed-schema guards | Added IR/render-plan absence assertions; existing contract cases already reject null, empty, false, wrong-type, and extra-key metadata |
-| 2 | Rails runtime | Pending | Pending |
-| 2 | Correctness / security | Pending | Pending |
-| 2 | QA / TDD | Pending | Pending |
+| 2 | Rails runtime | None | — |
+| 2 | Correctness / security | None | — |
+| 2 | QA / TDD | None | — |
 
 ## Residual risks
 
