@@ -17,6 +17,7 @@ module RailsMmd
       :through_path,
       :foreign_key_holder_entity_id,
       :foreign_key_column,
+      :foreign_type_column,
       :referenced_primary_key_column,
       :physical_key,
       :owner_foreign_key_column,
@@ -36,6 +37,7 @@ module RailsMmd
 
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
     MACRO_PRIORITY = { belongs_to: 0, has_one: 1, has_many: 2 }.freeze
+    ReflectionEntry = Struct.new(:owner, :reflection, keyword_init: true)
     DomainContext = Struct.new(:domain, keyword_init: false) do
       def domain_id = domain.domain_id
 
@@ -66,22 +68,37 @@ module RailsMmd
       relationships = []
       output_diagnostics = []
 
-      context.entities.each do |owner|
-        owner_model = resolve_model(owner.ruby_constant)
-        next unless owner_model
-
-        association_reflections(owner_model).each do |reflection|
-          relationship, diagnostic = classify_reflection(context, owner, reflection)
-          relationships << relationship if relationship
-          output_diagnostics << diagnostic if diagnostic
-        end
+      entries = reflection_entries(context)
+      polymorphic_entries, ordinary_entries = entries.partition do |entry|
+        polymorphic_inventory?(entry.reflection)
       end
+      ordinary_entries.each do |entry|
+        relationship, diagnostic = classify_reflection(context, entry.owner, entry.reflection)
+        relationships << relationship if relationship
+        output_diagnostics << diagnostic if diagnostic
+      end
+      polymorphic_relationships, polymorphic_diagnostics = build_polymorphic_relationships(
+        context, polymorphic_entries
+      )
+      relationships.concat(polymorphic_relationships)
+      output_diagnostics.concat(polymorphic_diagnostics)
 
       DomainResult.new(
         domain_id: domain.domain_id,
         relationships: deduplicate_relationships(relationships).sort_by(&:relationship_id),
         diagnostics: output_diagnostics
       )
+    end
+
+    def reflection_entries(context)
+      context.entities.flat_map do |owner|
+        owner_model = resolve_model(owner.ruby_constant)
+        next [] unless owner_model
+
+        association_reflections(owner_model).map do |reflection|
+          ReflectionEntry.new(owner: owner, reflection: reflection)
+        end
+      end
     end
 
     def association_reflections(model)
@@ -104,6 +121,159 @@ module RailsMmd
 
     def direct_has?(reflection)
       %i[has_many has_one].include?(reflection_macro(reflection))
+    end
+
+    def polymorphic_inventory?(reflection)
+      polymorphic_root?(reflection) || polymorphic_inverse?(reflection)
+    end
+
+    def polymorphic_root?(reflection)
+      reflection_macro(reflection) == :belongs_to && polymorphic?(reflection)
+    end
+
+    def polymorphic_inverse?(reflection)
+      direct_has?(reflection) && !through?(reflection) && inverse_polymorphic?(reflection)
+    end
+
+    def build_polymorphic_relationships(context, entries)
+      roots = entries.select { |entry| polymorphic_root?(entry.reflection) }
+      inverses = entries.select { |entry| polymorphic_inverse?(entry.reflection) }
+      relationships = []
+      output_diagnostics = []
+      handled_inverses = {}.compare_by_identity
+
+      roots.each do |root|
+        root_relationships, root_diagnostics, handled = build_polymorphic_root(context, root, inverses)
+        relationships.concat(root_relationships)
+        output_diagnostics.concat(root_diagnostics)
+        handled.each { |reflection| handled_inverses[reflection] = true }
+      end
+      inverses.each do |entry|
+        next if handled_inverses.key?(entry.reflection)
+
+        code = scoped?(entry.reflection) ? 'ASSOCIATION_SCOPED_OMITTED' : 'ASSOCIATION_POLYMORPHIC_OMITTED'
+        output_diagnostics << omitted(context, entry.owner, reflection_name(entry.reflection),
+                                      code).last
+      end
+      [relationships, output_diagnostics]
+    end
+
+    def build_polymorphic_root(context, root, inverses)
+      owner = root.owner
+      reflection = root.reflection
+      association_name = reflection_name(reflection)
+      sanitized_name = sanitize_association_name(association_name)
+      return polymorphic_failure(context, owner, association_name, 'ASSOCIATION_SCOPED_OMITTED') if scoped?(reflection)
+      unless sanitized_name
+        return polymorphic_failure(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED')
+      end
+
+      keys = polymorphic_key_columns(reflection)
+      return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED') unless keys
+      unless default_polymorphic_keys?(sanitized_name, keys)
+        return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_OMITTED')
+      end
+      unless keys.values.all? { |column| column_names(owner).include?(column) }
+        return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING')
+      end
+
+      candidates, candidate_diagnostics, handled = polymorphic_candidates(
+        context, root, inverses, sanitized_name, keys
+      )
+      if candidates.empty?
+        candidate_diagnostics << omitted(
+          context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED'
+        ).last
+      end
+      relationships = candidates.map do |candidate|
+        polymorphic_relationship_for(owner, candidate.owner, sanitized_name, keys, candidate.reflection)
+      end
+      [relationships, candidate_diagnostics, handled]
+    end
+
+    def polymorphic_failure(context, owner, association_name, code)
+      [[], [omitted(context, owner, association_name, code).last], []]
+    end
+
+    def polymorphic_key_columns(reflection)
+      foreign_key = scalar_key(safe_reflection_value(reflection, :foreign_key))
+      foreign_type = scalar_key(safe_reflection_value(reflection, :foreign_type))
+      return unless foreign_key && foreign_type
+
+      { foreign_key: foreign_key, foreign_type: foreign_type }
+    end
+
+    def default_polymorphic_keys?(association_name, keys)
+      keys == {
+        foreign_key: "#{association_name}_id",
+        foreign_type: "#{association_name}_type"
+      }
+    end
+
+    def polymorphic_candidates(context, root, inverses, association_name, keys)
+      valid = []
+      output_diagnostics = []
+      handled = []
+      inverses.each do |candidate|
+        next unless inverse_interface(candidate.reflection) == association_name
+
+        target_model, target_constant = resolve_target(candidate.reflection)
+        next unless target_model && target_constant == root.owner.ruby_constant
+
+        handled << candidate.reflection
+        diagnostic = polymorphic_candidate_diagnostic(context, candidate, keys, target_model)
+        if diagnostic
+          output_diagnostics << diagnostic
+        else
+          valid << candidate
+        end
+      end
+      canonical = valid.group_by { |candidate| entity_id(candidate.owner) }.values.map do |duplicates|
+        duplicates.min_by do |candidate|
+          [MACRO_PRIORITY.fetch(reflection_macro(candidate.reflection)), reflection_name(candidate.reflection)]
+        end
+      end
+      [canonical, output_diagnostics, handled]
+    end
+
+    def polymorphic_candidate_diagnostic(context, candidate, root_keys, target_model)
+      reflection = candidate.reflection
+      association_name = reflection_name(reflection)
+      if scoped?(reflection)
+        return omitted(context, candidate.owner, association_name,
+                       'ASSOCIATION_SCOPED_OMITTED').last
+      end
+      unless renderable_model?(target_model)
+        return omitted(context, candidate.owner, association_name,
+                       'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_model.name).last
+      end
+
+      candidate_keys = polymorphic_inverse_key_columns(reflection)
+      unless candidate_keys == root_keys
+        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
+      end
+
+      primary_key = scalar_key(safe_reflection_value(reflection, :active_record_primary_key))
+      unless primary_key && primary_key == candidate.owner.primary_key
+        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED').last
+      end
+      return if column_names(candidate.owner).include?(primary_key)
+
+      omitted(context, candidate.owner, association_name, 'ASSOCIATION_KEY_COLUMN_MISSING').last
+    end
+
+    def polymorphic_inverse_key_columns(reflection)
+      foreign_key = scalar_key(safe_reflection_value(reflection, :foreign_key))
+      foreign_type = scalar_key(safe_reflection_value(reflection, :type))
+      return unless foreign_key && foreign_type
+
+      { foreign_key: foreign_key, foreign_type: foreign_type }
+    end
+
+    def inverse_interface(reflection)
+      reflection_options(reflection)[:as].to_s
+    rescue LoadError, SyntaxError, StandardError
+      ''
     end
 
     def build_direct_reflection(context, owner, reflection)
@@ -281,6 +451,40 @@ module RailsMmd
       )
     end
 
+    def polymorphic_relationship_for(owner, target, association_name, keys, inverse_reflection)
+      foreign_key = keys.fetch(:foreign_key)
+      foreign_type = keys.fetch(:foreign_type)
+      relationship_id = [
+        'relationships', owner.table_name, 'polymorphic', association_name,
+        foreign_key, foreign_type, target.table_name
+      ].join('/')
+      singular = reflection_macro(inverse_reflection) == :has_one ||
+                 unique_owner_keys?(owner, [foreign_type, foreign_key])
+      Relationship.new(
+        relationship_id: relationship_id,
+        owner_entity_id: entity_id(owner),
+        target_entity_id: entity_id(target),
+        association_name: association_name,
+        association_macro: :belongs_to,
+        relationship_kind: :polymorphic,
+        foreign_key_holder_entity_id: entity_id(owner),
+        foreign_key_column: foreign_key,
+        foreign_type_column: foreign_type,
+        referenced_primary_key_column: target.primary_key,
+        physical_key: [
+          'polymorphic', entity_id(owner), association_name,
+          foreign_key, foreign_type, entity_id(target)
+        ].join('|'),
+        owner_foreign_key_column: foreign_key,
+        target_primary_key_column: target.primary_key,
+        owner_fk_unique: singular,
+        db_foreign_key: false,
+        owner_fk_nullable: column_nullable?(owner, foreign_key) || column_nullable?(owner, foreign_type),
+        owner_cardinality: singular ? '0..1' : '0..many',
+        target_cardinality: '0..1'
+      )
+    end
+
     def through_relationship_for(owner, target, association_name, macro, path_names)
       relationship_id = [
         'relationships', owner.table_name, 'through', *path_names, target.table_name
@@ -307,6 +511,7 @@ module RailsMmd
 
     def canonical_relationship(candidates)
       return canonical_through_relationship(candidates) if candidates.first.relationship_kind == :through
+      return candidates.min_by(&:relationship_id) if candidates.first.relationship_kind == :polymorphic
 
       winner = candidates.min_by do |candidate|
         [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
@@ -443,6 +648,14 @@ module RailsMmd
       owner.indexes.any? do |index|
         index.unique == true &&
           Array(index.columns) == [owner_fk] &&
+          total_plain_index?(index)
+      end
+    end
+
+    def unique_owner_keys?(owner, key_columns)
+      owner.indexes.any? do |index|
+        index.unique == true &&
+          Array(index.columns).sort == key_columns.sort &&
           total_plain_index?(index)
       end
     end

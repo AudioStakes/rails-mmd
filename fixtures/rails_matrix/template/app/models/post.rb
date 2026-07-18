@@ -5,4 +5,5 @@ class Post < ApplicationRecord
   belongs_to :author, inverse_of: :posts
   has_many :labelings
   has_many :labels, through: :labelings
+  has_many :comments, as: :commentable
 end

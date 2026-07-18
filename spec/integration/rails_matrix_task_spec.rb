@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'json'
 require 'open3'
 require 'tmpdir'
 
@@ -96,6 +97,19 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     )
   end
 
+  def missing_expected_polymorphic_groups_asdf
+    relationships = JSON.generate(
+      [{
+        relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
+        label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1'
+      }]
+    )
+    missing_expected_relationships_asdf.sub(
+      'mkdir -p tmp/rails_mmd',
+      "printf '%s\\n' '#{relationships}' > rails_mmd_expected_relationships.json\n          mkdir -p tmp/rails_mmd"
+    )
+  end
+
   def run_matrix(path: ENV.fetch('PATH'), pair: nil)
     stdout, stderr, status = Open3.capture3(
       { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd },
@@ -167,6 +181,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('relationships did not match expectation'))
+    end
+  end
+
+  it 'rejects generated polymorphic groups that do not match the real-app expectation' do
+    with_fake_asdf(missing_expected_polymorphic_groups_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('polymorphic groups did not match expectation'))
     end
   end
 

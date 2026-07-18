@@ -69,6 +69,16 @@ ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
     t.string 'name', null: false
   end
 
+  create_table 'images', force: :cascade do |t|
+    t.string 'name', null: false
+  end
+
+  create_table 'comments', force: :cascade do |t|
+    t.integer 'commentable_id', null: false
+    t.string 'commentable_type', null: false
+    t.index %w[commentable_type commentable_id], name: 'index_comments_on_commentable'
+  end
+
   create_table 'labelings', force: :cascade do |t|
     t.integer 'post_id', null: false
     t.integer 'label_id', null: false
