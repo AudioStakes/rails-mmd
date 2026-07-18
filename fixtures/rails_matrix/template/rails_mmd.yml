@@ -3,7 +3,10 @@ domains:
   core:
     include_models:
       - Author
+      - Draft
+      - Employee
       - Post
+      - Profile
     exclude_models: []
 output:
   directory: tmp/rails_mmd

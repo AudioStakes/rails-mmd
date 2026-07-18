@@ -52,11 +52,12 @@ module RailsMatrix
 
     def validate(app_root, pair)
       output = app_root.join('tmp/rails_mmd')
-      ARTIFACT_KINDS.each { |kind| validate_artifact(output, kind, pair) }
+      plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
       diagnostics = output.glob('*.diagnostics.json').flat_map do |path|
         validate_json(path, pair, :diagnostics).fetch('diagnostics')
       end
       validate_expected_diagnostics(app_root, diagnostics, pair)
+      validate_expected_relationships(app_root, plans.fetch('er').fetch('relationships'), pair)
     end
 
     private
@@ -67,6 +68,7 @@ module RailsMatrix
       plan_path = output.join("core.#{kind}.render_plan.json")
       render_plan = validate_json(plan_path, pair, :render_plan)
       validate_mermaid(output.join("core.#{kind}.mmd"), plan_path, render_plan, pair)
+      render_plan
     end
 
     def validate_mermaid(path, plan_path, render_plan, pair)
@@ -103,6 +105,22 @@ module RailsMatrix
     def diagnostic_projection(diagnostic)
       %w[code severity phase scope subject_id metadata].to_h do |key|
         [key, diagnostic.fetch(key)]
+      end
+    end
+
+    def validate_expected_relationships(app_root, relationships, pair)
+      expected = JSON.parse(app_root.join('rails_mmd_expected_relationships.json').read)
+      actual = relationships.map { |relationship| relationship_projection(relationship) }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} relationships did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+
+    def relationship_projection(relationship)
+      %w[relationship_id owner_safe_token target_safe_token label owner_cardinality target_cardinality].to_h do |key|
+        [key, relationship.fetch(key)]
       end
     end
   end

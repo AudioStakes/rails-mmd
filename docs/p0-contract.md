@@ -274,6 +274,10 @@ IR key attributes carry their source DB/Rails type as a string so the
 render-plan builder can project a serializer-facing type without reading schema
 metadata or Rails objects.
 
+P1-03 emits an FK key attribute on the entity that actually holds the FK. For
+direct `has_many` / `has_one`, this is the associated target entity and is not
+necessarily the relationship declaration owner.
+
 ## Domain Resolution
 
 Resolution order is exact:
@@ -334,6 +338,14 @@ A relationship is eligible only when all conditions hold:
 - Association primary key equals target primary key.
 - Target primary-key column exists.
 
+P1-03 extends Rails 7.2/8.1 eligibility to direct, unscoped,
+non-polymorphic-owner `has_many` and `has_one`. Their scalar target FK must exist,
+their `active_record_primary_key` must equal the declaring owner's actual
+primary key, and both entities must be selected in the same domain. Through and
+`as:` variants remain omitted. If an existing `belongs_to` has the same
+FK-holder/column and referenced entity/primary-key tuple, that existing edge
+wins without an additional edge or warning.
+
 Omitted relationship diagnostics:
 
 | condition | diagnostic |
@@ -350,8 +362,9 @@ Omitted relationship diagnostics:
 | Non-`belongs_to` macro (P1-02) | `ASSOCIATION_MACRO_OMITTED` |
 
 The P0 baseline emitted no warnings for non-`belongs_to` associations. P1-02
-extends Rails 7.2/8.1 output with one warning per omitted macro; rendering
-eligibility remains unchanged until its owning P1 feature is implemented.
+extends Rails 7.2/8.1 output with one warning per omitted macro. P1-03 renders
+eligible direct `has_many` / `has_one`; unsupported variants retain an existing
+specific omission code or `ASSOCIATION_MACRO_OMITTED`.
 
 For P0, scoped `belongs_to` means the association reflection itself has a scope
 lambda or proc (`reflection.scope.present?`). A target model `default_scope` does
@@ -731,6 +744,15 @@ Direct `belongs_to` cardinality evidence:
 - Target endpoint is `1..1` only when DB FK exists and owner FK is non-nullable.
 - Otherwise target endpoint is `0..1`.
 - Unknown or degraded metadata never strengthens cardinality.
+
+Direct `has_many` / `has_one` cardinality evidence (P1-03):
+
+- The declaration owner endpoint is `1..1` only when a DB FK exists from the
+  associated target and that FK column is non-nullable; otherwise it is `0..1`.
+- The associated target endpoint is `0..many` for `has_many` and `0..1` for
+  `has_one`.
+- `has_one` represents the Active Record singular bound even when a unique DB
+  index does not enforce it.
 
 ClassDiagram relationship syntax:
 

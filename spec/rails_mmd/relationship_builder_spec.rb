@@ -74,11 +74,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     expect(result.domains.first.relationships.map(&:association_name)).to eq(['account'])
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
-      ['ASSOCIATION_MACRO_OMITTED']
+      ['ASSOCIATION_TARGET_UNRESOLVED']
     )
   end
 
-  it 'reports every non-belongs-to macro without resolving its target' do
+  it 'resolves supported has macros and leaves other macros generic' do
     owner = owner_model(
       association('profile', :has_one),
       association('posts', :has_many),
@@ -93,11 +93,122 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       [diagnostic.fetch('subject_id'), diagnostic.fetch('code'), diagnostic.dig('metadata', 'association_macro')]
     end
     expect(projected).to contain_exactly(
-      ['authors.profile', 'ASSOCIATION_MACRO_OMITTED', 'has_one'],
-      ['authors.posts', 'ASSOCIATION_MACRO_OMITTED', 'has_many'],
+      ['authors.profile', 'ASSOCIATION_TARGET_UNRESOLVED', nil],
+      ['authors.posts', 'ASSOCIATION_TARGET_UNRESOLVED', nil],
       ['authors.tags', 'ASSOCIATION_MACRO_OMITTED', 'has_and_belongs_to_many']
     )
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
+  end
+
+  it 'builds inverse-free direct has relationships from target-side FK evidence' do
+    author = owner_model(
+      association('profiles', :has_many, klass: renderable_model('Profile', 'profiles'), foreign_key: 'author_id'),
+      association('account', :has_one, klass: renderable_model('Account', 'accounts'), foreign_key: 'author_id')
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity('Profile', 'profiles', columns: [column('id', false), column('author_id', true)]),
+        entity('Account', 'accounts', columns: [column('id', false), column('author_id', false)],
+                                      foreign_keys: [foreign_key('accounts', 'author_id', 'authors', 'id')],
+                                      indexes: [index(['author_id'], true, using: :btree)])
+      ]
+    )
+
+    result = build(domain, 'Author' => author)
+    relationships = result.domains.first.relationships.to_h do |relationship|
+      [relationship.association_name, relationship]
+    end
+
+    expect(result.diagnostics).to eq([])
+    expect(relationships.fetch('profiles')).to have_attributes(
+      owner_entity_id: 'entities/authors', target_entity_id: 'entities/profiles',
+      foreign_key_holder_entity_id: 'entities/profiles', foreign_key_column: 'author_id',
+      owner_cardinality: '0..1', target_cardinality: '0..many'
+    )
+    expect(relationships.fetch('account')).to have_attributes(
+      owner_entity_id: 'entities/authors', target_entity_id: 'entities/accounts',
+      foreign_key_holder_entity_id: 'entities/accounts', foreign_key_column: 'author_id',
+      owner_cardinality: '1..1', target_cardinality: '0..1'
+    )
+  end
+
+  it 'keeps unsupported direct-has variants on deterministic omission paths' do
+    author = owner_model(
+      association('groups', :has_many, through: true),
+      association('recent_posts', :has_many, scope: -> {}),
+      association('assets', :has_many, type: 'attachable_type')
+    )
+    domain = domain_result('core', [entity('Author', 'authors')])
+
+    result = build(domain, 'Author' => author)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_MACRO_OMITTED ASSOCIATION_SCOPED_OMITTED ASSOCIATION_POLYMORPHIC_OMITTED]
+    )
+  end
+
+  it 'degrades direct-has key reader failures without misreporting target resolution' do
+    profile = renderable_model('Profile', 'profiles')
+    author = owner_model(
+      association('profiles', :has_many, klass: profile, foreign_key: -> { raise ArgumentError, 'invalid inverse' })
+    )
+    domain = domain_result('core', [entity('Author', 'authors'), entity('Profile', 'profiles')])
+
+    result = build(domain, 'Author' => author)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
+    )
+  end
+
+  it 'reuses target and key omission diagnostics for ineligible direct has associations' do
+    profile = renderable_model('Profile', 'profiles')
+    author = owner_model(
+      association('legacy_profiles', :has_many,
+                  klass: renderable_model('LegacyProfile', 'legacy_profiles', renderable: false)),
+      association('uuid_profiles', :has_many, klass: profile, foreign_key: 'author_id',
+                                              active_record_primary_key: 'uuid'),
+      association('missing_key_profiles', :has_many, klass: profile, foreign_key: 'missing_author_id')
+    )
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'),
+       entity('Profile', 'profiles', columns: [column('id', false), column('author_id', true)])]
+    )
+
+    result = build(domain, 'Author' => author)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[
+        ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED
+        ASSOCIATION_NON_PRIMARY_KEY_OMITTED
+        ASSOCIATION_KEY_COLUMN_MISSING
+      ]
+    )
+  end
+
+  it 'prefers an existing belongs_to over a physical-key-equivalent direct has edge' do
+    post = owner_model(belongs_to('author', klass: renderable_model('Author', 'authors')))
+    author = owner_model(
+      association('posts', :has_many, klass: renderable_model('Post', 'posts'), foreign_key: 'author_id')
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Post', 'posts', columns: [column('id', false), column('author_id', true)]),
+        entity('Author', 'authors')
+      ]
+    )
+
+    result = build(domain, 'Post' => post, 'Author' => author)
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(['relationships/posts/author'])
   end
 
   it 'omits ineligible belongs_to reflections with schema-valid diagnostics' do
@@ -288,8 +399,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     Reflection.new(macro.to_s, macro, {})
   end
 
-  def association(name, macro)
-    Reflection.new(name, macro, {})
+  def association(name, macro, options = {})
+    Reflection.new(name, macro, options)
   end
 
   def simple_reflection(name)
@@ -313,9 +424,18 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     def scope = @options[:scope]
 
-    def foreign_key = @options.fetch(:foreign_key, "#{name}_id")
+    def foreign_key
+      value = @options.fetch(:foreign_key, "#{name}_id")
+      value.respond_to?(:call) ? value.call : value
+    end
 
     def association_primary_key = @options.fetch(:association_primary_key, 'id')
+
+    def active_record_primary_key = @options.fetch(:active_record_primary_key, 'id')
+
+    def through_reflection? = @options.fetch(:through, false)
+
+    def type = @options[:type]
 
     def class_name = @options.fetch(:class_name, name.split('_').map(&:capitalize).join)
 

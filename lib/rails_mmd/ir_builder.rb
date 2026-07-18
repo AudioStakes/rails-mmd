@@ -76,7 +76,9 @@ module RailsMmd
       return [] unless relationship_domain
 
       relationship_domain.relationships.filter_map do |relationship|
-        relationship.owner_foreign_key_column if relationship.owner_entity_id == entity_id(entity)
+        holder_id = relationship.foreign_key_holder_entity_id || relationship.owner_entity_id
+        column = relationship.foreign_key_column || relationship.owner_foreign_key_column
+        column if holder_id == entity_id(entity)
       end
     end
 
