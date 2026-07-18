@@ -36,7 +36,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       'class_target_multiplicity' => '1',
       'metadata' => { 'scoped' => true }
     )
-    expect(payload.fetch('schema_version')).to eq(3)
+    expect(payload.fetch('schema_version')).to eq(4)
     expect(payload.fetch('comments').first.fetch('text')).not_to include('/tmp', 'token=', 'pid=')
     expect(payload.fetch('comments').first.fetch('safe_token')).not_to include('TMP', 'SECRET123', 'PID')
     expect(payload.fetch('diagnostic_ids')).to eq(['d_db_metadata_degraded'])
@@ -61,8 +61,19 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(relationship.fetch('er_left_marker')).to eq('|o')
     expect(relationship.fetch('er_right_marker')).to eq('o{')
     expect(relationship.fetch('metadata')).to eq('scoped' => true)
-    expect(result.payload.fetch('schema_version')).to eq(3)
+    expect(result.payload.fetch('schema_version')).to eq(4)
     expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'projects a primary and foreign key attribute with the combined Mermaid marker' do
+    ir = ir_payload
+    ir.fetch('entities').first.fetch('attributes').first['role'] = 'primary_foreign_key'
+
+    payload = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR').payload
+    entity = payload.fetch('entities').find { |candidate| candidate.fetch('entity_id') == 'entities/users' }
+    attribute = entity.fetch('attributes').first
+
+    expect(attribute.fetch('key_marker')).to eq('PK, FK')
   end
 
   it 'projects class-plan inheritances from IR STI metadata without republishing STI metadata' do
@@ -75,7 +86,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     payload = result.payload
     entities = payload.fetch('entities').to_h { |entity| [entity.fetch('entity_id'), entity] }
 
-    expect(payload.fetch('schema_version')).to eq(3)
+    expect(payload.fetch('schema_version')).to eq(4)
     expect(entities.fetch('entities/admin_cars')).to include(
       'entity_kind' => 'physical',
       'label' => 'AdminCar',
@@ -433,7 +444,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       table_name: 'users',
       connection_context_id: '{"name":"primary"}',
       columns: [RailsMmd::SchemaProbe::Column.new(name: 'id', type: :bigint, nullable: false)],
-      primary_key: 'id',
+      primary_key_columns: ['id'],
       foreign_keys: [],
       indexes: []
     )
@@ -449,7 +460,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
   def ir_payload(owner_cardinality: '0..many', target_cardinality: '1..1')
     {
-      'schema_version' => 3,
+      'schema_version' => 4,
       'domain_id' => 'core',
       'entities' => [
         {
@@ -491,7 +502,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
   def sti_ir_payload
     {
-      'schema_version' => 3,
+      'schema_version' => 4,
       'domain_id' => 'core',
       'entities' => [
         {

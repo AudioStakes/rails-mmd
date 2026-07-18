@@ -9,6 +9,43 @@ require 'rails_mmd/schema_validator'
 
 # rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::SchemaProbe do
+  it 'retains a selected entity with an ordered composite primary-key tuple' do
+    order = model(
+      table_exists: true,
+      columns: [column('shop_id', :integer, false), column('order_id', :integer, false)],
+      primary_key: %w[shop_id order_id]
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { order }).probe(
+      domains: [domain_result('core', [record('Order')])]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.entities.first.primary_key_columns).to eq(%w[shop_id order_id])
+    expect(result.domains.first.entities.first.primary_key_columns).to be_frozen
+  end
+
+  it 'does not read association key metadata while probing selected entities' do
+    reflection = Object.new
+    reflection.define_singleton_method(:macro) { :belongs_to }
+    reflection.define_singleton_method(:polymorphic?) { false }
+    reflection.define_singleton_method(:foreign_key) { raise 'must not read association foreign key' }
+    reflection.define_singleton_method(:association_primary_key) { raise 'must not read association primary key' }
+    reflection.define_singleton_method(:active_record_primary_key) { raise 'must not read owner primary key' }
+    owner = model(table_exists: true, columns: [column('id', :integer, false)])
+    owner.define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+      macro == :belongs_to || macro.nil? ? [reflection] : []
+    end
+
+    result = described_class.new(model_resolver: ->(_name) { owner }).probe(
+      domains: [domain_result('core', [record('Owner')])]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.entities.first.primary_key_columns).to eq(['id'])
+  end
+
   it 'reads table, column, primary-key, foreign-key, and unique-index metadata for selected entities only' do
     user = model(
       table_exists: true,
@@ -29,9 +66,28 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result.domains.first.entities.map(&:ruby_constant)).to eq(['User'])
     entity = result.domains.first.entities.first
     expect(entity.columns.map(&:name)).to eq(%w[id account_id email])
-    expect(entity.primary_key).to eq('id')
-    expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
+    expect(entity.primary_key_columns).to eq(['id'])
+    expect(entity.foreign_keys.map(&:columns)).to eq([['account_id']])
     expect(entity.indexes.map(&:unique)).to eq([true])
+  end
+
+  it 'normalizes ordered composite adapter foreign-key pairs' do
+    line_item = model(
+      table_exists: true,
+      columns: [column('shop_id', :integer, false), column('line_item_id', :integer, false)],
+      primary_key: %w[shop_id line_item_id],
+      foreign_keys: [foreign_key('line_items', %w[shop_id order_id], 'orders', %w[shop_id id])]
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { line_item }).probe(
+      domains: [domain_result('core', [record('LineItem')])]
+    )
+
+    foreign_key = result.domains.first.entities.first.foreign_keys.first
+    expect(foreign_key.columns).to eq(%w[shop_id order_id])
+    expect(foreign_key.primary_key_columns).to eq(%w[shop_id id])
+    expect(foreign_key.columns).to be_frozen
+    expect(foreign_key.primary_key_columns).to be_frozen
   end
 
   it 'keeps the selected physical base entity and normalizes direct and multi-level STI subtypes' do
@@ -272,7 +328,7 @@ RSpec.describe RailsMmd::SchemaProbe do
         family.owner_entity_id,
         family.owner_ruby_constant,
         family.association_name,
-        family.foreign_key,
+        family.foreign_key_columns,
         family.foreign_type,
         family.scoped,
         family.root_diagnostic_code,
@@ -285,7 +341,7 @@ RSpec.describe RailsMmd::SchemaProbe do
                    'entities/entries',
                    'Entry',
                    'entryable',
-                   'entryable_id',
+                   ['entryable_id'],
                    'entryable_type',
                    false,
                    nil,
@@ -298,7 +354,7 @@ RSpec.describe RailsMmd::SchemaProbe do
                    'entities/messages',
                    'Message',
                    'subjectable',
-                   'subjectable_id',
+                   ['subjectable_id'],
                    'subjectable_type',
                    false,
                    nil,
@@ -576,6 +632,14 @@ RSpec.describe RailsMmd::SchemaProbe do
                   column('entryable_type', :string, true)],
         foreign_key: %w[entryable_id tenant_id]
       ),
+      'MalformedOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
+                  column('entryable_type', :string, true)],
+        foreign_key: %w[entryable_id entryable_id]
+      ),
       'CustomKeyOwner' => delegated_owner_model(
         delegated_runtime_file,
         'entryable',
@@ -607,12 +671,15 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [
         domain_result(
           'core',
-          %w[BadNameOwner CompositeOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner].map { |name| record(name) }
+          %w[BadNameOwner CompositeOwner MalformedOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner].map do |name|
+            record(name)
+          end
         )
       ],
       inventory_records: [
         inventory_record('BadNameOwner', table_name: 'bad_name_owners'),
         inventory_record('CompositeOwner', table_name: 'composite_owners'),
+        inventory_record('MalformedOwner', table_name: 'malformed_owners'),
         inventory_record('CustomKeyOwner', table_name: 'custom_key_owners'),
         inventory_record('PrimaryKeyOwner', table_name: 'primary_key_owners'),
         inventory_record('MissingColumnOwner', table_name: 'missing_column_owners'),
@@ -623,17 +690,45 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result).to be_success
     expect(result.diagnostics).to eq([])
     expect(result.domains.first.entities.map(&:ruby_constant)).to eq(
-      %w[BadNameOwner CompositeOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner]
+      %w[BadNameOwner CompositeOwner MalformedOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner]
     )
     expect(result.domains.first.delegated_type_families.map do |family|
       [family.owner_ruby_constant, family.association_name, family.root_diagnostic_code, family.targets]
     end).to eq([
                  ['BadNameOwner', 'entryable::bad', 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED', []],
-                 ['CompositeOwner', 'entryable', 'ASSOCIATION_COMPOSITE_KEY_OMITTED', []],
+                 ['CompositeOwner', 'entryable', 'ASSOCIATION_KEY_COLUMN_MISSING', []],
                  ['CustomKeyOwner', 'entryable', 'ASSOCIATION_POLYMORPHIC_OMITTED', []],
+                 ['MalformedOwner', 'entryable', 'ASSOCIATION_COMPOSITE_KEY_OMITTED', []],
                  ['MissingColumnOwner', 'entryable', 'ASSOCIATION_KEY_COLUMN_MISSING', []],
                  ['PrimaryKeyOwner', 'entryable', 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', []]
                ])
+  end
+
+  it 'hands off a delegated root composite identifier tuple with its scalar type discriminator' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+    owner = delegated_owner_model(
+      delegated_runtime_file,
+      'entryable',
+      [],
+      columns: [
+        column('id', :integer, false),
+        column('entryable_shop_id', :integer, true),
+        column('entryable_id', :integer, true),
+        column('entryable_type', :string, true)
+      ],
+      foreign_key: %w[entryable_shop_id entryable_id]
+    )
+
+    result = described_class.new(model_resolver: ->(_name) { owner }).probe(
+      domains: [domain_result('core', [record('Entry')])]
+    )
+
+    family = result.domains.first.delegated_type_families.first
+    expect(family.root_diagnostic_code).to be_nil
+    expect(family.foreign_key_columns).to eq(%w[entryable_shop_id entryable_id])
+    expect(family.foreign_key_columns).to be_frozen
+    expect(family.foreign_type).to eq('entryable_type')
   end
 
   it 'caches hidden HABTM join-table metadata for selected public reflections' do
@@ -654,9 +749,28 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
 
     expect(result.domains.first.join_tables).to contain_exactly(
-      have_attributes(table_name: 'authors_tags', primary_key: nil)
+      have_attributes(table_name: 'authors_tags', primary_key_columns: nil)
     )
     expect(result.domains.first.join_tables.first.columns.map(&:name)).to eq(%w[author_id tag_id])
+  end
+
+  it 'normalizes a hidden join-table composite primary key' do
+    reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
+    connection = Object.new
+    join_columns = [column('author_id', :integer, false), column('tag_id', :integer, false)]
+    connection.define_singleton_method(:data_source_exists?) { |_name| true }
+    connection.define_singleton_method(:columns) { |_name| join_columns }
+    connection.define_singleton_method(:primary_key) { |_name| %w[author_id tag_id] }
+    author = model(table_exists: true, columns: [column('id', :integer, false)])
+    author.define_singleton_method(:reflect_on_all_associations) { |_macro| [reflection] }
+    author.define_singleton_method(:connection) { connection }
+
+    result = described_class.new(model_resolver: ->(_name) { author }).probe(
+      domains: [domain_result('core', [record('Author')])]
+    )
+
+    expect(result.domains.first.join_tables.first.primary_key_columns).to eq(%w[author_id tag_id])
+    expect(result.domains.first.join_tables.first.primary_key_columns).to be_frozen
   end
 
   it 'contains HABTM reflection and join-table connection failures' do
@@ -716,7 +830,7 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
 
     expect(result.domains.first.join_tables).to contain_exactly(
-      have_attributes(table_name: 'authors_tags', primary_key: nil)
+      have_attributes(table_name: 'authors_tags', primary_key_columns: nil)
     )
   end
 
@@ -946,7 +1060,7 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     entity = result.domains.first.entities.first
     expect(result).to be_success
-    expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
+    expect(entity.foreign_keys.map(&:columns)).to eq([['account_id']])
     expect(entity.indexes.map(&:columns)).to eq([%w[email]])
   end
 
@@ -1027,7 +1141,7 @@ RSpec.describe RailsMmd::SchemaProbe do
       primary_key: 'id',
       foreign_keys: [
         foreign_key('users', 'account_id', 'accounts', 'id'),
-        foreign_key('users', nil, 'accounts', 'id')
+        foreign_key('users', %w[account_id tenant_id], 'accounts', ['id'])
       ],
       indexes: [
         index(['account_id'], true, using: :btree),
@@ -1040,7 +1154,7 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
 
     entity = result.domains.first.entities.first
-    expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
+    expect(entity.foreign_keys.map(&:columns)).to eq([['account_id']])
     expect(entity.indexes.map(&:columns)).to eq([['account_id']])
     expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
       .to eq(%w[foreign_key unique_index])

@@ -1,0 +1,69 @@
+erDiagram
+  direction LR
+  P204_ATTACHMENT }o..o| P204_ORDER : attachable
+  P204_ATTACHMENT }o..o| P204_SHOP : attachable
+  P204_BIN }o..o| P204_WAREHOUSE : p204_warehouse
+  P204_CATALOG_ITEM }o..o| P204_CATALOG : p204_catalog
+  P204_ENTRY }o..o| P204_POST : entryable
+  P204_LINE_ITEM }o..|| P204_ORDER : p204_order
+  P204_ORDER }o..|| P204_SHOP : p204_shop
+  P204_SHOP }o..o{ P204_LINE_ITEM : p204_line_items
+  P204_WAREHOUSE_PROFILE |o..o| P204_WAREHOUSE : p204_warehouse
+  P204_ATTACHMENT {
+    integer id PK
+    integer attachable_id FK
+    string attachable_region_code FK
+    string attachable_type FK
+  }
+  P204_AUTHOR {
+    string first_name PK
+    string last_name PK
+  }
+  P204_BIN {
+    integer id PK
+    string region_code FK
+    integer warehouse_id FK
+  }
+  P204_BOOK {
+    integer book_id PK
+    integer shop_id PK
+  }
+  P204_CATALOG_ITEM {
+    integer id PK
+    integer p204_catalog_id FK
+  }
+  P204_CATALOG {
+    integer id PK
+    string tenant_id PK
+  }
+  P204_ENTRY {
+    integer id PK
+    integer entryable_id FK
+    string entryable_region_code FK
+    string entryable_type FK
+  }
+  P204_LINE_ITEM {
+    integer order_code PK, FK
+    string shop_region_code PK, FK
+  }
+  P204_ORDER {
+    integer order_code PK
+    string shop_region_code PK, FK
+    integer shop_code FK
+  }
+  P204_POST {
+    integer post_code PK
+    string region_code PK
+  }
+  P204_SHOP {
+    string region_code PK
+    integer shop_code PK
+  }
+  P204_WAREHOUSE_PROFILE {
+    integer id PK
+    string region_code FK
+    integer warehouse_id FK
+  }
+  P204_WAREHOUSE {
+    integer id PK
+  }

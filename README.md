@@ -64,17 +64,20 @@ Rails Active Record support and implementation priorities are tracked in
 ## Artifact Schema Versions
 
 P2 scoped-relationship metadata moved generated IR and render-plan artifacts
-from schema version 1 to schema version 2. P2 STI support now moves both
-artifacts from version 2 to version 3: IR entities can carry closed STI metadata,
-while renderer entities carry a kind discriminator and class plans expose
-explicit inheritance edges. Consumers must validate generated artifacts with
-the schemas shipped by the same `rails-mmd` release. Configuration and
-diagnostics artifacts remain at schema version 1.
+from schema version 1 to schema version 2. P2 STI support moved both artifacts
+from version 2 to version 3: IR entities can carry closed STI metadata, while
+renderer entities carry a kind discriminator and class plans expose explicit
+inheritance edges. P2 composite-key support moves both artifacts to version 4:
+ordered primary/foreign-key members are emitted once per physical column, and a
+column serving both roles is represented as `primary_foreign_key` in IR and
+`PK, FK` in render plans. Consumers must validate generated artifacts with the
+schemas shipped by the same `rails-mmd` release. Configuration and diagnostics
+artifacts remain at schema version 1.
 
-There is no dual-version output mode. Strict v2 consumers must update for the
-new required render-plan members and closed entity variants before consuming v3
-IR or render plans. Association relationship objects retain their v2 shape.
-Mermaid artifact filenames are unchanged.
+There is no dual-version output mode. Consumers of v1-v3 IR or render plans must
+update before consuming v4 artifacts. Association relationship objects retain
+their public shape, including scalar relationship IDs; composite key tuples use
+an unambiguous encoded ID segment. Mermaid artifact filenames are unchanged.
 
 P2 `delegated_type` support does not change the public schema version. Selecting
 a delegator may add its declared, renderable concrete delegate tables to the

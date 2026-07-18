@@ -41,6 +41,19 @@ RSpec.describe 'runtime primitives' do
       expect(validator.valid?(:diagnostics, fixture('diagnostics/invalid/unknown_code.json'))).to be(false)
       expect(validator.errors(:diagnostics, fixture('diagnostics/invalid/unknown_code.json'))).not_to be_empty
     end
+
+    it 'rejects duplicate attribute identities even when the duplicate rows differ' do
+      validator = described_class.new
+      ir = fixture('ir/invalid/duplicate_attribute_identity.json')
+      render_plan = fixture('render_plan/invalid/duplicate_attribute_identity.json')
+
+      expect(validator.valid?(:ir, ir)).to be(false)
+      expect(validator.valid?(:render_plan, render_plan)).to be(false)
+      expect(validator.errors(:ir, ir)).to include(
+        include('type' => 'unique_attribute_identity',
+                'data_pointer' => '/entities/0/attributes/1/attribute_id')
+      )
+    end
   end
 
   describe RailsMmd::Diagnostics do

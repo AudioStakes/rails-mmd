@@ -1,0 +1,69 @@
+classDiagram
+  direction LR
+  class P204_ATTACHMENT {
+    +integer id
+    +integer attachable_id
+    +string attachable_region_code
+    +string attachable_type
+  }
+  class P204_AUTHOR {
+    +string first_name
+    +string last_name
+  }
+  class P204_BIN {
+    +integer id
+    +string region_code
+    +integer warehouse_id
+  }
+  class P204_BOOK {
+    +integer book_id
+    +integer shop_id
+  }
+  class P204_CATALOG_ITEM {
+    +integer id
+    +integer p204_catalog_id
+  }
+  class P204_CATALOG {
+    +integer id
+    +string tenant_id
+  }
+  class P204_ENTRY {
+    +integer id
+    +integer entryable_id
+    +string entryable_region_code
+    +string entryable_type
+  }
+  class P204_LINE_ITEM {
+    +integer order_code
+    +string shop_region_code
+  }
+  class P204_ORDER {
+    +integer order_code
+    +string shop_region_code
+    +integer shop_code
+  }
+  class P204_POST {
+    +integer post_code
+    +string region_code
+  }
+  class P204_SHOP {
+    +string region_code
+    +integer shop_code
+  }
+  class P204_WAREHOUSE_PROFILE {
+    +integer id
+    +string region_code
+    +integer warehouse_id
+  }
+  class P204_WAREHOUSE {
+    +integer id
+  }
+  P204_ATTACHMENT "0..*" --> "0..1" P204_ORDER : attachable
+  P204_ATTACHMENT "0..*" --> "0..1" P204_SHOP : attachable
+  P204_BIN "0..*" --> "0..1" P204_WAREHOUSE : p204_warehouse
+  P204_CATALOG_ITEM "0..*" --> "0..1" P204_CATALOG : p204_catalog
+  P204_ENTRY "0..*" --> "0..1" P204_POST : entryable
+  P204_LINE_ITEM "0..*" --> "1" P204_ORDER : p204_order
+  P204_ORDER "0..*" --> "1" P204_SHOP : p204_shop
+  P204_SHOP "0..*" --> "0..*" P204_LINE_ITEM : p204_line_items
+  P204_WAREHOUSE_PROFILE "0..1" --> "0..1" P204_WAREHOUSE : p204_warehouse

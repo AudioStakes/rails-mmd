@@ -2,6 +2,7 @@
 
 require 'json'
 require 'json_schemer'
+require 'rails_mmd/schema_validator'
 
 # rubocop:disable RSpec/DescribeClass
 RSpec.describe 'P0 contract schemas' do
@@ -21,16 +22,20 @@ RSpec.describe 'P0 contract schemas' do
     JSONSchemer.schema(load_json(schema_root.join("#{name}.schema.json")))
   end
 
+  def validator
+    @validator ||= RailsMmd::SchemaValidator.new(schema_root: schema_root)
+  end
+
   def fixture(path)
     load_json(fixture_root.join(path))
   end
 
   def expect_valid(schema_name, fixture_path)
-    expect(schema(schema_name)).to be_valid(fixture(fixture_path))
+    expect(validator.valid?(schema_name, fixture(fixture_path))).to be(true)
   end
 
   def expect_invalid(schema_name, fixture_path)
-    expect(schema(schema_name)).not_to be_valid(fixture(fixture_path))
+    expect(validator.valid?(schema_name, fixture(fixture_path))).to be(false)
   end
 
   def expect_invalid_relationship_metadata(schema_name, fixture_path)
@@ -86,7 +91,7 @@ RSpec.describe 'P0 contract schemas' do
 
   describe 'ir.schema.json' do
     it 'accepts Mermaid-independent IR with digest and no safe tokens' do
-      %w[ir/valid/core.json ir/valid/sti.json].each do |path|
+      %w[ir/valid/core.json ir/valid/sti.json ir/valid/composite_key.json].each do |path|
         expect_valid('ir', path)
         expect(JSON.generate(fixture(path))).not_to include('safe_token')
       end
@@ -98,6 +103,18 @@ RSpec.describe 'P0 contract schemas' do
 
     it 'rejects every relationship metadata shape except scoped true' do
       expect_invalid_relationship_metadata('ir', 'ir/valid/core.json')
+    end
+
+    it 'accepts the v4 combined key role' do
+      payload = fixture('ir/valid/core.json')
+      payload['schema_version'] = 4
+      payload.fetch('entities').first.fetch('attributes').first['role'] = 'primary_foreign_key'
+
+      expect(schema('ir')).to be_valid(payload)
+    end
+
+    it 'rejects stale v3 documents' do
+      expect_invalid('ir', 'ir/invalid/stale_v3.json')
     end
   end
 
@@ -114,6 +131,18 @@ RSpec.describe 'P0 contract schemas' do
 
     it 'rejects every relationship metadata shape except scoped true' do
       expect_invalid_relationship_metadata('render_plan', 'render_plan/valid/er.json')
+    end
+
+    it 'accepts the v4 combined key marker' do
+      payload = fixture('render_plan/valid/er.json')
+      payload['schema_version'] = 4
+      payload.fetch('entities').first.fetch('attributes').first['key_marker'] = 'PK, FK'
+
+      expect(schema('render_plan')).to be_valid(payload)
+    end
+
+    it 'rejects stale v3 documents' do
+      expect_invalid('render_plan', 'render_plan/invalid/stale_v3.json')
     end
   end
 
@@ -141,7 +170,7 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def ir_invalid_fixtures
-    ir_digest_and_shape_invalid_fixtures + ir_sti_invalid_fixtures
+    ir_digest_and_shape_invalid_fixtures + ir_v4_invalid_fixtures + ir_sti_invalid_fixtures
   end
 
   def ir_digest_and_shape_invalid_fixtures
@@ -154,6 +183,15 @@ RSpec.describe 'P0 contract schemas' do
       ir/invalid/missing_digest.json
       ir/invalid/missing_attribute_type.json
       ir/invalid/machine_local_fields.json
+    ]
+  end
+
+  def ir_v4_invalid_fixtures
+    %w[
+      ir/invalid/stale_v3.json
+      ir/invalid/illegal_combined_role.json
+      ir/invalid/duplicate_attribute_identity.json
+      ir/invalid/duplicate_attribute_identity_across_entities.json
     ]
   end
 
@@ -214,11 +252,12 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/invalid/long_digest.json
       render_plan/invalid/non_hex_digest.json
       render_plan/invalid/missing_digest.json
+      render_plan/invalid/stale_v3.json
     ]
   end
 
   def render_plan_sanitized_invalid_fixtures
-    render_plan_shape_invalid_fixtures + render_plan_sti_invalid_fixtures
+    render_plan_shape_invalid_fixtures + render_plan_identity_invalid_fixtures + render_plan_sti_invalid_fixtures
   end
 
   def render_plan_shape_invalid_fixtures
@@ -229,6 +268,14 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/invalid/machine_local_fields.json
       render_plan/invalid/unsanitized_comment.json
       render_plan/invalid/redacted_key_value_comment.json
+      render_plan/invalid/illegal_combined_marker.json
+    ]
+  end
+
+  def render_plan_identity_invalid_fixtures
+    %w[
+      render_plan/invalid/duplicate_attribute_identity.json
+      render_plan/invalid/duplicate_attribute_identity_across_entities.json
     ]
   end
 
@@ -249,6 +296,7 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/valid/er.json
       render_plan/valid/class.json
       render_plan/valid/class_sti.json
+      render_plan/valid/composite_key.json
     ]
   end
 
@@ -293,7 +341,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def ir_domain_id_valid?(domain_id)
     data = {
-      'schema_version' => 3,
+      'schema_version' => 4,
       'domain_id' => domain_id,
       'entities' => [],
       'relationships' => [],
@@ -314,7 +362,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def render_plan_base
     {
-      'schema_version' => 3, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
+      'schema_version' => 4, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
       'entities' => [],
       'inheritances' => [],
       'relationships' => [],

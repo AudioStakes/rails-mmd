@@ -22,7 +22,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | P2-01 | scoped関連 | 対応 | scope procを実行せず、解決済み関連へ`metadata.scoped: true`を保持する |
 | P2-02 | STI | 対応 | ERは共有tableの基底のみ、class図はloaded concrete subtypeと継承edgeを決定的に描画する |
 | P2-03 | `delegated_type` | 対応 | Rails生成type whitelistを安全に検出し、委譲元から描画可能な宣言済み具象型へ具体edgeを描画する |
-| P2-04 | 複合primary/foreign key、`query_constraints` | 未対応 | 対応する列組を保持・照合する |
+| P2-04 | 複合primary/foreign key、`query_constraints` | 対応 | 順序付き列組を全層で保持し、完全一致するDB制約・nullability・unique根拠を照合する。複合HABTMは対応Railsで実用不可のため診断して省略する |
 | P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |
 | P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
 | P2-07 | `dependent` / `touch` / `counter_cache` | 未対応 | 図へ載せる動作metadataを定義する |
@@ -33,13 +33,13 @@ rails-mmdの対象版はRails 7.2と8.1。
 
 Rails 7.2/8.1で次を対応済み。
 
-- 非polymorphic・unscoped・scalar direct `belongs_to`
-- scalar `foreign_key`と`class_name`
+- 非polymorphic・unscopedのscalar/composite direct `belongs_to`、`has_many`、`has_one`
+- scalar/ordered composite `foreign_key`、model-level `query_constraints`、`class_name`
 - FK、nullability、unique indexによる保守的な多重度
 - same-domain限定のER/Class出力
 - 対応範囲内の`belongs_to`除外診断
-- direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
-- hidden join tableを持つunscoped scalar `has_and_belongs_to_many`
+- scalar/composite direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
+- hidden join tableを持つunscoped scalar `has_and_belongs_to_many`。複合HABTMは対応Railsのruntime probeに基づき診断して省略
 - provenance確認済み`delegated_type`の宣言済み具象型（同一connection・同一domain）
 
 ## 根拠

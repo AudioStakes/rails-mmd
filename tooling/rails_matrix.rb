@@ -8,6 +8,7 @@ require 'pathname'
 require 'tmpdir'
 require 'yaml'
 require 'rails_mmd/mermaid_serializer'
+require 'rails_mmd/relationship_id_codec'
 require 'rails_mmd/schema_validator'
 
 module RailsMatrix
@@ -19,6 +20,40 @@ module RailsMatrix
       "ruby-#{ruby_version}-rails-#{rails_series}"
     end
   end
+
+  FAMILY_RUNTIME_ORACLES = {
+    'delegated_type' => {
+      command: %w[exec ruby bin/rails runner script/rails_mmd_delegated_type_runtime_oracle.rb],
+      actual: 'delegated_type_runtime.json',
+      expected: 'rails_mmd_expected_delegated_type_runtime.json',
+      label: 'delegated type'
+    },
+    'composite_keys' => {
+      command: %w[exec ruby bin/rails runner script/rails_mmd_composite_runtime_oracle.rb],
+      actual: 'composite_runtime.json',
+      expected: 'rails_mmd_expected_composite_runtime.json',
+      label: 'composite key'
+    }
+  }.freeze
+
+  PAIR_PROBES = {
+    'composite_keys' => {
+      script: 'docs/p2/04-composite-keys/probes/composite_habtm_probe.rb',
+      label: 'composite HABTM'
+    }
+  }.freeze
+
+  LOCKED_RAILS_VERSIONS = {
+    '7.2' => '7.2.3.1',
+    '8.1' => '8.1.3'
+  }.freeze
+
+  COMPOSITE_HABTM_EXPECTATIONS = {
+    'book_sql_has_full_owner_tuple' => false,
+    'book_sql_uses_scalar_fallback' => true,
+    'author_sql_has_full_owner_tuple' => false,
+    'author_sql_uses_scalar_fallback' => true
+  }.freeze
 
   # Reads the versioned compatibility matrix without owning execution policy.
   class Manifest
@@ -88,11 +123,22 @@ module RailsMatrix
     end
 
     def key_attributes(id, holder)
-      key_names = id.split('/').last(2)
+      key_names = polymorphic_key_names(id)
       entities.fetch(holder).fetch('attributes').filter_map do |attribute|
-        label = attribute.fetch('label')
-        label if key_names.include?(label) && attribute.fetch('key_marker') == 'FK'
+        attribute.fetch('label') if foreign_key_attribute?(attribute, key_names)
       end.uniq.sort
+    end
+
+    def polymorphic_key_names(id)
+      decoded = RailsMmd::RelationshipIdCodec.decode_polymorphic_group(id)
+      [*decoded.fetch(:identifier_columns), decoded.fetch(:type_column)]
+    rescue RailsMmd::RelationshipIdCodec::Error => e
+      raise VerificationError, "malformed polymorphic relationship ID #{id.inspect}: #{e.message}"
+    end
+
+    def foreign_key_attribute?(attribute, key_names)
+      key_names.include?(attribute.fetch('label')) &&
+        attribute.fetch('key_marker').split(',').map(&:strip).include?('FK')
     end
   end
 
@@ -112,6 +158,7 @@ module RailsMatrix
     def validate(app_root, pair, fixture_family: 'default')
       output = app_root.join('tmp/rails_mmd')
       plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
+      validate_expected_render_plans(app_root, plans, pair) if fixture_family == 'composite_keys'
       validate_expected_mermaid(app_root, output.join('core.er.mmd'), 'ER', 'rails_mmd_expected_core_er.mmd', pair)
       validate_expected_mermaid(
         app_root,
@@ -137,9 +184,12 @@ module RailsMatrix
     attr_reader :mermaid_serializer, :schema_validator
 
     def validate_fixture_runtime(app_root, output, pair, fixture_family)
-      return unless fixture_family == 'delegated_type'
+      return if fixture_family == 'default'
 
-      validate_expected_delegated_type_runtime(app_root, output.join('delegated_type_runtime.json'), pair)
+      oracle = FAMILY_RUNTIME_ORACLES.fetch(fixture_family) do
+        raise VerificationError, "Missing runtime oracle wiring for fixture family: #{fixture_family}"
+      end
+      validate_expected_runtime(app_root, output, pair, oracle)
     end
 
     def validate_artifact(output, kind, pair)
@@ -147,6 +197,16 @@ module RailsMatrix
       render_plan = validate_json(plan_path, pair, :render_plan)
       validate_mermaid(output.join("core.#{kind}.mmd"), plan_path, render_plan, pair)
       render_plan
+    end
+
+    def validate_expected_render_plans(app_root, plans, pair)
+      ARTIFACT_KINDS.each do |kind|
+        expected_name = "rails_mmd_expected_core_#{kind}.render_plan.json"
+        expected = read_expected_json(app_root, expected_name, pair)
+        next if plans.fetch(kind) == expected
+
+        raise VerificationError, "#{pair.name} #{kind.upcase} render plan did not match expectation"
+      end
     end
 
     def validate_mermaid(path, plan_path, render_plan, pair)
@@ -256,13 +316,14 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} published invalid #{actual_path.basename}: #{e.message}"
     end
 
-    def validate_expected_delegated_type_runtime(app_root, actual_path, pair)
-      expected = read_expected_json(app_root, 'rails_mmd_expected_delegated_type_runtime.json', pair)
+    def validate_expected_runtime(app_root, output, pair, oracle)
+      actual_path = output.join(oracle.fetch(:actual))
+      expected = read_expected_json(app_root, oracle.fetch(:expected), pair)
       actual = JSON.parse(actual_path.read)
       return if actual == expected
 
       raise VerificationError,
-            "#{pair.name} delegated type runtime did not match expectation\n" \
+            "#{pair.name} #{oracle.fetch(:label)} runtime did not match expectation\n" \
             "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
     rescue Errno::ENOENT, JSON::ParserError => e
       raise VerificationError, "#{pair.name} published invalid #{actual_path.basename}: #{e.message}"
@@ -376,18 +437,55 @@ module RailsMatrix
       run_bundle(app_root, pair, %w[exec ruby bin/rails db:schema:load])
       run_bundle(app_root, pair, %w[exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb])
       run_family_runtime_oracle(app_root, pair, family)
+      run_pair_probe(app_root, pair, family)
       run_bundle(app_root, pair, %w[exec rails-mmd generate])
       artifact_validator.validate(app_root, pair, fixture_family: family)
     end
 
     def run_family_runtime_oracle(app_root, pair, family)
-      return unless family == 'delegated_type'
+      return if family == 'default'
 
-      run_bundle(
-        app_root,
-        pair,
-        %w[exec ruby bin/rails runner script/rails_mmd_delegated_type_runtime_oracle.rb]
+      oracle = FAMILY_RUNTIME_ORACLES.fetch(family) do
+        raise VerificationError, "Missing runtime oracle wiring for fixture family: #{family}"
+      end
+      run_bundle(app_root, pair, oracle.fetch(:command))
+    end
+
+    def run_pair_probe(app_root, pair, family)
+      probe = PAIR_PROBES[family]
+      return unless probe
+
+      script = root.join(probe.fetch(:script))
+      result = capture_bundle(app_root, pair, ['exec', 'ruby', script.to_s])
+      verify_result(result, pair, "#{probe.fetch(:label)} probe")
+      validate_composite_habtm_probe(JSON.parse(json_object(result.first)), pair)
+    rescue JSON::ParserError => e
+      raise VerificationError, "#{pair.name} published invalid #{probe.fetch(:label)} probe: #{e.message}"
+    end
+
+    def json_object(output)
+      starts = [0] if output.start_with?('{')
+      starts = [*starts, *output.enum_for(:scan, /\n\{/).map { Regexp.last_match.begin(0) + 1 }]
+      starts.reverse_each do |start|
+        candidate = output[start..]
+        return candidate if JSON.parse(candidate).is_a?(Hash)
+      rescue JSON::ParserError
+        next
+      end
+
+      ''
+    end
+
+    def validate_composite_habtm_probe(payload, pair)
+      expected = COMPOSITE_HABTM_EXPECTATIONS.merge(
+        'rails_version' => LOCKED_RAILS_VERSIONS.fetch(pair.rails_series)
       )
+      actual = expected.keys.to_h { |key| [key, payload[key]] }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} composite HABTM probe did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
     end
 
     def prepare_app(app_root, pair, family)

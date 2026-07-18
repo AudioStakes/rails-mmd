@@ -38,7 +38,7 @@ module RailsMmd
       physical_entity_ids = domain.entities.map { |entity| entity_id(entity) }
 
       {
-        'schema_version' => 3,
+        'schema_version' => 4,
         'domain_id' => domain.domain_id,
         'entities' => entities_payload(domain, relationship_domain, subtype_entities, base_metadata),
         'relationships' => relationships_payload(relationship_domain, physical_entity_ids),
@@ -86,15 +86,30 @@ module RailsMmd
     def attributes_payload(entity, relationship_domain)
       return [] if attributes == :none
 
-      names = [[entity.primary_key, 'primary_key']]
-      names.concat(foreign_key_names(entity, relationship_domain).map { |name| [name, 'foreign_key'] })
-      payloads = names.compact.uniq.map do |name, role|
+      roles_by_name = Hash.new { |roles, name| roles[name] = [] }
+      entity.primary_key_columns.each { |name| roles_by_name[name] << :primary }
+      foreign_key_names(entity, relationship_domain).each { |name| roles_by_name[name] << :foreign }
+      payloads = roles_by_name.map do |name, roles|
+        role = attribute_role(roles)
         { 'attribute_id' => "#{entity_id(entity)}/attributes/#{name}", 'name' => name, 'role' => role,
           'type' => column_type(entity, name) }
       end
 
       payloads.sort_by do |attribute|
-        [attribute.fetch('role') == 'primary_key' ? 0 : 1, attribute.fetch('attribute_id')]
+        [attribute.fetch('role') == 'foreign_key' ? 1 : 0, attribute.fetch('attribute_id')]
+      end
+    end
+
+    def attribute_role(roles)
+      case roles.uniq.sort
+      when [:primary]
+        'primary_key'
+      when [:foreign]
+        'foreign_key'
+      when %i[foreign primary]
+        'primary_foreign_key'
+      else
+        raise ArgumentError, "unsupported attribute roles: #{roles.inspect}"
       end
     end
 
@@ -105,10 +120,7 @@ module RailsMmd
         holder_id = relationship.foreign_key_holder_entity_id || relationship.owner_entity_id
         next [] unless holder_id == entity_id(entity)
 
-        [
-          relationship.foreign_key_column || relationship.owner_foreign_key_column,
-          relationship.foreign_type_column
-        ].compact
+        Array(relationship.foreign_key_columns) + [relationship.foreign_type_column].compact
       end
     end
 

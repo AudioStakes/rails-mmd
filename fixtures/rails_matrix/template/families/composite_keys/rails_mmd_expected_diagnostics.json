@@ -1,0 +1,268 @@
+[
+  {
+    "code": "ASSOCIATION_COMPOSITE_KEY_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p204_authors.p204_books",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P204Author",
+      "association_name": "p204_books",
+      "target_constant": "P204Book"
+    }
+  },
+  {
+    "code": "ASSOCIATION_COMPOSITE_KEY_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p204_books.p204_authors",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P204Book",
+      "association_name": "p204_authors",
+      "target_constant": "P204Author"
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 7,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ORDER_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ORDER_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:REGION_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "REGION_CODE",
+      "collision_subject_count": 4,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:SHOP_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "SHOP_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:SHOP_REGION_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "SHOP_REGION_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:WAREHOUSE_ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "WAREHOUSE_ID",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:ATTACHABLE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ATTACHABLE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:P204_WAREHOUSE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "P204_WAREHOUSE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 7,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ORDER_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ORDER_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:REGION_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "REGION_CODE",
+      "collision_subject_count": 4,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:SHOP_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "SHOP_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:SHOP_REGION_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "SHOP_REGION_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:WAREHOUSE_ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "WAREHOUSE_ID",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:ATTACHABLE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ATTACHABLE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:P204_WAREHOUSE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "P204_WAREHOUSE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  }
+]

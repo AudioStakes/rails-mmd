@@ -1,0 +1,620 @@
+[
+  {
+    "ruby_constant": "P204Attachment",
+    "primary_key": "id",
+    "query_constraints": null,
+    "associations": [
+      {
+        "name": "attachable",
+        "macro": "belongs_to",
+        "polymorphic": true,
+        "foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "association_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "active_record_primary_key": null,
+        "join_primary_key": {
+          "error": "ArgumentError"
+        },
+        "join_foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "query_constraints": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "target_ruby_constant": "P204Order"
+      },
+      {
+        "name": "attachable",
+        "macro": "belongs_to",
+        "polymorphic": true,
+        "foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "association_primary_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "active_record_primary_key": null,
+        "join_primary_key": {
+          "error": "ArgumentError"
+        },
+        "join_foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "query_constraints": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "target_ruby_constant": "P204Shop"
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Author",
+    "primary_key": [
+      "first_name",
+      "last_name"
+    ],
+    "query_constraints": [
+      "first_name",
+      "last_name"
+    ],
+    "associations": [
+      {
+        "name": "p204_books",
+        "macro": "has_and_belongs_to_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "author_first_name",
+          "author_last_name"
+        ],
+        "association_primary_key": [
+          "shop_id",
+          "book_id"
+        ],
+        "active_record_primary_key": [
+          "first_name",
+          "last_name"
+        ],
+        "join_primary_key": [
+          "author_first_name",
+          "author_last_name"
+        ],
+        "join_foreign_key": [
+          "first_name",
+          "last_name"
+        ],
+        "query_constraints": [
+          "author_first_name",
+          "author_last_name"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Bin",
+    "primary_key": "id",
+    "query_constraints": null,
+    "associations": [
+      {
+        "name": "p204_warehouse",
+        "macro": "belongs_to",
+        "polymorphic": null,
+        "foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "association_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "active_record_primary_key": null,
+        "join_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "query_constraints": [
+          "region_code",
+          "warehouse_id"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Book",
+    "primary_key": [
+      "shop_id",
+      "book_id"
+    ],
+    "query_constraints": [
+      "shop_id",
+      "book_id"
+    ],
+    "associations": [
+      {
+        "name": "p204_authors",
+        "macro": "has_and_belongs_to_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "book_shop_id",
+          "book_book_id"
+        ],
+        "association_primary_key": [
+          "first_name",
+          "last_name"
+        ],
+        "active_record_primary_key": [
+          "shop_id",
+          "book_id"
+        ],
+        "join_primary_key": [
+          "book_shop_id",
+          "book_book_id"
+        ],
+        "join_foreign_key": [
+          "shop_id",
+          "book_id"
+        ],
+        "query_constraints": [
+          "book_shop_id",
+          "book_book_id"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Catalog",
+    "primary_key": [
+      "tenant_id",
+      "id"
+    ],
+    "query_constraints": [
+      "tenant_id",
+      "id"
+    ],
+    "associations": [
+      {
+        "name": "p204_catalog_items",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": "p204_catalog_id",
+        "association_primary_key": "id",
+        "active_record_primary_key": "id",
+        "join_primary_key": "p204_catalog_id",
+        "join_foreign_key": "id",
+        "query_constraints": null
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204CatalogItem",
+    "primary_key": "id",
+    "query_constraints": null,
+    "associations": [
+      {
+        "name": "p204_catalog",
+        "macro": "belongs_to",
+        "polymorphic": null,
+        "foreign_key": "p204_catalog_id",
+        "association_primary_key": "id",
+        "active_record_primary_key": "id",
+        "join_primary_key": "id",
+        "join_foreign_key": "p204_catalog_id",
+        "query_constraints": null
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Entry",
+    "primary_key": "id",
+    "query_constraints": null,
+    "associations": [
+      {
+        "name": "entryable",
+        "macro": "belongs_to",
+        "polymorphic": true,
+        "foreign_key": [
+          "entryable_region_code",
+          "entryable_id"
+        ],
+        "association_primary_key": [
+          "region_code",
+          "post_code"
+        ],
+        "active_record_primary_key": null,
+        "join_primary_key": {
+          "error": "ArgumentError"
+        },
+        "join_foreign_key": [
+          "entryable_region_code",
+          "entryable_id"
+        ],
+        "query_constraints": [
+          "entryable_region_code",
+          "entryable_id"
+        ],
+        "target_ruby_constant": "P204Post"
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204LineItem",
+    "primary_key": [
+      "shop_region_code",
+      "order_code"
+    ],
+    "query_constraints": [
+      "shop_region_code",
+      "order_code"
+    ],
+    "associations": [
+      {
+        "name": "p204_order",
+        "macro": "belongs_to",
+        "polymorphic": null,
+        "foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "association_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "active_record_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "query_constraints": [
+          "shop_region_code",
+          "order_code"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Order",
+    "primary_key": [
+      "shop_region_code",
+      "order_code"
+    ],
+    "query_constraints": [
+      "shop_region_code",
+      "order_code"
+    ],
+    "associations": [
+      {
+        "name": "p204_attachments",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "association_primary_key": "id",
+        "active_record_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_primary_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "join_foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "query_constraints": [
+          "attachable_region_code",
+          "attachable_id"
+        ]
+      },
+      {
+        "name": "p204_line_items",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "association_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "active_record_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "query_constraints": [
+          "shop_region_code",
+          "order_code"
+        ]
+      },
+      {
+        "name": "p204_shop",
+        "macro": "belongs_to",
+        "polymorphic": null,
+        "foreign_key": [
+          "shop_region_code",
+          "shop_code"
+        ],
+        "association_primary_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "active_record_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_primary_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "join_foreign_key": [
+          "shop_region_code",
+          "shop_code"
+        ],
+        "query_constraints": [
+          "shop_region_code",
+          "shop_code"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Post",
+    "primary_key": [
+      "region_code",
+      "post_code"
+    ],
+    "query_constraints": [
+      "region_code",
+      "post_code"
+    ],
+    "associations": [
+      {
+        "name": "p204_entry",
+        "macro": "has_one",
+        "polymorphic": null,
+        "foreign_key": [
+          "entryable_region_code",
+          "entryable_id"
+        ],
+        "association_primary_key": "id",
+        "active_record_primary_key": [
+          "region_code",
+          "post_code"
+        ],
+        "join_primary_key": [
+          "entryable_region_code",
+          "entryable_id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "post_code"
+        ],
+        "query_constraints": [
+          "entryable_region_code",
+          "entryable_id"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Shop",
+    "primary_key": [
+      "region_code",
+      "shop_code"
+    ],
+    "query_constraints": [
+      "region_code",
+      "shop_code"
+    ],
+    "associations": [
+      {
+        "name": "p204_attachments",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "association_primary_key": "id",
+        "active_record_primary_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "join_primary_key": [
+          "attachable_region_code",
+          "attachable_id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "query_constraints": [
+          "attachable_region_code",
+          "attachable_id"
+        ]
+      },
+      {
+        "name": "p204_line_items",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "association_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "active_record_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "join_foreign_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "query_constraints": null
+      },
+      {
+        "name": "p204_orders",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "shop_region_code",
+          "shop_code"
+        ],
+        "association_primary_key": [
+          "shop_region_code",
+          "order_code"
+        ],
+        "active_record_primary_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "join_primary_key": [
+          "shop_region_code",
+          "shop_code"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "shop_code"
+        ],
+        "query_constraints": [
+          "shop_region_code",
+          "shop_code"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204Warehouse",
+    "primary_key": "id",
+    "query_constraints": [
+      "region_code",
+      "id"
+    ],
+    "associations": [
+      {
+        "name": "p204_bins",
+        "macro": "has_many",
+        "polymorphic": null,
+        "foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "association_primary_key": "id",
+        "active_record_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "join_primary_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "id"
+        ],
+        "query_constraints": [
+          "region_code",
+          "warehouse_id"
+        ]
+      },
+      {
+        "name": "p204_warehouse_profile",
+        "macro": "has_one",
+        "polymorphic": null,
+        "foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "association_primary_key": "id",
+        "active_record_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "join_primary_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "id"
+        ],
+        "query_constraints": [
+          "region_code",
+          "warehouse_id"
+        ]
+      }
+    ]
+  },
+  {
+    "ruby_constant": "P204WarehouseProfile",
+    "primary_key": "id",
+    "query_constraints": null,
+    "associations": [
+      {
+        "name": "p204_warehouse",
+        "macro": "belongs_to",
+        "polymorphic": null,
+        "foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "association_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "active_record_primary_key": null,
+        "join_primary_key": [
+          "region_code",
+          "id"
+        ],
+        "join_foreign_key": [
+          "region_code",
+          "warehouse_id"
+        ],
+        "query_constraints": [
+          "region_code",
+          "warehouse_id"
+        ]
+      }
+    ]
+  }
+]

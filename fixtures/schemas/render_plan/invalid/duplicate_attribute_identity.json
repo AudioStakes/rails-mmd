@@ -1,0 +1,23 @@
+{
+  "schema_version": 4,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/line_items",
+      "entity_kind": "physical",
+      "safe_token": "LINE_ITEM",
+      "label": "LineItem",
+      "attributes": [
+        { "attribute_id": "entities/line_items/attributes/order_id", "safe_token": "ORDER_ID", "label": "order_id", "type": "bigint", "key_marker": "PK, FK" },
+        { "attribute_id": "entities/line_items/attributes/order_id", "safe_token": "ORDER_ID_ALIAS", "label": "order_id_alias", "type": "integer", "key_marker": "FK" }
+      ]
+    }
+  ],
+  "inheritances": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+}

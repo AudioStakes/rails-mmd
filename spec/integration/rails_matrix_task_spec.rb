@@ -4,11 +4,19 @@ require 'fileutils'
 require 'json'
 require 'open3'
 require 'tmpdir'
+require_relative '../../tooling/rails_matrix'
 
 # rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleMemoizedHelpers
 # rubocop:disable Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
 RSpec.describe 'the Rails compatibility matrix Rake command' do
   let(:matching_fake_app_asdf) { fake_generated_app_asdf }
+  let(:matching_rails72_fake_app_asdf) do
+    fake_generated_app_asdf(composite_habtm_probe: {
+                              rails_version: '7.2.3.1',
+                              book_sql_has_full_owner_tuple: false, book_sql_uses_scalar_fallback: true,
+                              author_sql_has_full_owner_tuple: false, author_sql_uses_scalar_fallback: true
+                            })
+  end
 
   let(:invalid_artifact_asdf) do
     <<~'SH'
@@ -170,6 +178,30 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     fake_generated_app_asdf(expected_delegated_runtime: '[{"association_name":"wrong"}]')
   end
 
+  def missing_expected_composite_runtime_asdf
+    fake_generated_app_asdf(expected_composite_runtime: nil)
+  end
+
+  def malformed_composite_runtime_asdf
+    fake_generated_app_asdf(actual_composite_runtime: '{not-json')
+  end
+
+  def mismatched_expected_composite_runtime_asdf
+    fake_generated_app_asdf(expected_composite_runtime: '[{"ruby_constant":"Wrong"}]')
+  end
+
+  def failing_composite_habtm_probe_asdf
+    fake_generated_app_asdf(
+      composite_habtm_probe: {
+        rails_version: '8.1.3',
+        book_sql_has_full_owner_tuple: false,
+        book_sql_uses_scalar_fallback: false,
+        author_sql_has_full_owner_tuple: false,
+        author_sql_uses_scalar_fallback: true
+      }
+    )
+  end
+
   def generic_expected_relationship
     {
       relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
@@ -188,6 +220,8 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
   def fake_generated_app_asdf(
     actual_er_plan_fixture: 'fixtures/schemas/render_plan/valid/er.json',
     actual_class_plan_fixture: 'fixtures/schemas/render_plan/valid/class.json',
+    expected_er_plan_fixture: actual_er_plan_fixture,
+    expected_class_plan_fixture: actual_class_plan_fixture,
     actual_er_mermaid: fake_er_mermaid,
     actual_class_mermaid: fake_class_mermaid,
     expected_er_mermaid: fake_er_mermaid,
@@ -201,6 +235,15 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     actual_runtime: '[]',
     expected_delegated_runtime: '[]',
     actual_delegated_runtime: '[]',
+    expected_composite_runtime: '[]',
+    actual_composite_runtime: '[]',
+    composite_habtm_probe: {
+      rails_version: '8.1.3',
+      book_sql_has_full_owner_tuple: false,
+      book_sql_uses_scalar_fallback: true,
+      author_sql_has_full_owner_tuple: false,
+      author_sql_uses_scalar_fallback: true
+    },
     actual_diagnostics_fixture: nil
   )
     <<~SH
@@ -213,10 +256,19 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"exec ruby bin/rails runner script/rails_mmd_delegated_type_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/delegated_type_runtime.json', actual_delegated_runtime)}          exit 0 ;;
+        *"exec ruby bin/rails runner script/rails_mmd_composite_runtime_oracle.rb"*)
+          mkdir -p tmp/rails_mmd
+#{write_file_shell('tmp/rails_mmd/composite_runtime.json', actual_composite_runtime)}          exit 0 ;;
+        *"composite_habtm_probe.rb"*)
+          printf '%s\n' '-- create_table(:p204_books, {id: false})'
+          printf '%s\n' '#{JSON.generate(composite_habtm_probe)}'
+          exit 0 ;;
         *"exec rails-mmd generate"*)
-#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
+#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/#{actual_er_plan_fixture}" tmp/rails_mmd/core.er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{actual_class_plan_fixture}" tmp/rails_mmd/core.class.render_plan.json
+          cp "$RAILS_MMD_TEST_ROOT/#{expected_er_plan_fixture}" rails_mmd_expected_core_er.render_plan.json
+          cp "$RAILS_MMD_TEST_ROOT/#{expected_class_plan_fixture}" rails_mmd_expected_core_class.render_plan.json
 #{copy_fixture_shell('tmp/rails_mmd/core.diagnostics.json', actual_diagnostics_fixture)}
 #{write_file_shell('tmp/rails_mmd/core.er.mmd', actual_er_mermaid)}#{write_file_shell('tmp/rails_mmd/core.class.mmd', actual_class_mermaid)}          exit 0 ;;
         *) exit 0 ;;
@@ -374,10 +426,125 @@ EOF
         success: true,
         output: include(
           'PASS ruby-4.0.6-rails-8.1 [default]',
-          'PASS ruby-4.0.6-rails-8.1 [delegated_type]'
+          'PASS ruby-4.0.6-rails-8.1 [delegated_type]',
+          'PASS ruby-4.0.6-rails-8.1 [composite_keys]'
         )
       )
     end
+  end
+
+  it 'runs the composite-key family and Rails 7.2 runtime probe branch' do
+    with_fake_asdf(matching_rails72_fake_app_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-7.2', fixture_family: 'composite_keys'
+      )
+
+      expect(result).to include(
+        success: true,
+        output: include('PASS ruby-4.0.6-rails-7.2 [composite_keys]')
+      )
+    end
+  end
+
+  it 'rejects a missing composite-key runtime expectation' do
+    with_fake_asdf(missing_expected_composite_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_composite_runtime.json')
+      )
+    end
+  end
+
+  it 'rejects malformed composite-key runtime output' do
+    with_fake_asdf(malformed_composite_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
+
+      expect(result).to include(success: false, output: include('published invalid composite_runtime.json'))
+    end
+  end
+
+  it 'rejects mismatched composite-key runtime output' do
+    with_fake_asdf(mismatched_expected_composite_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
+
+      expect(result).to include(success: false, output: include('composite key runtime did not match expectation'))
+    end
+  end
+
+  it 'rejects a composite HABTM probe that loses the conventional scalar fallback' do
+    with_fake_asdf(failing_composite_habtm_probe_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
+
+      expect(result).to include(success: false, output: include('composite HABTM probe did not match expectation'))
+    end
+  end
+
+  it 'rejects a composite render plan that differs from its checked-in exact oracle' do
+    asdf = fake_generated_app_asdf(expected_er_plan_fixture: 'fixtures/schemas/render_plan/valid/class.json')
+
+    with_fake_asdf(asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
+
+      expect(result).to include(success: false, output: include('ER render plan did not match expectation'))
+    end
+  end
+
+  it 'projects every composite polymorphic identifier member and the scalar type member' do
+    tuple_payload = 'WyJzdWJqZWN0X3Nob3BfaWQiLCJzdWJqZWN0X2lkIl0'
+    relationship_id =
+      "relationships/composite_comments/polymorphic/commentable/tuple/#{tuple_payload}/commentable_type/posts"
+    render_plan = {
+      'entities' => [
+        {
+          'safe_token' => 'COMPOSITE_COMMENT',
+          'attributes' => [
+            { 'label' => 'subject_shop_id', 'key_marker' => 'PK, FK' },
+            { 'label' => 'subject_id', 'key_marker' => 'FK' },
+            { 'label' => 'commentable_type', 'key_marker' => 'FK' }
+          ]
+        }
+      ],
+      'relationships' => [
+        {
+          'relationship_id' => relationship_id,
+          'owner_safe_token' => 'COMPOSITE_COMMENT',
+          'target_safe_token' => 'POST',
+          'label' => 'commentable'
+        }
+      ]
+    }
+
+    expect(RailsMatrix::PolymorphicGroupProjector.call(render_plan)).to eq(
+      [
+        {
+          'group_id' => relationship_id.split('/')[0...-1].join('/'),
+          'holder_safe_token' => 'COMPOSITE_COMMENT',
+          'root_label' => 'commentable',
+          'candidate_target_safe_tokens' => ['POST'],
+          'foreign_key_attributes' => %w[commentable_type subject_id subject_shop_id]
+        }
+      ]
+    )
+  end
+
+  it 'rejects malformed composite polymorphic group tuple payloads' do
+    render_plan = {
+      'entities' => [{ 'safe_token' => 'COMMENT', 'attributes' => [] }],
+      'relationships' => [
+        {
+          'relationship_id' =>
+            'relationships/comments/polymorphic/commentable/tuple/not-base64/commentable_type/posts',
+          'owner_safe_token' => 'COMMENT',
+          'target_safe_token' => 'POST',
+          'label' => 'commentable'
+        }
+      ]
+    }
+
+    expect { RailsMatrix::PolymorphicGroupProjector.call(render_plan) }
+      .to raise_error(RailsMatrix::VerificationError, /malformed polymorphic relationship ID/)
   end
 
   it 'passes delegated-type fixture-family selection through to the runner' do

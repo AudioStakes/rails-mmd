@@ -44,7 +44,7 @@ RSpec.describe RailsMmd::IrBuilder do
       'target_cardinality' => '1..1',
       'metadata' => { 'scoped' => true }
     )
-    expect(payload.fetch('schema_version')).to eq(3)
+    expect(payload.fetch('schema_version')).to eq(4)
     expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
     expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
     expect(schema_valid_ir?(payload)).to be(true)
@@ -53,7 +53,13 @@ RSpec.describe RailsMmd::IrBuilder do
     )
   end
 
-  it 'emits schema v3 STI base and subtype entity metadata' do
+  it 'raises on unsupported attribute role payloads' do
+    expect do
+      described_class.new.send(:attribute_role, %i[primary secondary])
+    end.to raise_error(ArgumentError, /unsupported attribute roles/)
+  end
+
+  it 'emits schema v4 STI base and subtype entity metadata' do
     domain = domain_with_sti(
       domain_id: 'core',
       entities: [entity('Vehicle', 'vehicles', columns: [column('id')]), entity('Part', 'parts')],
@@ -81,7 +87,7 @@ RSpec.describe RailsMmd::IrBuilder do
     payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
     entities = payload.fetch('entities').to_h { |entity_payload| [entity_payload.fetch('entity_id'), entity_payload] }
 
-    expect(payload.fetch('schema_version')).to eq(3)
+    expect(payload.fetch('schema_version')).to eq(4)
     expect(entities.fetch('entities/vehicles').fetch('metadata')).to eq(
       'kind' => 'sti_base',
       'inheritance_column' => 'type'
@@ -211,7 +217,7 @@ RSpec.describe RailsMmd::IrBuilder do
     )
     direct_has = relationship('relationships/authors/profile', 'entities/authors', 'entities/profiles', 'profile')
     direct_has.foreign_key_holder_entity_id = 'entities/profiles'
-    direct_has.foreign_key_column = 'author_id'
+    direct_has.foreign_key_columns = ['author_id']
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [direct_has], diagnostics: []
     )
@@ -228,6 +234,46 @@ RSpec.describe RailsMmd::IrBuilder do
     expect(payload.fetch('relationships').first).not_to have_key('metadata')
   end
 
+  it 'emits every composite key member once and merges primary and foreign roles' do
+    composite_entity = Struct.new(
+      :ruby_constant, :table_name, :columns, :primary_key_columns, keyword_init: true
+    ).new(
+      ruby_constant: 'LineItem',
+      table_name: 'line_items',
+      columns: [column('order_id'), column('line_number'), column('warehouse_id')],
+      primary_key_columns: %w[order_id line_number]
+    )
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core', entities: [composite_entity], diagnostics: []
+    )
+    composite_relationship = Struct.new(
+      :relationship_id, :owner_entity_id, :target_entity_id, :association_name,
+      :foreign_key_holder_entity_id, :foreign_key_columns, :foreign_type_column,
+      :owner_cardinality, :target_cardinality, :metadata,
+      keyword_init: true
+    ).new(
+      relationship_id: 'relationships/line_items/order',
+      owner_entity_id: 'entities/line_items',
+      target_entity_id: 'entities/line_items',
+      association_name: 'order',
+      foreign_key_holder_entity_id: 'entities/line_items',
+      foreign_key_columns: %w[order_id warehouse_id],
+      owner_cardinality: '0..many',
+      target_cardinality: '1..1'
+    )
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core', relationships: [composite_relationship], diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+    attributes = payload.fetch('entities').first.fetch('attributes')
+
+    expect(attributes.map { |attribute| [attribute.fetch('name'), attribute.fetch('role')] }).to eq(
+      [%w[line_number primary_key], %w[order_id primary_foreign_key], %w[warehouse_id foreign_key]]
+    )
+    expect(attributes.map { |attribute| attribute.fetch('attribute_id') }.uniq.length).to eq(3)
+  end
+
   it 'marks both polymorphic id and type columns as foreign keys' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core',
@@ -241,7 +287,7 @@ RSpec.describe RailsMmd::IrBuilder do
       'entities/comments', 'entities/posts', 'commentable'
     )
     polymorphic.foreign_key_holder_entity_id = 'entities/comments'
-    polymorphic.foreign_key_column = 'commentable_id'
+    polymorphic.foreign_key_columns = ['commentable_id']
     polymorphic.foreign_type_column = 'commentable_type'
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [polymorphic], diagnostics: []
@@ -266,8 +312,7 @@ RSpec.describe RailsMmd::IrBuilder do
       'entities/authors', 'entities/tags', 'tags'
     )
     habtm.relationship_kind = :habtm
-    habtm.owner_foreign_key_column = nil
-    habtm.foreign_key_column = nil
+    habtm.foreign_key_columns = nil
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [habtm], diagnostics: []
     )
@@ -301,7 +346,7 @@ RSpec.describe RailsMmd::IrBuilder do
       table_name: table_name,
       connection_context_id: '{"name":"primary"}',
       columns: columns,
-      primary_key: 'id',
+      primary_key_columns: ['id'],
       foreign_keys: [],
       indexes: []
     )
@@ -317,8 +362,9 @@ RSpec.describe RailsMmd::IrBuilder do
       owner_entity_id: owner_id,
       target_entity_id: target_id,
       association_name: name,
-      owner_foreign_key_column: 'account_id',
-      target_primary_key_column: 'id',
+      foreign_key_holder_entity_id: owner_id,
+      foreign_key_columns: ['account_id'],
+      referenced_key_columns: ['id'],
       owner_fk_unique: false,
       db_foreign_key: true,
       owner_fk_nullable: false,

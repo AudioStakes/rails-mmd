@@ -1,0 +1,468 @@
+{
+  "schema_version": 4,
+  "artifact_kind": "class",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/p204_attachments",
+      "entity_kind": "physical",
+      "safe_token": "P204_ATTACHMENT",
+      "label": "P204Attachment",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_attachments/attributes/id",
+          "safe_token": "ID_H5D30F9656EC3",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_attachments/attributes/attachable_id",
+          "safe_token": "ATTACHABLE_ID",
+          "label": "attachable_id",
+          "type": "integer",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_attachments/attributes/attachable_region_code",
+          "safe_token": "ATTACHABLE_REGION_CODE",
+          "label": "attachable_region_code",
+          "type": "string",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_attachments/attributes/attachable_type",
+          "safe_token": "ATTACHABLE_TYPE",
+          "label": "attachable_type",
+          "type": "string",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_authors",
+      "entity_kind": "physical",
+      "safe_token": "P204_AUTHOR",
+      "label": "P204Author",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_authors/attributes/first_name",
+          "safe_token": "FIRST_NAME",
+          "label": "first_name",
+          "type": "string",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_authors/attributes/last_name",
+          "safe_token": "LAST_NAME",
+          "label": "last_name",
+          "type": "string",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_bins",
+      "entity_kind": "physical",
+      "safe_token": "P204_BIN",
+      "label": "P204Bin",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_bins/attributes/id",
+          "safe_token": "ID_HCF3B4FE68E1B",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_bins/attributes/region_code",
+          "safe_token": "REGION_CODE_H316891F15A5E",
+          "label": "region_code",
+          "type": "string",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_bins/attributes/warehouse_id",
+          "safe_token": "WAREHOUSE_ID_H15DD8A7ABC33",
+          "label": "warehouse_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_books",
+      "entity_kind": "physical",
+      "safe_token": "P204_BOOK",
+      "label": "P204Book",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_books/attributes/book_id",
+          "safe_token": "BOOK_ID",
+          "label": "book_id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_books/attributes/shop_id",
+          "safe_token": "SHOP_ID",
+          "label": "shop_id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_catalog_items",
+      "entity_kind": "physical",
+      "safe_token": "P204_CATALOG_ITEM",
+      "label": "P204CatalogItem",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_catalog_items/attributes/id",
+          "safe_token": "ID_H468EC004760C",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_catalog_items/attributes/p204_catalog_id",
+          "safe_token": "P204_CATALOG_ID",
+          "label": "p204_catalog_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_catalogs",
+      "entity_kind": "physical",
+      "safe_token": "P204_CATALOG",
+      "label": "P204Catalog",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_catalogs/attributes/id",
+          "safe_token": "ID_HB437252108F1",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_catalogs/attributes/tenant_id",
+          "safe_token": "TENANT_ID",
+          "label": "tenant_id",
+          "type": "string",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_entries",
+      "entity_kind": "physical",
+      "safe_token": "P204_ENTRY",
+      "label": "P204Entry",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_entries/attributes/id",
+          "safe_token": "ID_HC8F3A173CF46",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_entries/attributes/entryable_id",
+          "safe_token": "ENTRYABLE_ID",
+          "label": "entryable_id",
+          "type": "integer",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_entries/attributes/entryable_region_code",
+          "safe_token": "ENTRYABLE_REGION_CODE",
+          "label": "entryable_region_code",
+          "type": "string",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_entries/attributes/entryable_type",
+          "safe_token": "ENTRYABLE_TYPE",
+          "label": "entryable_type",
+          "type": "string",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_line_items",
+      "entity_kind": "physical",
+      "safe_token": "P204_LINE_ITEM",
+      "label": "P204LineItem",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_line_items/attributes/order_code",
+          "safe_token": "ORDER_CODE_HC140C58BFED6",
+          "label": "order_code",
+          "type": "integer",
+          "key_marker": "PK, FK"
+        },
+        {
+          "attribute_id": "entities/p204_line_items/attributes/shop_region_code",
+          "safe_token": "SHOP_REGION_CODE_H39666C67F1A7",
+          "label": "shop_region_code",
+          "type": "string",
+          "key_marker": "PK, FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_orders",
+      "entity_kind": "physical",
+      "safe_token": "P204_ORDER",
+      "label": "P204Order",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_orders/attributes/order_code",
+          "safe_token": "ORDER_CODE_HB727313696C7",
+          "label": "order_code",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_orders/attributes/shop_region_code",
+          "safe_token": "SHOP_REGION_CODE_H859450629F33",
+          "label": "shop_region_code",
+          "type": "string",
+          "key_marker": "PK, FK"
+        },
+        {
+          "attribute_id": "entities/p204_orders/attributes/shop_code",
+          "safe_token": "SHOP_CODE_HFD688DFCF313",
+          "label": "shop_code",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_posts",
+      "entity_kind": "physical",
+      "safe_token": "P204_POST",
+      "label": "P204Post",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_posts/attributes/post_code",
+          "safe_token": "POST_CODE",
+          "label": "post_code",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_posts/attributes/region_code",
+          "safe_token": "REGION_CODE_HDB5E4D5E0917",
+          "label": "region_code",
+          "type": "string",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_shops",
+      "entity_kind": "physical",
+      "safe_token": "P204_SHOP",
+      "label": "P204Shop",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_shops/attributes/region_code",
+          "safe_token": "REGION_CODE_H0965689BBB34",
+          "label": "region_code",
+          "type": "string",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_shops/attributes/shop_code",
+          "safe_token": "SHOP_CODE_HEA71B9D03056",
+          "label": "shop_code",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_warehouse_profiles",
+      "entity_kind": "physical",
+      "safe_token": "P204_WAREHOUSE_PROFILE",
+      "label": "P204WarehouseProfile",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_warehouse_profiles/attributes/id",
+          "safe_token": "ID_H4653018EF3A6",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p204_warehouse_profiles/attributes/region_code",
+          "safe_token": "REGION_CODE_H7F3BE58FE3D8",
+          "label": "region_code",
+          "type": "string",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p204_warehouse_profiles/attributes/warehouse_id",
+          "safe_token": "WAREHOUSE_ID_H3E891EC459C5",
+          "label": "warehouse_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p204_warehouses",
+      "entity_kind": "physical",
+      "safe_token": "P204_WAREHOUSE",
+      "label": "P204Warehouse",
+      "attributes": [
+        {
+          "attribute_id": "entities/p204_warehouses/attributes/id",
+          "safe_token": "ID_H4D9450D8ADBE",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    }
+  ],
+  "inheritances": [],
+  "relationships": [
+    {
+      "relationship_id": "relationships/p204_attachments/polymorphic/attachable/tuple/WyJhdHRhY2hhYmxlX3JlZ2lvbl9jb2RlIiwiYXR0YWNoYWJsZV9pZCJd/attachable_type/p204_orders",
+      "safe_token": "ATTACHABLE_HDE26EE3BFC2F",
+      "owner_safe_token": "P204_ATTACHMENT",
+      "target_safe_token": "P204_ORDER",
+      "label": "attachable",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1"
+    },
+    {
+      "relationship_id": "relationships/p204_attachments/polymorphic/attachable/tuple/WyJhdHRhY2hhYmxlX3JlZ2lvbl9jb2RlIiwiYXR0YWNoYWJsZV9pZCJd/attachable_type/p204_shops",
+      "safe_token": "ATTACHABLE_H3A996DED231F",
+      "owner_safe_token": "P204_ATTACHMENT",
+      "target_safe_token": "P204_SHOP",
+      "label": "attachable",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1"
+    },
+    {
+      "relationship_id": "relationships/p204_bins/tuple/WyJyZWdpb25fY29kZSIsIndhcmVob3VzZV9pZCJd/p204_warehouses/tuple/WyJyZWdpb25fY29kZSIsImlkIl0",
+      "safe_token": "P204_WAREHOUSE_H18DB6930F737",
+      "owner_safe_token": "P204_BIN",
+      "target_safe_token": "P204_WAREHOUSE",
+      "label": "p204_warehouse",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1"
+    },
+    {
+      "relationship_id": "relationships/p204_catalog_items/p204_catalog_id/p204_catalogs/id",
+      "safe_token": "P204_CATALOG",
+      "owner_safe_token": "P204_CATALOG_ITEM",
+      "target_safe_token": "P204_CATALOG",
+      "label": "p204_catalog",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1"
+    },
+    {
+      "relationship_id": "relationships/p204_entries/polymorphic/entryable/tuple/WyJlbnRyeWFibGVfcmVnaW9uX2NvZGUiLCJlbnRyeWFibGVfaWQiXQ/entryable_type/p204_posts",
+      "safe_token": "ENTRYABLE",
+      "owner_safe_token": "P204_ENTRY",
+      "target_safe_token": "P204_POST",
+      "label": "entryable",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1"
+    },
+    {
+      "relationship_id": "relationships/p204_line_items/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwib3JkZXJfY29kZSJd/p204_orders/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwib3JkZXJfY29kZSJd",
+      "safe_token": "P204_ORDER",
+      "owner_safe_token": "P204_LINE_ITEM",
+      "target_safe_token": "P204_ORDER",
+      "label": "p204_order",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1"
+    },
+    {
+      "relationship_id": "relationships/p204_orders/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwic2hvcF9jb2RlIl0/p204_shops/tuple/WyJyZWdpb25fY29kZSIsInNob3BfY29kZSJd",
+      "safe_token": "P204_SHOP",
+      "owner_safe_token": "P204_ORDER",
+      "target_safe_token": "P204_SHOP",
+      "label": "p204_shop",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1",
+      "metadata": {
+        "scoped": true
+      }
+    },
+    {
+      "relationship_id": "relationships/p204_shops/through/p204_orders/p204_line_items/p204_line_items",
+      "safe_token": "P204_LINE_ITEMS",
+      "owner_safe_token": "P204_SHOP",
+      "target_safe_token": "P204_LINE_ITEM",
+      "label": "p204_line_items",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..many",
+      "er_left_marker": "}o",
+      "er_right_marker": "o{",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..*",
+      "metadata": {
+        "scoped": true
+      }
+    },
+    {
+      "relationship_id": "relationships/p204_warehouse_profiles/tuple/WyJyZWdpb25fY29kZSIsIndhcmVob3VzZV9pZCJd/p204_warehouses/tuple/WyJyZWdpb25fY29kZSIsImlkIl0",
+      "safe_token": "P204_WAREHOUSE_H10AEC98612DC",
+      "owner_safe_token": "P204_WAREHOUSE_PROFILE",
+      "target_safe_token": "P204_WAREHOUSE",
+      "label": "p204_warehouse",
+      "owner_cardinality": "0..1",
+      "target_cardinality": "0..1",
+      "er_left_marker": "|o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..1",
+      "class_target_multiplicity": "0..1"
+    }
+  ],
+  "comments": [],
+  "diagnostic_ids": [
+    "diag_07ba21616d67118c",
+    "diag_f64edb304b4ebd59"
+  ],
+  "digest_sha256": "a8de4d10af59484dbad3573a9757eaf98785640551e00e191e9980e4b856730b"
+}
