@@ -5,5 +5,5 @@ class Post < ApplicationRecord
   belongs_to :author, -> { raise 'scope execution is forbidden' }, inverse_of: :posts
   has_many :labelings
   has_many :labels, through: :labelings
-  has_many :comments, as: :commentable
+  has_many :comments, -> { raise 'scope execution is forbidden' }, as: :commentable
 end

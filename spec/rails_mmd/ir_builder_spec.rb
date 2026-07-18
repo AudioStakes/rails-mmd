@@ -88,6 +88,7 @@ RSpec.describe RailsMmd::IrBuilder do
     expect(entities.fetch('entities/profiles').fetch('attributes').map { |attribute| attribute.fetch('name') }).to eq(
       %w[id author_id]
     )
+    expect(payload.fetch('relationships').first).not_to have_key('metadata')
   end
 
   it 'marks both polymorphic id and type columns as foreign keys' do

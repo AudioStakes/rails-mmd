@@ -65,6 +65,16 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end
 
+  it 'keeps metadata absent when the IR relationship is unscoped' do
+    ir = ir_payload
+    ir.fetch('relationships').first.delete('metadata')
+
+    relationship = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+                                  .payload.fetch('relationships').first
+
+    expect(relationship).not_to have_key('metadata')
+  end
+
   it 'projects the full cardinality marker and multiplicity matrix' do
     expectations = {
       '0..1' => ['|o', 'o|', '0..1'],

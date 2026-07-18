@@ -758,6 +758,27 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationship.association_name).to eq('squads')
   end
 
+  it 'keeps scoped through with explicit source on the macro omission path' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    team_source = belongs_to('team', klass: team_model)
+    explicit = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model,
+                          source: :team, scope: -> { raise 'scope executed' }
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    result = build(domain, 'Author' => owner_model(explicit))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_MACRO_OMITTED']
+    )
+  end
+
   it 'routes unsupported through variants and ignores aggregate scope indicators' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
