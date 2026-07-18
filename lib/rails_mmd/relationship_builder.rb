@@ -324,7 +324,7 @@ module RailsMmd
 
     def canonical_through_relationship(candidates)
       candidates.min_by do |candidate|
-        [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
+        [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.association_name, candidate.relationship_id]
       end
     end
 

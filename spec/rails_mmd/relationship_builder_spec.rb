@@ -264,6 +264,27 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'uses lexical association name for same-macro through path ties' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    team_source = belongs_to('team', klass: team_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    squads = through_association(
+      'squads', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(teams, squads))
+                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+
+    expect(relationship.association_name).to eq('squads')
+  end
+
   it 'routes unsupported and unresolved through variants to stable diagnostics' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')

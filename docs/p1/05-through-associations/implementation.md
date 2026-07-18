@@ -15,10 +15,11 @@ Status: TDD implementation reviewed and verified
 
 ## Verification evidence
 
-- RelationshipBuilder specs: 27 examples, 0 failures.
+- RelationshipBuilder specs: 28 examples, 0 failures.
 - Diagnostic schema/primitives specs: 26 examples, 0 failures.
 - Full default gate: RuboCop 79 files, RSpec 240 examples, bundler-audit,
   Undercover, and all 3 Rails matrix pairs passed.
+- Repository hooks: pre-commit and pre-push passed.
 - Rails matrix: 3/3 pairs passed:
   Rails 7.2.3.1 / Ruby 4.0.6, Rails 8.1.3 / Ruby 3.3.12, and
   Rails 8.1.3 / Ruby 4.0.6.
@@ -33,6 +34,8 @@ Status: TDD implementation reviewed and verified
 | 2 | Rails runtime | None | — |
 | 2 | Architecture | None | — |
 | 2 | QA / TDD | None | — |
+| 3 | Architecture | Same-macro same-path label tie still fell back to reflection order | Added lexical association-name tie-break and reverse-order regression |
+| 4 | Architecture | None | — |
 
 ## Residual risks
 
