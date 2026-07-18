@@ -24,6 +24,12 @@ ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
     t.integer 'author_id'
   end
 
+  create_table 'notes', force: :cascade do |t|
+    t.integer 'author_id', null: false
+  end
+
+  add_foreign_key 'notes', 'authors'
+
   create_table 'employees', force: :cascade do |t|
     t.integer 'manager_id'
   end

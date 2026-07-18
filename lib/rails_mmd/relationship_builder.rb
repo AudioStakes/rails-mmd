@@ -33,6 +33,7 @@ module RailsMmd
     end
 
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
+    MACRO_PRIORITY = { belongs_to: 0, has_one: 1, has_many: 2 }.freeze
     DomainContext = Struct.new(:domain, keyword_init: false) do
       def domain_id = domain.domain_id
 
@@ -238,10 +239,51 @@ module RailsMmd
     end
 
     def deduplicate_relationships(relationships)
-      relationships.group_by(&:physical_key).flat_map do |_key, candidates|
-        belongs_to = candidates.select { |candidate| candidate.association_macro == :belongs_to }
-        belongs_to.empty? ? candidates : [belongs_to.min_by(&:relationship_id)]
+      relationships.group_by(&:physical_key).map do |_key, candidates|
+        canonical_relationship(candidates)
       end
+    end
+
+    def canonical_relationship(candidates)
+      winner = candidates.min_by do |candidate|
+        [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
+      end
+      holder_id = winner.foreign_key_holder_entity_id
+      referenced_id = referenced_entity_id(winner)
+      canonical = winner.dup
+      canonical.relationship_id = canonical_relationship_id(winner, holder_id, referenced_id)
+      canonical.owner_entity_id = holder_id
+      canonical.target_entity_id = referenced_id
+      canonical.owner_cardinality = canonical_holder_cardinality(candidates)
+      canonical.target_cardinality = canonical_referenced_cardinality(candidates)
+      canonical
+    end
+
+    def referenced_entity_id(relationship)
+      return relationship.target_entity_id if relationship.foreign_key_holder_entity_id == relationship.owner_entity_id
+
+      relationship.owner_entity_id
+    end
+
+    def canonical_relationship_id(relationship, holder_id, referenced_id)
+      [
+        'relationships', entity_table(holder_id), relationship.foreign_key_column,
+        entity_table(referenced_id), relationship.referenced_primary_key_column
+      ].join('/')
+    end
+
+    def entity_table(entity_id)
+      entity_id.delete_prefix('entities/')
+    end
+
+    def canonical_holder_cardinality(candidates)
+      singular = candidates.any? { |candidate| candidate.association_macro == :has_one || candidate.owner_fk_unique }
+      singular ? '0..1' : '0..many'
+    end
+
+    def canonical_referenced_cardinality(candidates)
+      required = candidates.any? { |candidate| candidate.db_foreign_key && candidate.owner_fk_nullable == false }
+      required ? '1..1' : '0..1'
     end
 
     def physical_key(holder_id, foreign_key, referenced_id, primary_key)

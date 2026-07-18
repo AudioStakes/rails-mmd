@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
-# Inverse-free direct has-one target.
+# Automatic-inverse has-one target.
 class Profile < ApplicationRecord
+  belongs_to :author
 end

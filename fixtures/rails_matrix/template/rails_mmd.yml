@@ -5,6 +5,7 @@ domains:
       - Author
       - Draft
       - Employee
+      - Note
       - Post
       - Profile
     exclude_models: []
