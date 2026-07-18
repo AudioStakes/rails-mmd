@@ -145,6 +145,24 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     end.to raise_error(ArgumentError, /inheritance parent missing/)
   end
 
+  it 'rejects relationships whose entity token is missing' do
+    ir = ir_payload
+    ir.fetch('relationships').first['target_entity_id'] = 'entities/missing'
+
+    expect do
+      described_class.new.build(ir: ir, artifact_kind: 'class', direction: 'BT')
+    end.to raise_error(ArgumentError, %r{render entity token missing: entities/missing})
+  end
+
+  it 'rejects duplicate render entity identifiers' do
+    ir = ir_payload
+    ir.fetch('entities') << ir.fetch('entities').first.dup
+
+    expect do
+      described_class.new.build(ir: ir, artifact_kind: 'class', direction: 'BT')
+    end.to raise_error(ArgumentError, %r{duplicate render entity_id: entities/users})
+  end
+
   it 'projects the full cardinality marker and multiplicity matrix' do
     expectations = {
       '0..1' => ['|o', 'o|', '0..1'],

@@ -1,6 +1,6 @@
 # P2-02 Single-Table Inheritance Implementation
 
-Status: implementation review complete; final verification pending
+Status: implementation and specialist review complete; final repository gate pending
 
 ## Baseline
 
@@ -15,7 +15,7 @@ Status: implementation review complete; final verification pending
 |---|---|---|
 | Research | Rails runtime, architecture, QA / compatibility | Round 2 and exact-final Round 3: no findings |
 | Design | Rails runtime, API / contract, QA / TDD | Round 4: no findings |
-| Implementation | Rails runtime, correctness / contract, QA / TDD | Round 3: no findings |
+| Implementation | Rails runtime, correctness / contract, QA / TDD | Round 4: no findings |
 
 ## TDD execution record
 
@@ -31,6 +31,7 @@ Status: implementation review complete; final verification pending
 | STI graph integrity | `IrBuilder#build` | A deliberately cyclic pair of subtype parents was accepted | Added deterministic cycle validation; IR builder + matrix integration suite: 29 examples, 0 failures | Complete |
 | Exact diagnostic oracle | `ArtifactValidator` | An unexpected diagnostic passed when the expected diagnostic list was empty | Removed code filtering and checked the complete normalized diagnostic projection; all real matrix pairs pass with an explicit 12-record expectation | Complete |
 | Expected JSON failure boundary | `ArtifactValidator` | A missing checked-in STI JSON oracle escaped as raw `Errno::ENOENT` | All expected JSON reads now normalize missing and malformed files to `VerificationError`; focused regression: 1 example, 0 failures; RuboCop: 2 files, no offenses | Complete |
+| Defensive branch coverage | `IrBuilder#build` and `RenderPlanBuilder#build` | Undercover identified unexecuted invalid-record and missing/duplicate-token guards | Added public-boundary invalid-input specs without implementation changes; coverage gate: 296 examples, 0 failures; Undercover: no missing coverage | Complete |
 | Regression closure | public contract and selection specs | Invalid subtype attributes and malformed FQ labels were initially schema-valid; abstract-family and exact-oracle audits found observable gaps | Closed schemas, explicit post-abstract family, exact renderer/runtime projections, graph validation, and deterministic oracle failures are covered | Complete |
 
 ## Implementation contribution record
@@ -55,7 +56,12 @@ Status: implementation review complete; final verification pending
 | Implementation Round 2 | Correctness / contract | Missing or malformed expected JSON oracles leaked raw filesystem/parser exceptions | Added a failing missing-oracle integration example and a shared controlled read boundary for every expected JSON oracle |
 | Implementation Round 2 | Rails runtime, QA / TDD | No findings | None |
 | Implementation Round 3 | Rails runtime, correctness / contract, QA / TDD | No findings | None |
+| Implementation Round 4 | Rails runtime, correctness / contract, QA / TDD | No findings after defensive-branch coverage additions | None |
 
 ## Verification evidence
 
-Pending until all slices are green.
+- RuboCop: 99 files inspected, no offenses before the final coverage additions; focused changed specs remain clean.
+- RSpec coverage gate: 296 examples, 0 failures.
+- Undercover: no coverage missing in the P2-02 changes.
+- Bundler Audit: no vulnerabilities found before the final coverage additions.
+- The complete default gate and direct Git hooks are rerun after the final documentation/test commit.

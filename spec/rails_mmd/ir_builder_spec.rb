@@ -177,6 +177,31 @@ RSpec.describe RailsMmd::IrBuilder do
     end.to raise_error(ArgumentError, /sti inheritance cycle/)
   end
 
+  it 'rejects inconsistent STI normalization records before projecting IR' do
+    cases = {
+      /base missing/ => sti_domain(sti_subtype_record(base_entity_id: 'entities/missing')),
+      /base table mismatch/ => sti_domain(sti_subtype_record(table_name: 'cars')),
+      /parent must reference base entity/ => sti_domain(
+        sti_subtype_record(parent_entity_id: 'entities/parts'), entities: sti_physical_entities
+      ),
+      /parent missing/ => sti_domain(sti_subtype_record(parent_entity_id: 'entities/missing')),
+      /parent base mismatch/ => parent_base_mismatch_domain,
+      /parent table mismatch/ => parent_table_mismatch_domain,
+      /base inheritance_column mismatch/ => sti_domain(
+        sti_subtype_record,
+        sti_subtype_record(entity_id: 'entities/vehicles/sti/Truck', ruby_constant: 'Truck', sti_name: 'Truck',
+                           inheritance_column: 'kind')
+      ),
+      /duplicate sti subtype entity_id/ => sti_domain(sti_subtype_record, sti_subtype_record)
+    }
+
+    cases.each do |message, domain|
+      expect do
+        described_class.new.build(domains: [domain], relationship_domains: [])
+      end.to raise_error(ArgumentError, message)
+    end
+  end
+
   it 'marks a direct has foreign key on the actual target-side holder' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core',
@@ -326,6 +351,41 @@ RSpec.describe RailsMmd::IrBuilder do
       :sti_name,
       keyword_init: true
     ).new(**attributes)
+  end
+
+  def sti_subtype_record(**overrides)
+    sti_subtype(
+      entity_id: 'entities/vehicles/sti/Car', base_entity_id: 'entities/vehicles',
+      parent_entity_id: 'entities/vehicles', ruby_constant: 'Car', table_name: 'vehicles',
+      inheritance_column: 'type', sti_name: 'Car', **overrides
+    )
+  end
+
+  def sti_domain(*subtypes, entities: [entity('Vehicle', 'vehicles')])
+    domain_with_sti(domain_id: 'core', entities: entities, sti_subtypes: subtypes, diagnostics: [])
+  end
+
+  def sti_physical_entities
+    [entity('Vehicle', 'vehicles'), entity('Part', 'parts')]
+  end
+
+  def parent_base_mismatch_domain
+    parent_id = 'entities/parts/sti/PartCar'
+    sti_domain(
+      sti_subtype_record(parent_entity_id: parent_id),
+      sti_subtype_record(entity_id: parent_id, base_entity_id: 'entities/parts',
+                         parent_entity_id: 'entities/parts', ruby_constant: 'PartCar', table_name: 'parts'),
+      entities: sti_physical_entities
+    )
+  end
+
+  def parent_table_mismatch_domain
+    parent_id = 'entities/vehicles/sti/Trailer'
+    sti_domain(
+      sti_subtype_record(parent_entity_id: parent_id),
+      sti_subtype_record(entity_id: parent_id, parent_entity_id: 'entities/vehicles',
+                         ruby_constant: 'Trailer', table_name: 'trailers', sti_name: 'Trailer')
+    )
   end
 
   def schema_valid_ir?(payload)
