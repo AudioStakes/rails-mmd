@@ -3,11 +3,18 @@ domains:
   core:
     include_models:
       - Author
+      - Account
+      - AccountMembership
       - Draft
       - Employee
+      - Label
+      - Labeling
+      - Membership
       - Note
+      - Partnership
       - Post
       - Profile
+      - Team
     exclude_models: []
 output:
   directory: tmp/rails_mmd

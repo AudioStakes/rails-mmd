@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "core",
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_source_extra",
+      "code": "ASSOCIATION_SOURCE_UNRESOLVED",
+      "severity": "warning",
+      "phase": "relationship_build",
+      "scope": "relationship",
+      "subject_id": "authors.teams",
+      "message": "source reflection unresolved",
+      "metadata": {
+        "domain_id": "core",
+        "owner_constant": "Author",
+        "association_name": "teams",
+        "source_name": "team"
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
