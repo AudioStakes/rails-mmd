@@ -132,7 +132,8 @@ RSpec.describe 'repository drift guards' do
   it 'documents user-facing generate behavior from the README' do
     readme = repository_text('README.md')
 
-    expect(readme).to include('docs/usage.md', 'docs/p0-blocking-fixture-matrix.md')
+    expect(readme).to include('docs/usage.md', 'docs/active-record-association-support.md',
+                              'docs/p0-blocking-fixture-matrix.md')
   end
 
   it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do

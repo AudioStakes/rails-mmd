@@ -60,6 +60,8 @@ Repository drift guards and setup-mode release conditions are documented in
 The P0 implementation contract is documented in
 [`docs/p0-contract.md`](docs/p0-contract.md). Future implementation work should
 read that file instead of relying on chat history or local design attachments.
+Rails Active Record support and implementation priorities are tracked in
+[`docs/active-record-association-support.md`](docs/active-record-association-support.md).
 
 ## Serena Setup
 
