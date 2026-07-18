@@ -54,6 +54,15 @@ RSpec.describe RailsMmd::Generate do
 
     expect(result.exit_code).to eq(3)
     expect(publisher.received.fetch(:diagnostics)).to include(mermaid_serialization_failed)
+    expect(publisher.received.fetch(:artifacts).fetch('core')).to be_empty
+  end
+
+  it 'publishes serialization diagnostics without converting them to output write failures' do
+    Dir.mktmpdir do |root|
+      result = run_generate_with_real_publisher_serialization_failure(root)
+
+      expect_serialization_failure_published_without_artifacts(result, Pathname(root).join('out'))
+    end
   end
 
   it 'returns pre-output diagnostics without running later pipeline stages when config fails' do
@@ -292,6 +301,71 @@ RSpec.describe RailsMmd::Generate do
     dependencies[:active_record_base] = Class.new do
       def self.descendants = []
     end
+  end
+
+  def real_publisher_serialization_failure_dependencies(root)
+    real_publisher_pipeline_dependencies.merge(
+      render_plan_builder: invalid_render_plan_builder,
+      publisher: RailsMmd::Publisher.new(project_root: root)
+    )
+  end
+
+  def real_publisher_pipeline_dependencies
+    {
+      config_loader: fake_loader(success_result(real_publisher_config)),
+      rails_loader: fake_loader(success_result(Object.new, application: Object.new)),
+      model_inventory: model_inventory,
+      domain_resolver: fake_stage(domains: [domain_result], diagnostics: []),
+      schema_probe: fake_stage(domains: [domain_result], diagnostics: []),
+      relationship_builder: fake_stage(domains: [domain_result], diagnostics: []),
+      ir_builder: ir_builder
+    }
+  end
+
+  def real_publisher_config
+    output = RailsMmd::Config::Output.new(directory: 'out', format: 'er', attributes: 'keys', direction: 'LR')
+    RailsMmd::Config::Resolved.new(domains: { 'core' => Object.new }, output: output, selected_domain_ids: ['core'])
+  end
+
+  def invalid_render_plan_builder
+    Struct.new(:payload, :diagnostics) do
+      def build(artifact_kind:, **kwargs)
+        input_ir = kwargs.fetch(:ir)
+        self.payload = invalid_payload(input_ir, artifact_kind)
+        self
+      end
+
+      def invalid_payload(input_ir, artifact_kind)
+        { 'domain_id' => input_ir.fetch('domain_id'), 'artifact_kind' => artifact_kind, 'diagnostic_ids' => [] }
+      end
+    end.new(nil, [])
+  end
+
+  def run_generate_with_real_publisher_serialization_failure(root)
+    described_class.new(
+      project_root: root,
+      dependencies: real_publisher_serialization_failure_dependencies(root)
+    ).run(cli_options: RailsMmd::Config::CliOptions.new)
+  end
+
+  def expect_serialization_failure_published_without_artifacts(result, output)
+    aggregate_failures do
+      expect_serialization_failure_result(result)
+      expect_serialization_failure_artifacts(output)
+    end
+  end
+
+  def expect_serialization_failure_result(result)
+    expect(result.exit_code).to eq(3)
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') })
+      .to contain_exactly('MERMAID_SERIALIZATION_FAILED')
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).not_to include('OUTPUT_WRITE_FAILED')
+  end
+
+  def expect_serialization_failure_artifacts(output)
+    expect(output.join('core.diagnostics.json')).to exist
+    expect(output.join('core.er.mmd')).not_to exist
+    expect(output.join('core.er.render_plan.json')).not_to exist
   end
 end
 # rubocop:enable RSpec/MultipleExpectations

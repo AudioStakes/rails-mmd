@@ -23,9 +23,31 @@ module RailsMmd
       '0..many' => '0..*',
       '1..many' => '1..*'
     }.freeze
-    COMMENT_SECRET_KEY = /(?:#{Redactor::SECRET_KEY_PATTERN}|generated_at|process_id|random_seed|raw_exception_backtrace|token|secret|pid)/ix
-    COMMENT_FORBIDDEN_ASSIGNMENT = /[A-Za-z0-9_-]*#{COMMENT_SECRET_KEY}[A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/ix
+    FREE_TEXT_SECRET_KEY = /
+      (?:
+        password|passwd|secret|credential|token|pid|
+        api\s*[_-]?\s*key|
+        database\s*[_-]?\s*url|
+        (?:access|auth|refresh)\s*[_-]?\s*token|
+        generated\s*[_-]?\s*at|
+        process\s*[_-]?\s*id|
+        random\s*[_-]?\s*seed|
+        raw\s*[_-]?\s*exception\s*[_-]?\s*backtrace
+      )
+    /ix
+    FREE_TEXT_FORBIDDEN_ASSIGNMENT = /[A-Za-z0-9_-]*#{FREE_TEXT_SECRET_KEY}[A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/ix
     REDACTED_KEY_ASSIGNMENT = /[A-Za-z0-9_-]*\[REDACTED_KEY\][A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/
+    URL_PATTERN = %r{\b[a-z][a-z0-9+.-]*://[^\s]+}i
+    URL_PLACEHOLDER_PREFIX = "\uE000RAILSMMDURL"
+    REDACTED_URL = '[REDACTED_URL]'
+    MERMAID_CONTROL_TEXT = /[\r\n\t[:cntrl:]]+/
+    CONTROL_SPLIT_ABSOLUTE_PATH =
+      /(?<![A-Za-z0-9_])\/[^[:cntrl:]\s)\]}>;,:!?]+(?:[\r\n\t[:cntrl:]][^[:cntrl:]\s)\]}>;,:!?]*)*/
+    RUBY_CONSTANT_PATTERN = /\A[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*\z/
+    RUBY_CONSTANT_LABEL_PATTERN = /\A[A-Z][A-Za-z0-9_]*\z/
+    SNAKE_IDENTIFIER_PATTERN = /\A[a-z][a-z0-9_]*\z/
+    ASSOCIATION_LABEL_SUFFIX = /[?!=]\z/
+    STRUCTURED_FALLBACK_LABEL = 'X'
 
     def initialize(safe_tokens: SafeTokens.new, redactor: Redactor.new)
       @safe_tokens = safe_tokens
@@ -83,11 +105,12 @@ module RailsMmd
     def token_subjects(ir, comments)
       {
         'entity' => ir.fetch('entities').map do |entity|
-          subject(entity.fetch('entity_id'), entity.fetch('ruby_constant'))
+          subject(entity.fetch('entity_id'), structured_mermaid_text(entity.fetch('ruby_constant'), :ruby_constant))
         end,
         'attribute' => ir.fetch('entities').flat_map { |entity| attribute_subjects(entity) },
         'relationship' => ir.fetch('relationships').map do |relationship|
-          subject(relationship.fetch('relationship_id'), relationship.fetch('association_name'))
+          subject(relationship.fetch('relationship_id'),
+                  relationship_label(relationship))
         end,
         'comment' => comments.map { |comment| subject(comment.fetch('comment_id'), comment.fetch('comment_id')) }
       }
@@ -99,7 +122,7 @@ module RailsMmd
 
     def attribute_subjects(entity)
       entity.fetch('attributes').map do |attribute|
-        subject(attribute.fetch('attribute_id'), sanitize_attribute_name(attribute.fetch('name')))
+        subject(attribute.fetch('attribute_id'), structured_mermaid_text(attribute.fetch('name'), :snake_identifier))
       end
     end
 
@@ -108,7 +131,7 @@ module RailsMmd
         {
           'entity_id' => entity.fetch('entity_id'),
           'safe_token' => token_sets.fetch('entity').fetch(entity.fetch('entity_id')),
-          'label' => entity.fetch('ruby_constant').split('::').last,
+          'label' => structured_mermaid_text(entity.fetch('ruby_constant').split('::').last, :ruby_constant_label),
           'attributes' => attributes == :none ? [] : attributes_payload(entity, token_sets)
         }
       end.sort_by { |entity| entity.fetch('entity_id') }
@@ -140,7 +163,7 @@ module RailsMmd
         'safe_token' => token_sets.fetch('relationship').fetch(relationship.fetch('relationship_id')),
         'owner_safe_token' => token_sets.fetch('entity').fetch(relationship.fetch('owner_entity_id')),
         'target_safe_token' => token_sets.fetch('entity').fetch(relationship.fetch('target_entity_id')),
-        'label' => redactor.sanitize(relationship.fetch('association_name')),
+        'label' => relationship_label(relationship),
         'owner_cardinality' => relationship.fetch('owner_cardinality'),
         'target_cardinality' => relationship.fetch('target_cardinality'),
         'er_left_marker' => er_left,
@@ -161,13 +184,58 @@ module RailsMmd
     end
 
     def sanitize_comment(text)
-      redactor.sanitize(
-        text.to_s.gsub(COMMENT_FORBIDDEN_ASSIGNMENT, '[REDACTED]')
-      ).gsub(REDACTED_KEY_ASSIGNMENT, '[REDACTED]')
+      free_text_mermaid_text(text)
     end
 
     def sanitize_attribute_name(name)
-      sanitize_comment(name)
+      structured_mermaid_text(name, :snake_identifier)
+    end
+
+    def relationship_label(relationship)
+      structured_mermaid_text(relationship.fetch('association_name').to_s.sub(ASSOCIATION_LABEL_SUFFIX, ''),
+                              :snake_identifier)
+    end
+
+    def free_text_mermaid_text(value)
+      urls = []
+      text = protect_urls(value.to_s.delete("\u0000"), urls)
+      text = text.gsub(CONTROL_SPLIT_ABSOLUTE_PATH, '[REDACTED_PATH]')
+      text = text.gsub(MERMAID_CONTROL_TEXT, ' ')
+      text = text.gsub(FREE_TEXT_FORBIDDEN_ASSIGNMENT, '[REDACTED]')
+      text = redactor.sanitize(text).gsub(REDACTED_KEY_ASSIGNMENT, '[REDACTED]')
+      restore_urls(text, urls).gsub(/\s+/, ' ').strip
+    end
+
+    def structured_mermaid_text(value, grammar)
+      text = single_line_text(value)
+      return STRUCTURED_FALLBACK_LABEL unless structured_pattern(grammar).match?(text)
+
+      text
+    end
+
+    def single_line_text(value)
+      value.to_s.delete("\u0000").gsub(MERMAID_CONTROL_TEXT, ' ').gsub(/\s+/, ' ').strip
+    end
+
+    def structured_pattern(grammar)
+      {
+        ruby_constant: RUBY_CONSTANT_PATTERN,
+        ruby_constant_label: RUBY_CONSTANT_LABEL_PATTERN,
+        snake_identifier: SNAKE_IDENTIFIER_PATTERN
+      }.fetch(grammar)
+    end
+
+    def protect_urls(text, urls)
+      text.gsub(URL_PATTERN) do |_url|
+        urls << REDACTED_URL
+        "#{URL_PLACEHOLDER_PREFIX}#{urls.length - 1}"
+      end
+    end
+
+    def restore_urls(text, urls)
+      urls.each_with_index.reduce(text) do |output, (url, index)|
+        output.gsub("#{URL_PLACEHOLDER_PREFIX}#{index}", url)
+      end
     end
 
     def diagnostic_ids(ir, available_diagnostic_ids)

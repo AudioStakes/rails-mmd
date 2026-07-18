@@ -111,6 +111,156 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end
 
+  it 'normalizes Mermaid-facing comments to sanitized single-line text before schema validation' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/control', 'text' => "first\nsecond\tthird\u0007 /tmp/project token=secret" }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('first second third [REDACTED_PATH] [REDACTED]')
+    expect(text).not_to match(/[\r\n\t[:cntrl:]]/)
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'redacts secret assignments and paths split by control characters' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/split_secret',
+          'text' => "api\n_key=supersecret /tmp/pri\nvate/token=hidden" }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('[REDACTED] [REDACTED_PATH]')
+    expect(text).not_to include('supersecret', 'hidden', 'pri', 'vate')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'redacts generic absolute paths split by control characters in free text' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/generic_split_path', 'text' => "/etc/pa\nsswd token=abc" }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('[REDACTED_PATH] [REDACTED]')
+    expect(text).not_to include('etc', 'pa', 'sswd', 'abc')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'redacts punctuation-adjacent absolute paths split by control characters in free text' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/punctuation_split_path', 'text' => "prefix(/etc/pa\nsswd) token=abc" }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('prefix([REDACTED_PATH]) [REDACTED]')
+    expect(text).not_to include('etc', 'pa', 'sswd', 'abc')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'does not redact relative paths or URLs as absolute paths in free text' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/benign_slashes',
+          'text' => 'see foo/bar and https://example.com/x?token=abc plus postgres://user:pass@example.com/db' }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('see foo/bar and [REDACTED_URL] plus [REDACTED_URL]')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'does not restore literal URL placeholders or redact standalone slashes' do
+    result = described_class.new.build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [
+        { 'comment_id' => 'comments/url_placeholder', 'text' => 'literal RAILSMMDURL0 / and https://example.com/x' }
+      ]
+    )
+    text = result.payload.fetch('comments').first.fetch('text')
+
+    expect(text).to eq('literal RAILSMMDURL0 / and [REDACTED_URL]')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'does not free-text redact credential-looking structured column labels or token sources' do
+    ir = ir_payload
+    user_attributes = ir.fetch('entities').first.fetch('attributes')
+    user_attributes[0]['name'] = 'api_key'
+    user_attributes[1]['name'] = 'password_digest'
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    labels = user_attribute_payloads(result.payload).map { |attribute| attribute.fetch('label') }
+    tokens = user_attribute_payloads(result.payload).map { |attribute| attribute.fetch('safe_token') }
+
+    expect(labels).to eq(%w[api_key password_digest])
+    expect(tokens).to include('API_KEY', 'PASSWORD_DIGEST')
+    expect(tokens).not_to include('REDACTED_KEY')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'does not free-text redact credential-looking structured entity labels or token sources' do
+    ir = ir_payload
+    ir.fetch('entities').first['ruby_constant'] = 'ApiKey'
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    entity = result.payload.fetch('entities').find { |candidate| candidate.fetch('entity_id') == 'entities/users' }
+
+    expect(entity.fetch('label')).to eq('ApiKey')
+    expect(entity.fetch('safe_token')).to eq('API_KEY')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'does not free-text redact credential-looking structured relationship labels or token sources' do
+    ir = ir_payload
+    ir.fetch('relationships').first['association_name'] = 'access_token'
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    relationship = result.payload.fetch('relationships').first
+
+    expect(relationship.fetch('label')).to eq('access_token')
+    expect(relationship.fetch('safe_token')).to eq('ACCESS_TOKEN')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'strips accepted association label suffixes before relationship labels and token sources' do
+    ['?', '!', '='].each do |suffix|
+      ir = ir_payload
+      ir.fetch('relationships').first['association_name'] = "account#{suffix}"
+
+      result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+      relationship = result.payload.fetch('relationships').first
+
+      expect(relationship.fetch('label')).to eq('account')
+      expect(relationship.fetch('safe_token')).to eq('ACCOUNT')
+      expect(schema_valid_render_plan?(result.payload)).to be(true)
+    end
+  end
+
   it 'sanitizes unsafe attribute names before labels and safe-token assignment' do
     ir = ir_payload
     ir.fetch('entities').first.fetch('attributes').first['name'] = '/Users/alice/.ssh/id_rsa token=abc123'
@@ -120,8 +270,58 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
                                                 .fetch('attributes')
                                                 .find { |candidate| candidate.fetch('key_marker') == 'PK' }
 
-    expect(attribute.fetch('label')).not_to include('/Users/alice', 'token=', 'abc123')
+    expect(attribute.fetch('label')).to eq('X')
     expect(attribute.fetch('safe_token')).not_to include('USERS', 'ALICE', 'ABC123')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'normalizes attribute labels and relationship labels without leaking unsafe token sources' do
+    ir = ir_payload
+    ir.fetch('entities').first.fetch('attributes').first['name'] = "id\n/tmp/project\tsecret=abc"
+    ir.fetch('relationships').first['association_name'] = "account\n/tmp/project\tsecret=abc"
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    attribute = result.payload.fetch('entities').find { |entity| entity.fetch('entity_id') == 'entities/users' }
+                                                .fetch('attributes')
+                                                .find { |candidate| candidate.fetch('key_marker') == 'PK' }
+    relationship = result.payload.fetch('relationships').first
+
+    expect(attribute.fetch('label')).to eq('X')
+    expect(attribute.fetch('safe_token')).not_to include('TMP', 'PROJECT', 'ABC')
+    expect(relationship.fetch('label')).to eq('X')
+    expect(relationship.fetch('safe_token')).not_to include('TMP', 'PROJECT', 'ABC')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'falls back for malformed structured labels and token sources' do
+    ir = ir_payload
+    ir.fetch('entities').first['ruby_constant'] = '/etc/passwd'
+    ir.fetch('entities').first.fetch('attributes').first['name'] = 'foo/bar'
+    ir.fetch('relationships').first['association_name'] = 'core.api'
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    entity = result.payload.fetch('entities').find { |candidate| candidate.fetch('entity_id') == 'entities/users' }
+    attribute = entity.fetch('attributes').find { |candidate| candidate.fetch('key_marker') == 'PK' }
+    relationship = result.payload.fetch('relationships').first
+
+    expect(entity.fetch('label')).to eq('X')
+    expect(entity.fetch('safe_token')).to eq('X')
+    expect(attribute.fetch('label')).to eq('X')
+    expect(attribute.fetch('safe_token')).to eq('X')
+    expect(relationship.fetch('label')).to eq('X')
+    expect(relationship.fetch('safe_token')).to eq('X')
+    expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'normalizes entity labels without leaking unsafe label sources into safe tokens' do
+    ir = ir_payload
+    ir.fetch('entities').first['ruby_constant'] = "User\n/tmp/project\tsecret=abc"
+
+    result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
+    entity = result.payload.fetch('entities').find { |candidate| candidate.fetch('entity_id') == 'entities/users' }
+
+    expect(entity.fetch('label')).to eq('X')
+    expect(entity.fetch('safe_token')).not_to include('TMP', 'PROJECT', 'ABC')
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end
 
@@ -184,6 +384,10 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       'diagnostic_ids' => %w[d_db_metadata_degraded d_missing],
       'digest_sha256' => 'b' * 64
     }
+  end
+
+  def user_attribute_payloads(payload)
+    payload.fetch('entities').find { |entity| entity.fetch('entity_id') == 'entities/users' }.fetch('attributes')
   end
 
   def schema_valid_render_plan?(payload)
