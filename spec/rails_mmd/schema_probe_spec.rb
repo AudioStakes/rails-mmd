@@ -34,6 +34,90 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(entity.indexes.map(&:unique)).to eq([true])
   end
 
+  it 'caches hidden HABTM join-table metadata for selected public reflections' do
+    reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
+    connection = Object.new
+    join_columns = [column('author_id', :integer, false), column('tag_id', :integer, false)]
+    connection.define_singleton_method(:data_source_exists?) { |name| name == 'authors_tags' }
+    connection.define_singleton_method(:columns) { |_name| join_columns }
+    connection.define_singleton_method(:primary_key) { |_name| nil }
+    author = model(table_exists: true, columns: [column('id', :integer, false)])
+    author.define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+      macro == :has_and_belongs_to_many ? [reflection] : []
+    end
+    author.define_singleton_method(:connection) { connection }
+
+    result = described_class.new(model_resolver: ->(_name) { author }).probe(
+      domains: [domain_result('core', [record('Author')])]
+    )
+
+    expect(result.domains.first.join_tables).to contain_exactly(
+      have_attributes(table_name: 'authors_tags', primary_key: nil)
+    )
+    expect(result.domains.first.join_tables.first.columns.map(&:name)).to eq(%w[author_id tag_id])
+  end
+
+  it 'contains HABTM reflection and join-table connection failures' do
+    reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
+    reflection_error = model(table_exists: true, columns: [column('id', :integer, false)])
+    reflection_error.define_singleton_method(:reflect_on_all_associations) { |_macro| raise 'reflection unavailable' }
+
+    connection_error = model(table_exists: true, columns: [column('id', :integer, false)])
+    connection_error.define_singleton_method(:reflect_on_all_associations) { |_macro| [reflection] }
+    denied_connection = Object.new
+    denied_connection.define_singleton_method(:data_source_exists?) { |_name| raise 'connection denied' }
+    connection_error.define_singleton_method(:connection) { denied_connection }
+
+    columns_error = model(table_exists: true, columns: [column('id', :integer, false)])
+    columns_reflection = Struct.new(:macro, :join_table).new(
+      :has_and_belongs_to_many,
+      'authors_tags_broken'
+    )
+    columns_error.define_singleton_method(:reflect_on_all_associations) { |_macro| [columns_reflection] }
+    broken_connection = Object.new
+    broken_connection.define_singleton_method(:data_source_exists?) { |_name| true }
+    broken_connection.define_singleton_method(:columns) { |_name| raise 'columns unavailable' }
+    broken_connection.define_singleton_method(:primary_key) { |_name| nil }
+    columns_error.define_singleton_method(:connection) { broken_connection }
+    models = {
+      'ReflectionError' => reflection_error,
+      'ConnectionError' => connection_error,
+      'ColumnsError' => columns_error
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [domain_result('core', models.keys.map { |name| record(name) })]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.join_tables).to eq([])
+  end
+
+  it 'retries a shared HABTM join table through another validated entity model' do
+    reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
+    denied = model(table_exists: true, columns: [column('id', :integer, false)])
+    denied.define_singleton_method(:reflect_on_all_associations) { |_macro| [reflection] }
+    denied.define_singleton_method(:connection) { raise 'connection denied' }
+
+    readable = model(table_exists: true, columns: [column('id', :integer, false)])
+    readable.define_singleton_method(:reflect_on_all_associations) { |_macro| [reflection] }
+    join_columns = [column('author_id', :integer, false), column('tag_id', :integer, false)]
+    connection = Object.new
+    connection.define_singleton_method(:data_source_exists?) { |_name| true }
+    connection.define_singleton_method(:columns) { |_name| join_columns }
+    connection.define_singleton_method(:primary_key) { |_name| nil }
+    readable.define_singleton_method(:connection) { connection }
+    models = { 'Author' => denied, 'Tag' => readable }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [domain_result('core', models.keys.map { |name| record(name) })]
+    )
+
+    expect(result.domains.first.join_tables).to contain_exactly(
+      have_attributes(table_name: 'authors_tags', primary_key: nil)
+    )
+  end
+
   it 'guards only selected renderable entity connection contexts' do
     first = record('User', connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
     second = record('Account', connection_context_id: '{"name":"animals","role":"writing","shard":"default"}')

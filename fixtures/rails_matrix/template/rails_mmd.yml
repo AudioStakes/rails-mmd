@@ -17,6 +17,7 @@ domains:
       - Post
       - Profile
       - Team
+      - Tag
     exclude_models: []
 output:
   directory: tmp/rails_mmd

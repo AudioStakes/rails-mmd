@@ -67,3 +67,6 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Resolve polymorphic associations from a two-pass reflection inventory. Never
   call `klass` on a polymorphic `belongs_to`; derive concrete targets only from
   selected matching inverse `as:` reflections.
+- Probe hidden association tables through `SchemaProbe` and pass only normalized
+  metadata to `RelationshipBuilder`; never add raw database connection access
+  to relationship construction.

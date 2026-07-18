@@ -80,7 +80,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  it 'resolves supported has macros and leaves other macros generic' do
+  it 'resolves every supported macro before target eligibility' do
     owner = owner_model(
       association('profile', :has_one),
       association('posts', :has_many),
@@ -97,9 +97,164 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(projected).to contain_exactly(
       ['authors.profile', 'ASSOCIATION_TARGET_UNRESOLVED', nil],
       ['authors.posts', 'ASSOCIATION_TARGET_UNRESOLVED', nil],
-      ['authors.tags', 'ASSOCIATION_MACRO_OMITTED', 'has_and_belongs_to_many']
+      ['authors.tags', 'ASSOCIATION_TARGET_UNRESOLVED', nil]
     )
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
+  end
+
+  it 'builds one validated HABTM many-to-many edge without endpoint FK columns' do
+    tag_model = renderable_model('Tag', 'tags')
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Tag', 'tags')],
+      join_tables: [join_table('authors_tags', %w[author_id tag_id])]
+    )
+
+    result = build(domain, 'Author' => owner_model(tags), 'Tag' => owner_model)
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships).to contain_exactly(
+      have_attributes(
+        relationship_id: 'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
+        owner_entity_id: 'entities/authors', target_entity_id: 'entities/tags',
+        association_name: 'tags', relationship_kind: :habtm,
+        owner_cardinality: '0..many', target_cardinality: '0..many',
+        foreign_key_holder_entity_id: nil, foreign_key_column: nil
+      )
+    )
+  end
+
+  it 'deduplicates reciprocal HABTM declarations with left-owner label priority' do
+    author_model = renderable_model('Author', 'authors')
+    tag_model = renderable_model('Tag', 'tags')
+    author_tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    tag_authors = association(
+      'authors', :has_and_belongs_to_many, klass: author_model, join_table: 'authors_tags',
+                                           foreign_key: 'tag_id', association_foreign_key: 'author_id'
+    )
+    domain = domain_result(
+      'core', [entity('Tag', 'tags'), entity('Author', 'authors')],
+      join_tables: [join_table('authors_tags', %w[tag_id author_id])]
+    )
+
+    result = build(domain, 'Tag' => owner_model(tag_authors), 'Author' => owner_model(author_tags))
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships).to contain_exactly(
+      have_attributes(
+        relationship_id: 'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
+        owner_entity_id: 'entities/authors', target_entity_id: 'entities/tags', association_name: 'tags'
+      )
+    )
+  end
+
+  it 'builds custom-key self-HABTM with a stable column-normalized identity' do
+    author_model = renderable_model('Author', 'authors')
+    coauthors = association(
+      'coauthors', :has_and_belongs_to_many, klass: author_model, join_table: 'author_links',
+                                             foreign_key: 'author_id',
+                                             association_foreign_key: 'coauthor_id'
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors')],
+      join_tables: [join_table('author_links', %w[coauthor_id author_id])]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(coauthors)).domains.first.relationships.first
+
+    expect(relationship).to have_attributes(
+      relationship_id: 'relationships/authors/habtm/author_links/author_id/authors/coauthor_id',
+      owner_entity_id: 'entities/authors', target_entity_id: 'entities/authors', association_name: 'coauthors'
+    )
+  end
+
+  it 'diagnoses invalid HABTM join-table shapes with a closed reason' do
+    tag_model = renderable_model('Tag', 'tags')
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    domain = domain_result('core', [entity('Author', 'authors'), entity('Tag', 'tags')])
+
+    result = build(domain, 'Author' => owner_model(tags), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics).to contain_exactly(
+      include(
+        'code' => 'ASSOCIATION_JOIN_TABLE_INVALID',
+        'metadata' => include('join_table' => 'authors_tags', 'reason' => 'unresolved')
+      )
+    )
+  end
+
+  it 'classifies every invalid HABTM table-global shape deterministically' do
+    tag_model = renderable_model('Tag', 'tags')
+    cases = {
+      'primary_key_present' => [join_table('authors_tags', %w[author_id tag_id], primary_key: 'id'), 'tag_id'],
+      'join_column_missing' => [join_table('authors_tags', ['author_id']), 'tag_id'],
+      'extra_columns' => [join_table('authors_tags', %w[author_id tag_id created_at]), 'tag_id'],
+      'ambiguous_columns' => [join_table('authors_tags', ['author_id']), 'author_id']
+    }
+
+    actual = cases.map do |_expected_reason, (table, target_column)|
+      reflection = association(
+        'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                          foreign_key: 'author_id', association_foreign_key: target_column
+      )
+      domain = domain_result(
+        'core', [entity('Author', 'authors'), entity('Tag', 'tags')], join_tables: [table]
+      )
+      diagnostic = build(domain, 'Author' => owner_model(reflection), 'Tag' => owner_model).diagnostics.fetch(0)
+      [diagnostic.fetch('code'), diagnostic.dig('metadata', 'reason'), schema_valid_diagnostic?(diagnostic)]
+    end
+
+    expect(actual).to eq(cases.keys.map { |reason| ['ASSOCIATION_JOIN_TABLE_INVALID', reason, true] })
+  end
+
+  it 'publishes a valid HABTM edge beside a scoped same-signature alias warning' do
+    tag_model = renderable_model('Tag', 'tags')
+    valid = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    scoped = association(
+      'recent_tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags', scope: -> {},
+                                               foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Tag', 'tags')],
+      join_tables: [join_table('authors_tags', %w[author_id tag_id])]
+    )
+
+    result = build(domain, 'Author' => owner_model(scoped, valid), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships.map(&:association_name)).to eq(['tags'])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_SCOPED_OMITTED']
+    )
+  end
+
+  it 'omits a HABTM target that resolves but is not renderable' do
+    hidden_tag = renderable_model('Tag', 'tags', renderable: false)
+    reflection = association(
+      'tags', :has_and_belongs_to_many, klass: hidden_tag, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Tag', 'tags')],
+      join_tables: [join_table('authors_tags', %w[author_id tag_id])]
+    )
+
+    result = build(domain, 'Author' => owner_model(reflection), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.first).to include('code' => 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
   end
 
   it 'builds inverse-free direct has relationships from target-side FK evidence' do
@@ -952,8 +1107,10 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     described_class.new(model_resolver: ->(name) { models.fetch(name) }).build(domains: [domain])
   end
 
-  def domain_result(domain_id, entities)
-    RailsMmd::SchemaProbe::DomainResult.new(domain_id: domain_id, entities: entities, diagnostics: [])
+  def domain_result(domain_id, entities, join_tables: [])
+    RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: domain_id, entities: entities, join_tables: join_tables, diagnostics: []
+    )
   end
 
   def entity(ruby_constant, table_name, columns: [column('id', false)], primary_key: 'id', foreign_keys: [],
@@ -989,6 +1146,16 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       where: where,
       using: using,
       expression: expression
+    )
+  end
+
+  def join_table(table_name, column_names, primary_key: nil)
+    RailsMmd::SchemaProbe::JoinTable.new(
+      table_name: table_name,
+      columns: column_names.map do |name|
+        RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: false)
+      end,
+      primary_key: primary_key
     )
   end
 
@@ -1084,6 +1251,10 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     def association_primary_key = @options.fetch(:association_primary_key, 'id')
 
     def foreign_type = @options.fetch(:foreign_type, "#{name}_type")
+
+    def association_foreign_key = @options[:association_foreign_key]
+
+    def join_table = @options[:join_table]
 
     def active_record_primary_key = @options.fetch(:active_record_primary_key, 'id')
 

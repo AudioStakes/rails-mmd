@@ -60,6 +60,8 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       case "$*" in
         *--version*) exit 0 ;;
         *"exec rails-mmd generate"*)
+          printf '%s\n' '[{"code":"ASSOCIATION_MACRO_OMITTED"}]' \
+            > rails_mmd_expected_diagnostics.json
           mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/fixtures/schemas/render_plan/valid/er.json" \
             tmp/rails_mmd/core.er.render_plan.json
@@ -98,16 +100,35 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
   end
 
   def missing_expected_polymorphic_groups_asdf
-    relationships = JSON.generate(
-      [{
-        relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
-        label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1'
-      }]
-    )
+    relationships = JSON.generate([generic_expected_relationship])
     missing_expected_relationships_asdf.sub(
       'mkdir -p tmp/rails_mmd',
       "printf '%s\\n' '#{relationships}' > rails_mmd_expected_relationships.json\n          mkdir -p tmp/rails_mmd"
     )
+  end
+
+  def missing_expected_habtm_asdf
+    relationships = [generic_expected_relationship, habtm_expected_relationship]
+    missing_expected_relationships_asdf.sub(
+      'mkdir -p tmp/rails_mmd',
+      "printf '%s\\n' '#{JSON.generate(relationships)}' > rails_mmd_expected_relationships.json\n          " \
+      'mkdir -p tmp/rails_mmd'
+    )
+  end
+
+  def generic_expected_relationship
+    {
+      relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
+      label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1'
+    }
+  end
+
+  def habtm_expected_relationship
+    {
+      relationship_id: 'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
+      owner_safe_token: 'AUTHOR', target_safe_token: 'TAG', label: 'tags',
+      owner_cardinality: '0..many', target_cardinality: '0..many'
+    }
   end
 
   def run_matrix(path: ENV.fetch('PATH'), pair: nil)
@@ -189,6 +210,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('polymorphic groups did not match expectation'))
+    end
+  end
+
+  it 'rejects artifacts whose only missing expected relationship is HABTM' do
+    with_fake_asdf(missing_expected_habtm_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('relationships did not match expectation'))
     end
   end
 

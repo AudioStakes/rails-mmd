@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "core",
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_join_table_extra",
+      "code": "ASSOCIATION_JOIN_TABLE_INVALID",
+      "severity": "warning",
+      "phase": "relationship_build",
+      "scope": "relationship",
+      "subject_id": "authors.tags",
+      "message": "join table invalid",
+      "metadata": {
+        "domain_id": "core",
+        "owner_constant": "Author",
+        "association_name": "tags",
+        "target_constant": "Tag",
+        "join_table": "authors_tags",
+        "reason": "unresolved",
+        "raw_columns": ["author_id", "tag_id"]
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
