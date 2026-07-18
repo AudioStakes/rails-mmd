@@ -89,6 +89,13 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     SH
   end
 
+  let(:missing_expected_relationships_asdf) do
+    missing_expected_diagnostics_asdf.sub(
+      'mkdir -p tmp/rails_mmd',
+      "printf '[]\\n' > rails_mmd_expected_diagnostics.json\n          mkdir -p tmp/rails_mmd"
+    )
+  end
+
   def run_matrix(path: ENV.fetch('PATH'), pair: nil)
     stdout, stderr, status = Open3.capture3(
       { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd },
@@ -152,6 +159,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('diagnostics did not match expectation'))
+    end
+  end
+
+  it 'rejects generated relationships that do not match the real-app expectation' do
+    with_fake_asdf(missing_expected_relationships_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('relationships did not match expectation'))
     end
   end
 

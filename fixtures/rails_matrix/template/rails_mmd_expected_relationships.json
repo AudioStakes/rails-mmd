@@ -1,0 +1,34 @@
+[
+  {
+    "relationship_id": "relationships/authors/drafts",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "DRAFT",
+    "label": "drafts",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/authors/profile",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "PROFILE",
+    "label": "profile",
+    "owner_cardinality": "1..1",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/employees/reports",
+    "owner_safe_token": "EMPLOYEE",
+    "target_safe_token": "EMPLOYEE",
+    "label": "reports",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/posts/author",
+    "owner_safe_token": "POST",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  }
+]

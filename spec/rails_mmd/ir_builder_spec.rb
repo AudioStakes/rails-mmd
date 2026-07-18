@@ -62,6 +62,31 @@ RSpec.describe RailsMmd::IrBuilder do
     expect(schema_valid_ir?(result.domains.first.payload)).to be(true)
   end
 
+  it 'marks a direct has foreign key on the actual target-side holder' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [entity('Author', 'authors'),
+                 entity('Profile', 'profiles', columns: [column('id'), column('author_id')])],
+      diagnostics: []
+    )
+    direct_has = relationship('relationships/authors/profile', 'entities/authors', 'entities/profiles', 'profile')
+    direct_has.foreign_key_holder_entity_id = 'entities/profiles'
+    direct_has.foreign_key_column = 'author_id'
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core', relationships: [direct_has], diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+    entities = payload.fetch('entities').to_h { |entity_payload| [entity_payload.fetch('entity_id'), entity_payload] }
+
+    expect(entities.fetch('entities/authors').fetch('attributes').map do |attribute|
+      attribute.fetch('name')
+    end).to eq(['id'])
+    expect(entities.fetch('entities/profiles').fetch('attributes').map { |attribute| attribute.fetch('name') }).to eq(
+      %w[id author_id]
+    )
+  end
+
   it 'falls back to unknown when selected key column type metadata is unavailable' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core',

@@ -12,6 +12,11 @@ module RailsMmd
       :owner_entity_id,
       :target_entity_id,
       :association_name,
+      :association_macro,
+      :foreign_key_holder_entity_id,
+      :foreign_key_column,
+      :referenced_primary_key_column,
+      :physical_key,
       :owner_foreign_key_column,
       :target_primary_key_column,
       :owner_fk_unique,
@@ -71,7 +76,7 @@ module RailsMmd
 
       DomainResult.new(
         domain_id: domain.domain_id,
-        relationships: relationships.sort_by(&:relationship_id),
+        relationships: deduplicate_relationships(relationships).sort_by(&:relationship_id),
         diagnostics: output_diagnostics
       )
     end
@@ -88,8 +93,49 @@ module RailsMmd
 
     def classify_reflection(context, owner, reflection)
       return build_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
+      return build_direct_reflection(context, owner, reflection) if direct_has?(reflection)
 
       [nil, omitted_macro(context, owner, reflection)]
+    end
+
+    def direct_has?(reflection)
+      %i[has_many has_one].include?(reflection_macro(reflection))
+    end
+
+    def build_direct_reflection(context, owner, reflection)
+      association_name = reflection_name(reflection)
+      return [nil, omitted_macro(context, owner, reflection)] if through?(reflection)
+      if inverse_polymorphic?(reflection)
+        return omitted(context, owner, association_name,
+                       'ASSOCIATION_POLYMORPHIC_OMITTED')
+      end
+      return omitted(context, owner, association_name, 'ASSOCIATION_SCOPED_OMITTED') if scoped?(reflection)
+
+      sanitized_name = sanitize_association_name(association_name)
+      return omitted(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED') unless sanitized_name
+
+      target_model, target_constant = resolve_target(reflection)
+      unless target_model
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_TARGET_UNRESOLVED', target_constant)
+      end
+      unless renderable_model?(target_model)
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_constant)
+      end
+
+      target = context.entity_by_constant[target_constant]
+      return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
+
+      keys = direct_key_columns(reflection, owner)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
+      unless keys.fetch(:referenced_primary_key) == owner.primary_key
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
+      end
+      unless column_names(target).include?(keys.fetch(:foreign_key)) &&
+             column_names(owner).include?(keys.fetch(:referenced_primary_key))
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
+      end
+
+      [direct_relationship_for(owner, target, sanitized_name, reflection_macro(reflection), keys), nil]
     end
 
     def omitted_macro(context, owner, reflection)
@@ -150,6 +196,11 @@ module RailsMmd
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
         association_name: association_name,
+        association_macro: :belongs_to,
+        foreign_key_holder_entity_id: entity_id(owner),
+        foreign_key_column: owner_fk,
+        referenced_primary_key_column: target_pk,
+        physical_key: physical_key(entity_id(owner), owner_fk, entity_id(target), target_pk),
         owner_foreign_key_column: owner_fk,
         target_primary_key_column: target_pk,
         owner_fk_unique: owner_unique,
@@ -158,6 +209,43 @@ module RailsMmd
         owner_cardinality: owner_unique ? '0..1' : '0..many',
         target_cardinality: db_foreign_key && owner_fk_nullable == false ? '1..1' : '0..1'
       )
+    end
+
+    def direct_relationship_for(owner, target, association_name, macro, keys)
+      foreign_key = keys.fetch(:foreign_key)
+      referenced_primary_key = keys.fetch(:referenced_primary_key)
+      db_foreign_key = db_foreign_key?(target, owner, foreign_key, referenced_primary_key)
+      foreign_key_nullable = column_nullable?(target, foreign_key)
+
+      Relationship.new(
+        relationship_id: "relationships/#{owner.table_name}/#{association_name}",
+        owner_entity_id: entity_id(owner),
+        target_entity_id: entity_id(target),
+        association_name: association_name,
+        association_macro: macro,
+        foreign_key_holder_entity_id: entity_id(target),
+        foreign_key_column: foreign_key,
+        referenced_primary_key_column: referenced_primary_key,
+        physical_key: physical_key(entity_id(target), foreign_key, entity_id(owner), referenced_primary_key),
+        owner_foreign_key_column: foreign_key,
+        target_primary_key_column: referenced_primary_key,
+        owner_fk_unique: unique_owner_fk?(target, foreign_key),
+        db_foreign_key: db_foreign_key,
+        owner_fk_nullable: foreign_key_nullable,
+        owner_cardinality: db_foreign_key && foreign_key_nullable == false ? '1..1' : '0..1',
+        target_cardinality: macro == :has_one ? '0..1' : '0..many'
+      )
+    end
+
+    def deduplicate_relationships(relationships)
+      relationships.group_by(&:physical_key).flat_map do |_key, candidates|
+        belongs_to = candidates.select { |candidate| candidate.association_macro == :belongs_to }
+        belongs_to.empty? ? candidates : [belongs_to.min_by(&:relationship_id)]
+      end
+    end
+
+    def physical_key(holder_id, foreign_key, referenced_id, primary_key)
+      [holder_id, foreign_key, referenced_id, primary_key].join('|')
     end
 
     def omitted(context, owner, association_name, code, target_constant = nil)
@@ -229,6 +317,17 @@ module RailsMmd
       }
     end
 
+    def direct_key_columns(reflection, owner)
+      foreign_key = scalar_key(reflection_value(reflection, :foreign_key))
+      referenced_primary_key = scalar_key(reflection_value(reflection, :active_record_primary_key))
+      referenced_primary_key ||= scalar_key(owner.primary_key)
+      return unless foreign_key && referenced_primary_key
+
+      { foreign_key: foreign_key, referenced_primary_key: referenced_primary_key }
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
     def unique_owner_fk?(owner, owner_fk)
       owner.indexes.any? do |index|
         index.unique == true &&
@@ -288,6 +387,14 @@ module RailsMmd
 
     def scoped?(reflection)
       reflection.respond_to?(:scope) && !!reflection.scope
+    end
+
+    def through?(reflection)
+      reflection.respond_to?(:through_reflection?) && reflection.through_reflection?
+    end
+
+    def inverse_polymorphic?(reflection)
+      reflection.respond_to?(:type) && !reflection.type.nil?
     end
 
     def sanitize_association_name(name)
