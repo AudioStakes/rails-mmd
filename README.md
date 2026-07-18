@@ -15,24 +15,22 @@ render plans, serializing Mermaid, and publishing local artifacts.
 
 ## Ruby And CLI
 
-This repository pins MRI Ruby `4.0.5` in [`.ruby-version`](.ruby-version).
-Ruby `4.0` is the selected stable branch for this project, and `4.0.5` was
-selected as the available `4.0` patch at this issue-plan revision time. This is
-not based on a claim that a downloads page alone labels `4.0.5` as the only
-current stable release.
+This repository develops on MRI Ruby `4.0.6` and supports maintained Ruby
+versions `>= 3.3, < 4.1`. The local Rails matrix verifies three selected pairs:
+Rails 7.2 on Ruby 4.0.6, and Rails 8.1 on Ruby 3.3.12 and 4.0.6.
 
 The CLI supports help, version, and P0 generation:
 
 ```sh
-asdf install ruby 4.0.5
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle install
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd --help
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd --version
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd generate --help
+asdf install ruby 4.0.6
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle install
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd --help
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd --version
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd generate --help
 ```
 
 If your shell does not already resolve `ruby` and `bundle` through the pinned
-toolchain, prefix commands with `ASDF_RUBY_VERSION=4.0.5 asdf exec`.
+toolchain, prefix commands with `ASDF_RUBY_VERSION=4.0.6 asdf exec`.
 
 `rails-mmd generate` exposes only P0 options: `--config`, `--output-dir`,
 `--domain`, `--format`, and `--fail-on-warning`.

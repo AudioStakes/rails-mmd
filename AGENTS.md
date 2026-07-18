@@ -51,3 +51,12 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   output before rerunning the hook.
 - Preserve the repair-first loop: run/autocorrect first, inspect the diff, stage
   explicit repairs, then let read-only checks run.
+
+## P1 Engineering Records
+
+- Before P1 work, read [`docs/p1/README.md`](docs/p1/README.md) and the applicable
+  feature records. Keep phase rules and feature details there, not in this file.
+- For runtime-compatibility scope changes, prefer editing
+  `fixtures/rails_matrix/matrix.yml` as an explicit `pairs:` list and keep
+  documentation aligned in `docs/p1/01-runtime-compatibility/*` to avoid
+  accidental Cartesian matrix drift.

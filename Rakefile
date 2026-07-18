@@ -2,6 +2,7 @@
 
 require 'bundler/gem_tasks'
 require 'rails_mmd/tooling_tasks'
+require_relative 'tooling/rails_matrix'
 require 'rubocop/rake_task'
 require 'rspec/core/rake_task'
 require 'yaml'
@@ -33,10 +34,19 @@ namespace :bundle do
   end
 end
 
+namespace :verify do
+  desc 'Verify rails-mmd against the supported Ruby and Rails matrix'
+  task :rails_matrix do
+    RailsMatrix::Runner.new.run
+  rescue RailsMatrix::PrerequisiteError, RailsMatrix::VerificationError => e
+    abort e.message
+  end
+end
+
 desc 'Run coverage and changed-code coverage checks'
 task coverage: :spec do
   config = YAML.safe_load_file('.undercover.yml')
   sh(*RailsMmd::ToolingTasks.undercover_command(config))
 end
 
-task default: %i[rubocop spec bundle:audit coverage]
+task default: %i[rubocop spec bundle:audit coverage verify:rails_matrix]

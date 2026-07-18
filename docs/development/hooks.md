@@ -5,7 +5,7 @@ This repository uses Bundler-managed Lefthook for local Git hooks.
 Install hooks after `bundle install`:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec lefthook install
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook install
 ```
 
 ## Pre-Commit
@@ -43,7 +43,7 @@ restaging.
 The `pre-push` hook runs the CI-equivalent default Rake task:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec lefthook run pre-push
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook run pre-push
 ```
 
 Hosted GitHub Actions CI is intentionally disabled. Treat local `pre-push`
