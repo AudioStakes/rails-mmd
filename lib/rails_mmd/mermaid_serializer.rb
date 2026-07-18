@@ -59,6 +59,7 @@ module RailsMmd
     def class_text(render_plan)
       lines = header_lines('classDiagram', render_plan) + comment_lines(render_plan)
       lines.concat(render_plan.fetch('entities').flat_map { |entity| class_entity_lines(entity) })
+      lines.concat(class_inheritance_lines(render_plan))
       lines.concat(class_relationship_lines(render_plan))
       "#{lines.join("\n")}\n"
     end
@@ -90,6 +91,12 @@ module RailsMmd
       end
     end
 
+    def class_inheritance_lines(render_plan)
+      render_plan.fetch('inheritances').map do |inheritance|
+        "  #{inheritance.fetch('parent_safe_token')} <|-- #{inheritance.fetch('child_safe_token')}"
+      end
+    end
+
     def er_entity_lines(entity)
       return ["  #{entity.fetch('safe_token')}"] if entity.fetch('attributes').empty?
 
@@ -101,13 +108,21 @@ module RailsMmd
     end
 
     def class_entity_lines(entity)
-      return ["  class #{entity.fetch('safe_token')}"] if entity.fetch('attributes').empty?
+      declaration = class_declaration(entity)
+      return ["  #{declaration}"] if entity.fetch('attributes').empty?
 
       [
-        "  class #{entity.fetch('safe_token')} {",
+        "  #{declaration} {",
         *entity.fetch('attributes').map { |attribute| "    #{class_attribute_line(attribute)}" },
         '  }'
       ]
+    end
+
+    def class_declaration(entity)
+      declaration = "class #{entity.fetch('safe_token')}"
+      return declaration unless entity.fetch('entity_kind') == 'sti_subtype'
+
+      "#{declaration}[\"#{line_text(entity.fetch('label'), field: 'entity label')}\"]"
     end
 
     def er_attribute_line(attribute)

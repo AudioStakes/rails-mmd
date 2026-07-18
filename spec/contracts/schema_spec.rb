@@ -86,8 +86,10 @@ RSpec.describe 'P0 contract schemas' do
 
   describe 'ir.schema.json' do
     it 'accepts Mermaid-independent IR with digest and no safe tokens' do
-      expect_valid('ir', 'ir/valid/core.json')
-      expect(JSON.generate(fixture('ir/valid/core.json'))).not_to include('safe_token')
+      %w[ir/valid/core.json ir/valid/sti.json].each do |path|
+        expect_valid('ir', path)
+        expect(JSON.generate(fixture(path))).not_to include('safe_token')
+      end
     end
 
     it 'rejects safe tokens and invalid digest boundaries' do
@@ -101,7 +103,7 @@ RSpec.describe 'P0 contract schemas' do
 
   describe 'render_plan.schema.json' do
     it 'accepts render plans covering safe tokens, markers, multiplicities, and diagnostics' do
-      %w[render_plan/valid/er.json render_plan/valid/class.json].each do |path|
+      render_plan_valid_fixtures.each do |path|
         expect_valid('render_plan', path)
       end
     end
@@ -139,6 +141,10 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def ir_invalid_fixtures
+    ir_digest_and_shape_invalid_fixtures + ir_sti_invalid_fixtures
+  end
+
+  def ir_digest_and_shape_invalid_fixtures
     %w[
       ir/invalid/contains_safe_token.json
       ir/invalid/uppercase_digest.json
@@ -148,6 +154,15 @@ RSpec.describe 'P0 contract schemas' do
       ir/invalid/missing_digest.json
       ir/invalid/missing_attribute_type.json
       ir/invalid/machine_local_fields.json
+    ]
+  end
+
+  def ir_sti_invalid_fixtures
+    %w[
+      ir/invalid/sti_base_missing_inheritance_column.json
+      ir/invalid/sti_subtype_extra_metadata.json
+      ir/invalid/sti_subtype_null_metadata.json
+      ir/invalid/sti_subtype_attributes_present.json
     ]
   end
 
@@ -203,6 +218,10 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def render_plan_sanitized_invalid_fixtures
+    render_plan_shape_invalid_fixtures + render_plan_sti_invalid_fixtures
+  end
+
+  def render_plan_shape_invalid_fixtures
     %w[
       render_plan/invalid/missing_attribute_type.json
       render_plan/invalid/multiline_comment.json
@@ -210,6 +229,26 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/invalid/machine_local_fields.json
       render_plan/invalid/unsanitized_comment.json
       render_plan/invalid/redacted_key_value_comment.json
+    ]
+  end
+
+  def render_plan_sti_invalid_fixtures
+    %w[
+      render_plan/invalid/missing_entity_kind.json
+      render_plan/invalid/null_entity_kind.json
+      render_plan/invalid/er_sti_subtype_kind.json
+      render_plan/invalid/er_nonempty_inheritances.json
+      render_plan/invalid/inheritance_missing_parent_safe_token.json
+      render_plan/invalid/sti_subtype_attributes_present.json
+      render_plan/invalid/sti_subtype_malformed_label.json
+    ]
+  end
+
+  def render_plan_valid_fixtures
+    %w[
+      render_plan/valid/er.json
+      render_plan/valid/class.json
+      render_plan/valid/class_sti.json
     ]
   end
 
@@ -254,7 +293,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def ir_domain_id_valid?(domain_id)
     data = {
-      'schema_version' => 2,
+      'schema_version' => 3,
       'domain_id' => domain_id,
       'entities' => [],
       'relationships' => [],
@@ -275,8 +314,9 @@ RSpec.describe 'P0 contract schemas' do
 
   def render_plan_base
     {
-      'schema_version' => 2, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
+      'schema_version' => 3, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
       'entities' => [],
+      'inheritances' => [],
       'relationships' => [],
       'comments' => [],
       'diagnostic_ids' => [],

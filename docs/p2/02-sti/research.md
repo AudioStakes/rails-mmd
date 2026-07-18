@@ -113,8 +113,11 @@ ER semantics remain stable while the class view gains explicit inheritance.
   constant, never from `sti_name` alone.
 - Normalize, without evaluating queries or reading rows:
   `base_entity_id`, `parent_entity_id`, `ruby_constant`, `inheritance_column`,
-  and exact `sti_name`. `parent_entity_id` points to the nearest visible
-  concrete ancestor, never to an omitted abstract node.
+  and exact `sti_name`. `parent_entity_id` points to the nearest accepted
+  concrete ancestor in the same selected family. An abstract superclass starts
+  a new Rails `base_class` boundary for the next concrete class, so a concrete
+  descendant across that boundary is not reattached to the earlier selected
+  base and neither node is projected for that family.
 - IR v3 contains the base entity plus subtype entities with closed STI metadata.
   Shared attributes remain on the base; subtype attributes are empty.
 - ER render plans contain the base physical entity only. Class render plans
@@ -148,7 +151,10 @@ ER semantics remain stable while the class view gains explicit inheritance.
   synthetic subtype or inheritance edge.
 - Unit: one-level, multi-level, namespaced, custom-column, and demodulized
   `sti_name` normalization is deterministic and never reads rows.
-- Unit: abstract classes are excluded and immediate parent IDs remain valid.
+- Unit and real Rails matrix: an abstract boundary and its new concrete family
+  are excluded from the earlier selected base. The matrix separately selects
+  the post-boundary concrete base and proves its own concrete subtype/edge;
+  immediate accepted parent IDs remain valid in both selected families.
 - Contract: fixture-backed IR/render-plan v3 negatives reject missing required
   STI members, malformed types, extra members, and subtype metadata in an ER
   artifact. Builder/serializer tests reject a class inheritance reference that

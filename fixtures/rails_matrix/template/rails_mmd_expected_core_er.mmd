@@ -1,0 +1,107 @@
+erDiagram
+  direction LR
+  ACCOUNT_MEMBERSHIP |o..|| ACCOUNT : account
+  ACCOUNT_MEMBERSHIP |o..|| AUTHOR : author
+  ACCOUNT }o..o| AUTHOR : author
+  AUTHOR }o..o{ TAG : tags
+  AUTHOR }o..o| ACCOUNT : account
+  AUTHOR }o..o{ TEAM : teams
+  AUTHOR }o..o{ TEAM : collaborators
+  AUTHOR }o..o{ LABEL : labels
+  COMMENT |o..o| IMAGE : commentable
+  COMMENT }o..o| POST : commentable
+  DRAFT }o..o| AUTHOR : drafts
+  EMPLOYEE }o..o| EMPLOYEE : manager
+  LABELING }o..|| LABEL : label
+  LABELING }o..|| POST : post
+  LABEL }o..o{ POST : posts
+  MEMBERSHIP }o..|| AUTHOR : author
+  MEMBERSHIP }o..|| TEAM : team
+  NOTE }o..|| AUTHOR : author
+  PARTNERSHIP }o..|| AUTHOR : author
+  PARTNERSHIP }o..|| TEAM : collaborator
+  POST }o..|| AUTHOR : author
+  POST }o..o{ LABEL : labels
+  PROFILE |o..|| AUTHOR : author
+  TEAM }o..o{ AUTHOR : authors
+  ACCOUNT_MEMBERSHIP {
+    integer id PK
+    integer account_id FK
+    integer author_id FK
+  }
+  ACCOUNT {
+    integer id PK
+  }
+  ANIMAL {
+    integer id PK
+  }
+  APPLIANCE {
+    integer id PK
+  }
+  AUTHOR {
+    integer id PK
+  }
+  COMMENT {
+    integer id PK
+    integer commentable_id FK
+    string commentable_type FK
+  }
+  DEVICE {
+    integer id PK
+  }
+  DRAFT {
+    integer id PK
+    integer author_id FK
+  }
+  ELECTRIC_VEHICLE {
+    integer id PK
+  }
+  EMPLOYEE {
+    integer id PK
+    integer manager_id FK
+  }
+  IMAGE {
+    integer id PK
+  }
+  LABELING {
+    integer id PK
+    integer label_id FK
+    integer post_id FK
+  }
+  LABEL {
+    integer id PK
+  }
+  MEMBERSHIP {
+    integer id PK
+    integer author_id FK
+    integer team_id FK
+  }
+  MESSAGE {
+    integer id PK
+  }
+  NOTE {
+    integer id PK
+    integer author_id FK
+  }
+  PARTNERSHIP {
+    integer id PK
+    integer author_id FK
+    integer collaborator_id FK
+  }
+  POST {
+    integer id PK
+    integer author_id FK
+  }
+  PROFILE {
+    integer id PK
+    integer author_id FK
+  }
+  TAG {
+    integer id PK
+  }
+  TEAM {
+    integer id PK
+  }
+  VEHICLE {
+    integer id PK
+  }

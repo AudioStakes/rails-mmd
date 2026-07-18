@@ -1,0 +1,20 @@
+{
+  "schema_version": 3,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/admin_cars/sti/Admin::Car",
+      "entity_kind": "sti_subtype",
+      "safe_token": "ADMIN_CAR",
+      "label": "Admin::Car",
+      "attributes": []
+    }
+  ],
+  "inheritances": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

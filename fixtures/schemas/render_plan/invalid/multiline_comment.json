@@ -1,11 +1,12 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_kind": "class",
   "domain_id": "core",
   "direction": "LR",
   "entities": [
-    { "entity_id": "entities/users", "safe_token": "USER", "label": "User\nBreak", "attributes": [] }
+    { "entity_id": "entities/users", "entity_kind": "physical", "safe_token": "USER", "label": "User\nBreak", "attributes": [] }
   ],
+  "inheritances": [],
   "relationships": [],
   "comments": [
     { "comment_id": "comments/multiline", "safe_token": "COMMENT_MULTILINE", "text": "line one\nline two" }

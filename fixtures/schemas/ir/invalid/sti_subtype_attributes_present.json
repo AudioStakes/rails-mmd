@@ -1,0 +1,29 @@
+{
+  "schema_version": 3,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/vehicles/sti/Admin::Car",
+      "ruby_constant": "Admin::Car",
+      "table_name": "vehicles",
+      "attributes": [
+        {
+          "attribute_id": "entities/vehicles/sti/Admin::Car/attributes/id",
+          "name": "id",
+          "role": "primary_key",
+          "type": "bigint"
+        }
+      ],
+      "metadata": {
+        "kind": "sti_subtype",
+        "base_entity_id": "entities/vehicles",
+        "parent_entity_id": "entities/vehicles",
+        "inheritance_column": "type",
+        "sti_name": "Car"
+      }
+    }
+  ],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

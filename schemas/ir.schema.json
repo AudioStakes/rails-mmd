@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "domain_id", "entities", "relationships", "diagnostic_ids", "digest_sha256"],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "entities": {
       "type": "array",
@@ -35,6 +35,12 @@
       "pattern": "^[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*$"
     },
     "entity": {
+      "oneOf": [
+        { "$ref": "#/$defs/physical_entity" },
+        { "$ref": "#/$defs/sti_subtype_entity" }
+      ]
+    },
+    "physical_entity": {
       "type": "object",
       "additionalProperties": false,
       "required": ["entity_id", "ruby_constant", "table_name", "attributes"],
@@ -45,7 +51,24 @@
         "attributes": {
           "type": "array",
           "items": { "$ref": "#/$defs/attribute" }
-        }
+        },
+        "metadata": { "$ref": "#/$defs/sti_base_metadata" }
+      }
+    },
+    "sti_subtype_entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "ruby_constant", "table_name", "attributes", "metadata"],
+      "properties": {
+        "entity_id": { "type": "string", "minLength": 1 },
+        "ruby_constant": { "$ref": "#/$defs/ruby_constant" },
+        "table_name": { "type": "string", "minLength": 1 },
+        "attributes": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "$ref": "#/$defs/attribute" }
+        },
+        "metadata": { "$ref": "#/$defs/sti_subtype_metadata" }
       }
     },
     "attribute": {
@@ -86,6 +109,27 @@
       "required": ["scoped"],
       "properties": {
         "scoped": { "const": true }
+      }
+    },
+    "sti_base_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "inheritance_column"],
+      "properties": {
+        "kind": { "const": "sti_base" },
+        "inheritance_column": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sti_subtype_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "base_entity_id", "parent_entity_id", "inheritance_column", "sti_name"],
+      "properties": {
+        "kind": { "const": "sti_subtype" },
+        "base_entity_id": { "type": "string", "minLength": 1 },
+        "parent_entity_id": { "type": "string", "minLength": 1 },
+        "inheritance_column": { "type": "string", "minLength": 1 },
+        "sti_name": { "type": "string", "minLength": 1 }
       }
     },
     "cardinality": { "enum": ["0..1", "1..1", "0..many", "1..many"] }

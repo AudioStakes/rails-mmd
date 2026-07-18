@@ -31,6 +31,15 @@ RSpec.describe RailsMmd::MermaidSerializer do
     end
   end
 
+  it 'serializes fully qualified STI labels and inheritance edges after declarations' do
+    result = serializer.serialize(render_plan: render_plan_fixture('class_sti'))
+
+    aggregate_failures do
+      expect(result.diagnostics).to be_empty
+      expect(result.text).to eq(mermaid_fixture('class_sti_inheritance.mmd'))
+    end
+  end
+
   it 'serializes class attribute blocks when render plans include key attributes' do
     result = serializer.serialize(render_plan: class_attributes_plan)
 

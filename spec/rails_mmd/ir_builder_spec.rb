@@ -44,13 +44,66 @@ RSpec.describe RailsMmd::IrBuilder do
       'target_cardinality' => '1..1',
       'metadata' => { 'scoped' => true }
     )
-    expect(payload.fetch('schema_version')).to eq(2)
+    expect(payload.fetch('schema_version')).to eq(3)
     expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
     expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
     expect(schema_valid_ir?(payload)).to be(true)
     expect(payload.fetch('digest_sha256')).to eq(
       RailsMmd::CanonicalJson.digest_sha256(payload.merge('digest_sha256' => nil))
     )
+  end
+
+  it 'emits schema v3 STI base and subtype entity metadata' do
+    domain = domain_with_sti(
+      domain_id: 'core',
+      entities: [entity('Vehicle', 'vehicles', columns: [column('id')]), entity('Part', 'parts')],
+      sti_subtypes: [
+        sti_subtype(
+          entity_id: 'entities/vehicles/sti/Admin::Car',
+          base_entity_id: 'entities/vehicles',
+          parent_entity_id: 'entities/vehicles',
+          ruby_constant: 'Admin::Car',
+          table_name: 'vehicles',
+          inheritance_column: 'type',
+          sti_name: 'Car'
+        )
+      ],
+      diagnostics: []
+    )
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core',
+      relationships: [
+        relationship('relationships/parts/vehicle', 'entities/parts', 'entities/vehicles', 'vehicle')
+      ],
+      diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+    entities = payload.fetch('entities').to_h { |entity_payload| [entity_payload.fetch('entity_id'), entity_payload] }
+
+    expect(payload.fetch('schema_version')).to eq(3)
+    expect(entities.fetch('entities/vehicles').fetch('metadata')).to eq(
+      'kind' => 'sti_base',
+      'inheritance_column' => 'type'
+    )
+    expect(entities.fetch('entities/vehicles/sti/Admin::Car')).to eq(
+      'entity_id' => 'entities/vehicles/sti/Admin::Car',
+      'ruby_constant' => 'Admin::Car',
+      'table_name' => 'vehicles',
+      'attributes' => [],
+      'metadata' => {
+        'kind' => 'sti_subtype',
+        'base_entity_id' => 'entities/vehicles',
+        'parent_entity_id' => 'entities/vehicles',
+        'inheritance_column' => 'type',
+        'sti_name' => 'Car'
+      }
+    )
+    expect(payload.fetch('relationships').first).to include(
+      'owner_entity_id' => 'entities/parts',
+      'target_entity_id' => 'entities/vehicles'
+    )
+    expect(schema_valid_ir?(payload)).to be(true)
   end
 
   it 'supports attributes none without changing relationship serialization' do
@@ -63,6 +116,65 @@ RSpec.describe RailsMmd::IrBuilder do
 
     expect(result.domains.first.payload.fetch('entities').first.fetch('attributes')).to eq([])
     expect(schema_valid_ir?(result.domains.first.payload)).to be(true)
+  end
+
+  it 'rejects relationship endpoints that reference STI subtype entities' do
+    domain = domain_with_sti(
+      domain_id: 'core',
+      entities: [entity('Vehicle', 'vehicles')],
+      sti_subtypes: [
+        sti_subtype(
+          entity_id: 'entities/vehicles/sti/Admin::Car',
+          base_entity_id: 'entities/vehicles',
+          parent_entity_id: 'entities/vehicles',
+          ruby_constant: 'Admin::Car',
+          table_name: 'vehicles',
+          inheritance_column: 'type',
+          sti_name: 'Car'
+        )
+      ],
+      diagnostics: []
+    )
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core',
+      relationships: [
+        relationship(
+          'relationships/vehicles/admin_car',
+          'entities/vehicles',
+          'entities/vehicles/sti/Admin::Car',
+          'admin_car'
+        )
+      ],
+      diagnostics: []
+    )
+
+    expect do
+      described_class.new.build(domains: [domain], relationship_domains: [relationships])
+    end.to raise_error(ArgumentError, /relationship endpoint must be physical/)
+  end
+
+  it 'rejects cyclic STI parent references before projecting IR' do
+    first_id = 'entities/vehicles/sti/FirstCar'
+    second_id = 'entities/vehicles/sti/SecondCar'
+    domain = domain_with_sti(
+      domain_id: 'core',
+      entities: [entity('Vehicle', 'vehicles')],
+      sti_subtypes: [
+        sti_subtype(
+          entity_id: first_id, base_entity_id: 'entities/vehicles', parent_entity_id: second_id,
+          ruby_constant: 'FirstCar', table_name: 'vehicles', inheritance_column: 'type', sti_name: 'FirstCar'
+        ),
+        sti_subtype(
+          entity_id: second_id, base_entity_id: 'entities/vehicles', parent_entity_id: first_id,
+          ruby_constant: 'SecondCar', table_name: 'vehicles', inheritance_column: 'type', sti_name: 'SecondCar'
+        )
+      ],
+      diagnostics: []
+    )
+
+    expect do
+      described_class.new.build(domains: [domain], relationship_domains: [])
+    end.to raise_error(ArgumentError, /sti inheritance cycle/)
   end
 
   it 'marks a direct has foreign key on the actual target-side holder' do
@@ -192,6 +304,28 @@ RSpec.describe RailsMmd::IrBuilder do
 
   def diagnostic(id)
     { 'diagnostic_id' => id }
+  end
+
+  def domain_with_sti(domain_id:, entities:, sti_subtypes:, diagnostics:)
+    Struct.new(:domain_id, :entities, :sti_subtypes, :diagnostics, keyword_init: true).new(
+      domain_id: domain_id,
+      entities: entities,
+      sti_subtypes: sti_subtypes,
+      diagnostics: diagnostics
+    )
+  end
+
+  def sti_subtype(**attributes)
+    Struct.new(
+      :entity_id,
+      :base_entity_id,
+      :parent_entity_id,
+      :ruby_constant,
+      :table_name,
+      :inheritance_column,
+      :sti_name,
+      keyword_init: true
+    ).new(**attributes)
   end
 
   def schema_valid_ir?(payload)

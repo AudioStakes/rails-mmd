@@ -20,7 +20,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | 優先順位 | Active Record機能 | rails-mmd | 完了条件 |
 |---|---|---|---|
 | P2-01 | scoped関連 | 対応 | scope procを実行せず、解決済み関連へ`metadata.scoped: true`を保持する |
-| P2-02 | STI | 未対応 | 基底・派生classの表示規則を定める |
+| P2-02 | STI | 対応 | ERは共有tableの基底のみ、class図はloaded concrete subtypeと継承edgeを決定的に描画する |
 | P2-03 | `delegated_type` | 未対応 | 委譲元と具象型を描画する |
 | P2-04 | 複合primary/foreign key、`query_constraints` | 未対応 | 対応する列組を保持・照合する |
 | P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |

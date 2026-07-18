@@ -1,0 +1,38 @@
+[
+  {
+    "entity_id": "entities/animals/sti/Admin::Dog",
+    "entity_kind": "sti_subtype",
+    "label": "Admin::Dog",
+    "safe_token": "ADMIN_DOG"
+  },
+  {
+    "entity_id": "entities/animals/sti/Storefront::Dog",
+    "entity_kind": "sti_subtype",
+    "label": "Storefront::Dog",
+    "safe_token": "STOREFRONT_DOG"
+  },
+  {
+    "entity_id": "entities/electric_vehicles/sti/ElectricCar",
+    "entity_kind": "sti_subtype",
+    "label": "ElectricCar",
+    "safe_token": "ELECTRIC_CAR"
+  },
+  {
+    "entity_id": "entities/messages/sti/EmailMessage",
+    "entity_kind": "sti_subtype",
+    "label": "EmailMessage",
+    "safe_token": "EMAIL_MESSAGE"
+  },
+  {
+    "entity_id": "entities/vehicles/sti/Car",
+    "entity_kind": "sti_subtype",
+    "label": "Car",
+    "safe_token": "CAR"
+  },
+  {
+    "entity_id": "entities/vehicles/sti/SportsCar",
+    "entity_kind": "sti_subtype",
+    "label": "SportsCar",
+    "safe_token": "SPORTS_CAR"
+  }
+]

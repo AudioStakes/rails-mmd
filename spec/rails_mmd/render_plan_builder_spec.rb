@@ -36,7 +36,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       'class_target_multiplicity' => '1',
       'metadata' => { 'scoped' => true }
     )
-    expect(payload.fetch('schema_version')).to eq(2)
+    expect(payload.fetch('schema_version')).to eq(3)
     expect(payload.fetch('comments').first.fetch('text')).not_to include('/tmp', 'token=', 'pid=')
     expect(payload.fetch('comments').first.fetch('safe_token')).not_to include('TMP', 'SECRET123', 'PID')
     expect(payload.fetch('diagnostic_ids')).to eq(['d_db_metadata_degraded'])
@@ -61,8 +61,69 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(relationship.fetch('er_left_marker')).to eq('|o')
     expect(relationship.fetch('er_right_marker')).to eq('o{')
     expect(relationship.fetch('metadata')).to eq('scoped' => true)
-    expect(result.payload.fetch('schema_version')).to eq(2)
+    expect(result.payload.fetch('schema_version')).to eq(3)
     expect(schema_valid_render_plan?(result.payload)).to be(true)
+  end
+
+  it 'projects class-plan inheritances from IR STI metadata without republishing STI metadata' do
+    result = described_class.new.build(
+      ir: sti_ir_payload,
+      artifact_kind: 'class',
+      direction: 'BT',
+      attributes: :none
+    )
+    payload = result.payload
+    entities = payload.fetch('entities').to_h { |entity| [entity.fetch('entity_id'), entity] }
+
+    expect(payload.fetch('schema_version')).to eq(3)
+    expect(entities.fetch('entities/admin_cars')).to include(
+      'entity_kind' => 'physical',
+      'label' => 'AdminCar',
+      'attributes' => []
+    )
+    expect(entities.fetch('entities/admin_cars/sti/Admin::Car')).to include(
+      'entity_kind' => 'sti_subtype',
+      'label' => 'Admin::Car',
+      'attributes' => []
+    )
+    expect(entities.fetch('entities/admin_cars/sti/Admin::Car')).not_to have_key('metadata')
+    expect(payload.fetch('inheritances')).to eq(
+      [
+        {
+          'inheritance_id' => 'inheritances/entities/admin_cars/sti/Admin::Car',
+          'parent_entity_id' => 'entities/admin_cars',
+          'child_entity_id' => 'entities/admin_cars/sti/Admin::Car',
+          'parent_safe_token' => entities.fetch('entities/admin_cars').fetch('safe_token'),
+          'child_safe_token' => entities.fetch('entities/admin_cars/sti/Admin::Car').fetch('safe_token')
+        }
+      ]
+    )
+    expect(schema_valid_render_plan?(payload)).to be(true)
+  end
+
+  it 'filters STI subtypes before ER token allocation and omits inheritances' do
+    result = described_class.new.build(
+      ir: sti_ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      attributes: :none
+    )
+    payload = result.payload
+
+    expect(payload.fetch('entities')).to eq(
+      [
+        {
+          'entity_id' => 'entities/admin_cars',
+          'entity_kind' => 'physical',
+          'safe_token' => 'ADMIN_CAR',
+          'label' => 'AdminCar',
+          'attributes' => []
+        }
+      ]
+    )
+    expect(payload.fetch('inheritances')).to eq([])
+    expect(result.diagnostics).to eq([])
+    expect(schema_valid_render_plan?(payload)).to be(true)
   end
 
   it 'keeps metadata absent when the IR relationship is unscoped' do
@@ -73,6 +134,15 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
                                   .payload.fetch('relationships').first
 
     expect(relationship).not_to have_key('metadata')
+  end
+
+  it 'rejects class-plan STI entities whose parent reference is missing' do
+    ir = sti_ir_payload
+    ir.fetch('entities').last.fetch('metadata')['parent_entity_id'] = 'entities/missing'
+
+    expect do
+      described_class.new.build(ir: ir, artifact_kind: 'class', direction: 'BT')
+    end.to raise_error(ArgumentError, /inheritance parent missing/)
   end
 
   it 'projects the full cardinality marker and multiplicity matrix' do
@@ -361,7 +431,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
   def ir_payload(owner_cardinality: '0..many', target_cardinality: '1..1')
     {
-      'schema_version' => 2,
+      'schema_version' => 3,
       'domain_id' => 'core',
       'entities' => [
         {
@@ -398,6 +468,41 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       ],
       'diagnostic_ids' => %w[d_db_metadata_degraded d_missing],
       'digest_sha256' => 'b' * 64
+    }
+  end
+
+  def sti_ir_payload
+    {
+      'schema_version' => 3,
+      'domain_id' => 'core',
+      'entities' => [
+        {
+          'entity_id' => 'entities/admin_cars',
+          'ruby_constant' => 'AdminCar',
+          'table_name' => 'admin_cars',
+          'attributes' => [],
+          'metadata' => {
+            'kind' => 'sti_base',
+            'inheritance_column' => 'type'
+          }
+        },
+        {
+          'entity_id' => 'entities/admin_cars/sti/Admin::Car',
+          'ruby_constant' => 'Admin::Car',
+          'table_name' => 'admin_cars',
+          'attributes' => [],
+          'metadata' => {
+            'kind' => 'sti_subtype',
+            'base_entity_id' => 'entities/admin_cars',
+            'parent_entity_id' => 'entities/admin_cars',
+            'inheritance_column' => 'type',
+            'sti_name' => 'Car'
+          }
+        }
+      ],
+      'relationships' => [],
+      'diagnostic_ids' => [],
+      'digest_sha256' => 'd' * 64
     }
   end
 

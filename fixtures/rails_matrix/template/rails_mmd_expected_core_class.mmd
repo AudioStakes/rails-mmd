@@ -1,0 +1,119 @@
+classDiagram
+  direction LR
+  class ACCOUNT_MEMBERSHIP {
+    +integer id
+    +integer account_id
+    +integer author_id
+  }
+  class ACCOUNT {
+    +integer id
+  }
+  class ANIMAL {
+    +integer id
+  }
+  class ADMIN_DOG["Admin::Dog"]
+  class STOREFRONT_DOG["Storefront::Dog"]
+  class APPLIANCE {
+    +integer id
+  }
+  class AUTHOR {
+    +integer id
+  }
+  class COMMENT {
+    +integer id
+    +integer commentable_id
+    +string commentable_type
+  }
+  class DEVICE {
+    +integer id
+  }
+  class DRAFT {
+    +integer id
+    +integer author_id
+  }
+  class ELECTRIC_VEHICLE {
+    +integer id
+  }
+  class ELECTRIC_CAR["ElectricCar"]
+  class EMPLOYEE {
+    +integer id
+    +integer manager_id
+  }
+  class IMAGE {
+    +integer id
+  }
+  class LABELING {
+    +integer id
+    +integer label_id
+    +integer post_id
+  }
+  class LABEL {
+    +integer id
+  }
+  class MEMBERSHIP {
+    +integer id
+    +integer author_id
+    +integer team_id
+  }
+  class MESSAGE {
+    +integer id
+  }
+  class EMAIL_MESSAGE["EmailMessage"]
+  class NOTE {
+    +integer id
+    +integer author_id
+  }
+  class PARTNERSHIP {
+    +integer id
+    +integer author_id
+    +integer collaborator_id
+  }
+  class POST {
+    +integer id
+    +integer author_id
+  }
+  class PROFILE {
+    +integer id
+    +integer author_id
+  }
+  class TAG {
+    +integer id
+  }
+  class TEAM {
+    +integer id
+  }
+  class VEHICLE {
+    +integer id
+  }
+  class CAR["Car"]
+  class SPORTS_CAR["SportsCar"]
+  ANIMAL <|-- ADMIN_DOG
+  ANIMAL <|-- STOREFRONT_DOG
+  ELECTRIC_VEHICLE <|-- ELECTRIC_CAR
+  MESSAGE <|-- EMAIL_MESSAGE
+  VEHICLE <|-- CAR
+  CAR <|-- SPORTS_CAR
+  ACCOUNT_MEMBERSHIP "0..1" --> "1" ACCOUNT : account
+  ACCOUNT_MEMBERSHIP "0..1" --> "1" AUTHOR : author
+  ACCOUNT "0..*" --> "0..1" AUTHOR : author
+  AUTHOR "0..*" --> "0..*" TAG : tags
+  AUTHOR "0..*" --> "0..1" ACCOUNT : account
+  AUTHOR "0..*" --> "0..*" TEAM : teams
+  AUTHOR "0..*" --> "0..*" TEAM : collaborators
+  AUTHOR "0..*" --> "0..*" LABEL : labels
+  COMMENT "0..1" --> "0..1" IMAGE : commentable
+  COMMENT "0..*" --> "0..1" POST : commentable
+  DRAFT "0..*" --> "0..1" AUTHOR : drafts
+  EMPLOYEE "0..*" --> "0..1" EMPLOYEE : manager
+  LABELING "0..*" --> "1" LABEL : label
+  LABELING "0..*" --> "1" POST : post
+  LABEL "0..*" --> "0..*" POST : posts
+  MEMBERSHIP "0..*" --> "1" AUTHOR : author
+  MEMBERSHIP "0..*" --> "1" TEAM : team
+  NOTE "0..*" --> "1" AUTHOR : author
+  PARTNERSHIP "0..*" --> "1" AUTHOR : author
+  PARTNERSHIP "0..*" --> "1" TEAM : collaborator
+  POST "0..*" --> "1" AUTHOR : author
+  POST "0..*" --> "0..*" LABEL : labels
+  PROFILE "0..1" --> "1" AUTHOR : author
+  TEAM "0..*" --> "0..*" AUTHOR : authors

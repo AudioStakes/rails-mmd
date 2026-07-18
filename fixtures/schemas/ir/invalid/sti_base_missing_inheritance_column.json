@@ -1,0 +1,18 @@
+{
+  "schema_version": 3,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/vehicles",
+      "ruby_constant": "Vehicle",
+      "table_name": "vehicles",
+      "attributes": [],
+      "metadata": {
+        "kind": "sti_base"
+      }
+    }
+  ],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

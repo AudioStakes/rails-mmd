@@ -93,8 +93,11 @@ module RailsMatrix
   end
 
   # Verifies the user-visible files emitted by a real matrix application.
+  # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength
   class ArtifactValidator
     ARTIFACT_KINDS = %w[er class].freeze
+    STI_ENTITY_KEYS = %w[entity_id entity_kind label safe_token].freeze
+    INHERITANCE_KEYS = %w[inheritance_id parent_entity_id child_entity_id parent_safe_token child_safe_token].freeze
 
     def initialize(schema_validator: RailsMmd::SchemaValidator.new,
                    mermaid_serializer: RailsMmd::MermaidSerializer.new)
@@ -105,12 +108,23 @@ module RailsMatrix
     def validate(app_root, pair)
       output = app_root.join('tmp/rails_mmd')
       plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
+      validate_expected_mermaid(app_root, output.join('core.er.mmd'), 'ER', 'rails_mmd_expected_core_er.mmd', pair)
+      validate_expected_mermaid(
+        app_root,
+        output.join('core.class.mmd'),
+        'class',
+        'rails_mmd_expected_core_class.mmd',
+        pair
+      )
       diagnostics = output.glob('*.diagnostics.json').flat_map do |path|
         validate_json(path, pair, :diagnostics).fetch('diagnostics')
       end
       validate_expected_diagnostics(app_root, diagnostics, pair)
       validate_expected_relationships(app_root, plans.fetch('er').fetch('relationships'), pair)
       validate_expected_polymorphic_groups(app_root, plans.fetch('er'), pair)
+      validate_expected_sti_entities(app_root, plans.fetch('class'), pair)
+      validate_expected_inheritances(app_root, plans.fetch('class').fetch('inheritances'), pair)
+      validate_expected_sti_runtime(app_root, output.join('sti_runtime.json'), pair)
     end
 
     private
@@ -142,12 +156,19 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} published invalid #{path.basename}: #{e.message}"
     end
 
+    def validate_expected_mermaid(app_root, actual_path, label, expected_name, pair)
+      expected_path = app_root.join(expected_name)
+      expected = expected_path.read
+      return if actual_path.read == expected
+
+      raise VerificationError, "#{pair.name} #{label} Mermaid did not match expectation"
+    rescue Errno::ENOENT => e
+      raise VerificationError, "#{pair.name} missing expected #{expected_name}: #{e.message}"
+    end
+
     def validate_expected_diagnostics(app_root, diagnostics, pair)
-      expected = JSON.parse(app_root.join('rails_mmd_expected_diagnostics.json').read)
-      expected_codes = expected.map { |diagnostic| diagnostic.fetch('code') }.uniq
-      actual = diagnostics
-               .select { |diagnostic| expected_codes.include?(diagnostic.fetch('code')) }
-               .map { |diagnostic| diagnostic_projection(diagnostic) }
+      expected = read_expected_json(app_root, 'rails_mmd_expected_diagnostics.json', pair)
+      actual = diagnostics.map { |diagnostic| diagnostic_projection(diagnostic) }
       return if actual == expected
 
       raise VerificationError,
@@ -162,7 +183,7 @@ module RailsMatrix
     end
 
     def validate_expected_relationships(app_root, relationships, pair)
-      expected = JSON.parse(app_root.join('rails_mmd_expected_relationships.json').read)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_relationships.json', pair)
       actual = relationships.map { |relationship| relationship_projection(relationship) }
       return if actual == expected
 
@@ -181,7 +202,7 @@ module RailsMatrix
     end
 
     def validate_expected_polymorphic_groups(app_root, render_plan, pair)
-      expected = JSON.parse(app_root.join('rails_mmd_expected_polymorphic_groups.json').read)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_polymorphic_groups.json', pair)
       actual = PolymorphicGroupProjector.call(render_plan)
       return if actual == expected
 
@@ -189,9 +210,55 @@ module RailsMatrix
             "#{pair.name} polymorphic groups did not match expectation\n" \
             "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
     end
+
+    def validate_expected_sti_entities(app_root, render_plan, pair)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_sti_entities.json', pair)
+      actual = render_plan.fetch('entities')
+                          .select { |entity| entity.fetch('entity_kind') == 'sti_subtype' }
+                          .map { |entity| projection(entity, STI_ENTITY_KEYS) }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} STI entities did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+
+    def validate_expected_inheritances(app_root, inheritances, pair)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_inheritances.json', pair)
+      actual = inheritances.map { |inheritance| projection(inheritance, INHERITANCE_KEYS) }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} inheritances did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+
+    def validate_expected_sti_runtime(app_root, actual_path, pair)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_sti_runtime.json', pair)
+      actual = JSON.parse(actual_path.read)
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} STI runtime did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    rescue Errno::ENOENT, JSON::ParserError => e
+      raise VerificationError, "#{pair.name} published invalid #{actual_path.basename}: #{e.message}"
+    end
+
+    def projection(payload, keys)
+      keys.to_h { |key| [key, payload.fetch(key)] }
+    end
+
+    def read_expected_json(app_root, expected_name, pair)
+      JSON.parse(app_root.join(expected_name).read)
+    rescue Errno::ENOENT, JSON::ParserError => e
+      raise VerificationError, "#{pair.name} missing or invalid expected #{expected_name}: #{e.message}"
+    end
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength
 
   # Orchestrates the repository-only Rails compatibility verification command.
+  # rubocop:disable Metrics/MethodLength
   class Runner
     def initialize(root: Pathname(__dir__).join('..').expand_path)
       @root = root
@@ -259,6 +326,7 @@ module RailsMatrix
         prepare_app(app_root, pair)
         install_bundle(app_root, pair)
         run_bundle(app_root, pair, %w[exec ruby bin/rails db:schema:load])
+        run_bundle(app_root, pair, %w[exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb])
         run_bundle(app_root, pair, %w[exec rails-mmd generate])
         artifact_validator.validate(app_root, pair)
       end
@@ -310,4 +378,5 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} failed (exit #{status.exitstatus}): #{operation}\n#{detail}"
     end
   end
+  # rubocop:enable Metrics/MethodLength
 end

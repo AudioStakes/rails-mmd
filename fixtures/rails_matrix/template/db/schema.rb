@@ -100,5 +100,41 @@ ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
   create_table 'employees', force: :cascade do |t|
     t.integer 'manager_id'
   end
+
+  create_table 'vehicles', force: :cascade do |t|
+    t.string 'type'
+    t.string 'name', null: false
+  end
+
+  create_table 'electric_vehicles', force: :cascade do |t|
+    t.string 'type'
+    t.string 'name', null: false
+  end
+
+  create_table 'messages', force: :cascade do |t|
+    t.string 'kind'
+    t.string 'subject', null: false
+  end
+
+  create_table 'animals', force: :cascade do |t|
+    t.string 'type'
+    t.string 'name', null: false
+  end
+
+  create_table 'devices', force: :cascade do |t|
+    t.string 'type'
+    t.string 'name', null: false
+  end
+
+  create_table 'appliances', force: :cascade do |t|
+    t.string 'name', null: false
+  end
+
+  create_table 'spoilers', force: :cascade do |t|
+    t.integer 'vehicle_id', null: false
+    t.index ['vehicle_id'], name: 'index_spoilers_on_vehicle_id'
+  end
+
+  add_foreign_key 'spoilers', 'vehicles', column: 'vehicle_id'
 end
 # rubocop:enable Metrics/BlockLength

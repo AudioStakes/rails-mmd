@@ -259,8 +259,10 @@ The shared real app adds loaded families for every declared Rails/Ruby pair:
 
 - default discriminator: base, direct child, and grandchild;
 - custom `inheritance_column`;
-- an abstract intermediate whose concrete descendant attaches to the nearest
-  visible concrete ancestor;
+- an abstract boundary whose following concrete class has a new `base_class`
+  and therefore does not attach to the earlier selected family; both the
+  earlier base and the post-boundary concrete base are selected, and the latter
+  has its own concrete STI child in the exact oracles;
 - namespaced concrete types with equal demodulized `sti_name` values;
 - Ruby inheritance with STI disabled; and
 - Ruby inheritance where the physical table has no effective discriminator.
@@ -269,11 +271,16 @@ Subtype-only associations are declared in a fixture family and must not appear
 in the association oracle.
 
 The matrix task gains checked-in exact STI projections from the class render
-plan:
+plan plus a fixture-owned Rails runtime oracle. The runtime probe is matrix-only
+instrumentation; it does not publish IR or put STI metadata back into the
+renderer contract:
 
-- `rails_mmd_expected_sti_entities.json` compares subtype IDs, base/parent IDs,
-  constants, table, discriminator column, and exact `sti_name`;
+- `rails_mmd_expected_sti_entities.json` compares projected subtype entity IDs,
+  kinds, fully qualified labels, and safe tokens;
 - `rails_mmd_expected_inheritances.json` compares inheritance IDs and endpoints;
+- `rails_mmd_expected_sti_runtime.json` compares the loaded classes' exact
+  `base_class`, table, effective `inheritance_column`, `sti_name`, abstract flag,
+  and `descends_from_active_record?` value as observed inside each real app;
 - `rails_mmd_expected_core_class.mmd` compares the complete class artifact,
   including fully qualified labels, inheritance order, and unchanged
   associations; and
@@ -282,7 +289,9 @@ plan:
 
 The Mermaid files are independent checked-in oracles, not text regenerated from
 the render plan under test. The matrix retains its existing self-consistency
-check in addition to these exact comparisons.
+check in addition to these exact comparisons. Before artifact validation, the
+runner executes a checked-in fixture script under the pair's Rails environment
+to write the actual runtime STI projection for comparison.
 
 Matrix integration TDD starts with four explicit red cases: missing class
 oracle, missing ER oracle, mismatched class oracle, and mismatched ER oracle.
@@ -302,7 +311,7 @@ assert a new private helper.
    multi-level true STI family; implement `inventory_records:` and normalized
    `StiSubtype` output.
 2. **Normalization boundaries** — red examples for custom column/name,
-   namespace collisions, abstract intermediates, disabled/no-column false
+   namespace collisions, abstract boundaries, disabled/no-column false
    positives, unreadable metadata, and deterministic ordering; complete only
    the safe runtime classifier.
 3. **IR v3** — red builder and fixture-backed schema examples for non-STI,
@@ -372,10 +381,13 @@ Tests and real app:
 - `spec/contracts/schema_spec.rb` and v3 fixtures
 - `fixtures/rails_matrix/template/app/models/**`
 - `fixtures/rails_matrix/template/db/schema.rb`
+- `fixtures/rails_matrix/template/rails_mmd.yml`
 - `fixtures/rails_matrix/template/rails_mmd_expected_sti_entities.json`
 - `fixtures/rails_matrix/template/rails_mmd_expected_inheritances.json`
+- `fixtures/rails_matrix/template/rails_mmd_expected_sti_runtime.json`
 - `fixtures/rails_matrix/template/rails_mmd_expected_core_class.mmd`
 - `fixtures/rails_matrix/template/rails_mmd_expected_core_er.mmd`
+- `fixtures/rails_matrix/template/script/rails_mmd_sti_runtime_oracle.rb`
 - `tooling/rails_matrix.rb`
 - `spec/integration/rails_matrix_task_spec.rb`
 
