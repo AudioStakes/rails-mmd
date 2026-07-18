@@ -30,7 +30,7 @@ Status: TDD implementation reviewed and verified
 - Exact Rails matrix: 3/3 declared Ruby/Rails pairs passed.
 - Default Rake gate: RuboCop inspected 82 files with no offenses; RSpec,
   bundler-audit, Undercover, and all matrix pairs passed.
-- Repository hooks are pending the final reviewed snapshot.
+- Repository pre-commit and pre-push hooks passed on the reviewed branch.
 
 ## Implementation review record
 
