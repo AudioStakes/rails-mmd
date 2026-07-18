@@ -461,10 +461,8 @@ RSpec.describe RailsMmd::SchemaProbe do
 
   def owner_model(*reflections)
     Class.new do
-      define_singleton_method(:reflect_on_all_associations) do |macro|
-        raise 'only belongs_to should be requested' unless macro == :belongs_to
-
-        reflections
+      define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+        macro ? reflections.select { |reflection| reflection.macro == macro } : reflections
       end
     end
   end

@@ -80,6 +80,7 @@
         "ASSOCIATION_KEY_COLUMN_MISSING",
         "ASSOCIATION_NON_PRIMARY_KEY_OMITTED",
         "ASSOCIATION_NAME_UNSUPPORTED_OMITTED",
+        "ASSOCIATION_MACRO_OMITTED",
         "DOMAIN_RELATIONSHIP_OMITTED",
         "DB_METADATA_DEGRADED",
         "SAFE_TOKEN_COLLISION",
@@ -124,6 +125,7 @@
         { "$ref": "#/$defs/metadata_for_association_key_column_missing" },
         { "$ref": "#/$defs/metadata_for_association_non_primary_key_omitted" },
         { "$ref": "#/$defs/metadata_for_association_name_unsupported_omitted" },
+        { "$ref": "#/$defs/metadata_for_association_macro_omitted" },
         { "$ref": "#/$defs/metadata_for_domain_relationship_omitted" },
         { "$ref": "#/$defs/metadata_for_db_metadata_degraded" },
         { "$ref": "#/$defs/metadata_for_safe_token_collision" },
@@ -295,6 +297,17 @@
         "target_constant": { "$ref": "#/$defs/ruby_constant" }
       }
     },
+    "metadata_shape_association_macro": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "owner_constant", "association_name", "association_macro"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "owner_constant": { "$ref": "#/$defs/ruby_constant" },
+        "association_name": { "$ref": "#/$defs/sanitized_string" },
+        "association_macro": { "$ref": "#/$defs/structured_id" }
+      }
+    },
     "metadata_shape_db_metadata_degraded": {
       "type": "object",
       "additionalProperties": false,
@@ -367,6 +380,7 @@
     "metadata_for_association_key_column_missing": { "if": { "properties": { "code": { "const": "ASSOCIATION_KEY_COLUMN_MISSING" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_non_primary_key_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_NON_PRIMARY_KEY_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_name_unsupported_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_NAME_UNSUPPORTED_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_macro_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_MACRO_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association_macro" } } } },
     "metadata_for_domain_relationship_omitted": { "if": { "properties": { "code": { "const": "DOMAIN_RELATIONSHIP_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_db_metadata_degraded": { "if": { "properties": { "code": { "const": "DB_METADATA_DEGRADED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_db_metadata_degraded" } } } },
     "metadata_for_safe_token_collision": { "if": { "properties": { "code": { "const": "SAFE_TOKEN_COLLISION" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_safe_token_collision" } } } },

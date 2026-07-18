@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "core",
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_macro_extra",
+      "code": "ASSOCIATION_MACRO_OMITTED",
+      "severity": "warning",
+      "phase": "relationship_build",
+      "scope": "relationship",
+      "subject_id": "authors.posts",
+      "message": "association omitted",
+      "metadata": {
+        "domain_id": "core",
+        "owner_constant": "Author",
+        "association_name": "posts",
+        "association_macro": "has_many",
+        "target_constant": "Post"
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

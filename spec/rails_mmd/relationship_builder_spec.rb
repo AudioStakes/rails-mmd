@@ -9,11 +9,7 @@ require 'rails_mmd/schema_validator'
 # rubocop:disable Lint/ConstantDefinitionInBlock, Metrics/ParameterLists, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::RelationshipBuilder do
   it 'builds eligible belongs_to relationships with conservative cardinality evidence' do
-    user_model = owner_model(
-      belongs_to('account'),
-      ignored_reflection(:has_many),
-      ignored_reflection(:has_one)
-    )
+    user_model = owner_model(belongs_to('account'))
     account_model = renderable_model('Account', 'accounts')
     domain = domain_result(
       'core',
@@ -43,14 +39,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationship.target_cardinality).to eq('1..1')
   end
 
-  it 'ignores non-belongs_to associations without diagnostics' do
-    user_model = Class.new do
-      def self.reflect_on_all_associations(macro)
-        raise 'non-belongs_to associations should not be scanned' unless macro == :belongs_to
-
-        []
-      end
-    end
+  it 'handles owner models without associations' do
+    user_model = owner_model
     domain = domain_result('core', [entity('User', 'users')])
 
     result = build(domain, 'User' => user_model)
@@ -83,7 +73,31 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     ).build(domains: [domain])
 
     expect(result.domains.first.relationships.map(&:association_name)).to eq(['account'])
-    expect(result.diagnostics).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_MACRO_OMITTED']
+    )
+  end
+
+  it 'reports every non-belongs-to macro without resolving its target' do
+    owner = owner_model(
+      association('profile', :has_one),
+      association('posts', :has_many),
+      association('tags', :has_and_belongs_to_many)
+    )
+    domain = domain_result('core', [entity('Author', 'authors')])
+
+    result = build(domain, 'Author' => owner)
+
+    expect(result.domains.first.relationships).to eq([])
+    projected = result.diagnostics.map do |diagnostic|
+      [diagnostic.fetch('subject_id'), diagnostic.fetch('code'), diagnostic.dig('metadata', 'association_macro')]
+    end
+    expect(projected).to contain_exactly(
+      ['authors.profile', 'ASSOCIATION_MACRO_OMITTED', 'has_one'],
+      ['authors.posts', 'ASSOCIATION_MACRO_OMITTED', 'has_many'],
+      ['authors.tags', 'ASSOCIATION_MACRO_OMITTED', 'has_and_belongs_to_many']
+    )
+    expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
   end
 
   it 'omits ineligible belongs_to reflections with schema-valid diagnostics' do
@@ -251,10 +265,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
   def owner_model(*reflections)
     Class.new do
-      define_singleton_method(:reflect_on_all_associations) do |macro|
-        raise 'only belongs_to should be requested' unless macro == :belongs_to
-
-        reflections.select { |reflection| reflection.macro == :belongs_to }
+      define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+        macro ? reflections.select { |reflection| reflection.macro == macro } : reflections
       end
     end
   end
@@ -274,6 +286,10 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
   def ignored_reflection(macro)
     Reflection.new(macro.to_s, macro, {})
+  end
+
+  def association(name, macro)
+    Reflection.new(name, macro, {})
   end
 
   def simple_reflection(name)

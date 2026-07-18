@@ -62,8 +62,8 @@ module RailsMmd
         owner_model = resolve_model(owner.ruby_constant)
         next unless owner_model
 
-        belongs_to_reflections(owner_model).each do |reflection|
-          relationship, diagnostic = build_reflection(context, owner, reflection)
+        association_reflections(owner_model).each do |reflection|
+          relationship, diagnostic = classify_reflection(context, owner, reflection)
           relationships << relationship if relationship
           output_diagnostics << diagnostic if diagnostic
         end
@@ -76,14 +76,32 @@ module RailsMmd
       )
     end
 
-    def belongs_to_reflections(model)
+    def association_reflections(model)
       if model.respond_to?(:reflect_on_all_associations)
-        Array(model.reflect_on_all_associations(:belongs_to))
+        Array(model.reflect_on_all_associations)
       elsif model.respond_to?(:reflections)
-        model.reflections.values.select { |reflection| reflection_macro(reflection) == :belongs_to }
+        model.reflections.values
       else
         []
       end
+    end
+
+    def classify_reflection(context, owner, reflection)
+      return build_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
+
+      [nil, omitted_macro(context, owner, reflection)]
+    end
+
+    def omitted_macro(context, owner, reflection)
+      association_name = reflection_name(reflection)
+      diagnostics.build(
+        code: 'ASSOCIATION_MACRO_OMITTED',
+        message: omission_message(owner, association_name, 'ASSOCIATION_MACRO_OMITTED'),
+        subject_id: "#{owner.table_name}.#{safe_subject_association(association_name)}",
+        metadata: association_metadata(context.domain_id, owner, association_name, nil).merge(
+          association_macro: reflection_macro(reflection).to_s
+        )
+      )
     end
 
     def build_reflection(context, owner, reflection)
