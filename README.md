@@ -76,6 +76,11 @@ new required render-plan members and closed entity variants before consuming v3
 IR or render plans. Association relationship objects retain their v2 shape.
 Mermaid artifact filenames are unchanged.
 
+P2 `delegated_type` support does not change the public schema version. Selecting
+a delegator may add its declared, renderable concrete delegate tables to the
+same domain as target-only nodes. Explicit exclusions and ownership by another
+configured domain still win, and no unrelated associations are expanded.
+
 ## Serena Setup
 
 Local setup for Codex and Serena MCP is documented in

@@ -1,0 +1,29 @@
+[
+  {
+    "relationship_id": "relationships/delegated_type_same_leaf_namespace_holders/polymorphic/same_leaf_reference/same_leaf_reference_id/same_leaf_reference_type/delegated_type_namespaced_a_same_leaf_targets",
+    "owner_safe_token": "DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER",
+    "target_safe_token": "DELEGATED_TYPE_NAMESPACE_A_SAME_LEAF_TARGET",
+    "label": "same_leaf_reference",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1",
+    "metadata": {
+      "scoped": true
+    }
+  },
+  {
+    "relationship_id": "relationships/delegated_type_same_leaf_namespace_holders/polymorphic/same_leaf_reference/same_leaf_reference_id/same_leaf_reference_type/delegated_type_namespaced_b_same_leaf_targets",
+    "owner_safe_token": "DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER",
+    "target_safe_token": "DELEGATED_TYPE_NAMESPACE_B_SAME_LEAF_TARGET",
+    "label": "same_leaf_reference",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/delegated_type_same_leaf_namespace_holders/polymorphic/same_leaf_reference/same_leaf_reference_id/same_leaf_reference_type/delegated_type_sti_records",
+    "owner_safe_token": "DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER",
+    "target_safe_token": "DELEGATED_TYPE_STI_BASE",
+    "label": "same_leaf_reference",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  }
+]

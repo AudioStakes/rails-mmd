@@ -594,6 +594,266 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'publishes delegated whitelist targets without inverse discovery authority' do
+    entry_model = renderable_model('Entry', 'entries')
+    image_inverse = association(
+      'entry', :has_one, klass: entry_model, as: :entryable,
+                         foreign_key: 'entryable_id', type: 'entryable_type',
+                         scope: -> { raise 'scope executed' }
+    )
+    undeclared_inverse = association(
+      'entries',
+      :has_many,
+      klass: entry_model,
+      as: :entryable,
+      foreign_key: 'entryable_id',
+      type: 'entryable_type'
+    )
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)]),
+       entity('Post', 'posts'),
+       entity('Image', 'images'),
+       entity('Video', 'videos')],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries',
+          owner_ruby_constant: 'Entry',
+          association_name: 'entryable',
+          foreign_key: 'entryable_id',
+          foreign_type: 'entryable_type',
+          targets: [
+            delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected),
+            delegated_type_target(ruby_constant: 'Image', entity_id: 'entities/images', status: :selected),
+            delegated_type_target(ruby_constant: 'MissingEntryable', status: :unresolved,
+                                  diagnostic_code: 'ASSOCIATION_TARGET_UNRESOLVED')
+          ]
+        )
+      ]
+    )
+
+    result = build(
+      domain,
+      'Entry' => owner_model(belongs_to('entryable', polymorphic: true)),
+      'Post' => owner_model,
+      'Image' => owner_model(image_inverse),
+      'Video' => owner_model(undeclared_inverse)
+    )
+
+    polymorphic_relationships = result.domains.first.relationships.select do |relationship|
+      relationship.relationship_kind == :polymorphic
+    end
+    relationships = polymorphic_relationships.to_h { |relationship| [relationship.target_entity_id, relationship] }
+
+    expect(relationships.keys).to eq(%w[entities/images entities/posts])
+    expect(relationships.fetch('entities/posts')).to have_attributes(
+      relationship_id: 'relationships/entries/polymorphic/entryable/entryable_id/entryable_type/posts',
+      owner_cardinality: '0..many',
+      target_cardinality: '0..1',
+      metadata: nil
+    )
+    expect(relationships.fetch('entities/images')).to have_attributes(
+      relationship_id: 'relationships/entries/polymorphic/entryable/entryable_id/entryable_type/images',
+      owner_cardinality: '0..1',
+      target_cardinality: '0..1',
+      metadata: { scoped: true }
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_TARGET_UNRESOLVED ASSOCIATION_POLYMORPHIC_OMITTED]
+    )
+  end
+
+  it 'keeps declared delegated edges while diagnosing invalid inverses in family order' do
+    entry_model = renderable_model('Entry', 'entries')
+    wrong_owner = renderable_model('OtherEntry', 'other_entries')
+    wrong_inverse = association(
+      'entries', :has_many, klass: wrong_owner, as: :entryable,
+                            foreign_key: 'entryable_id', type: 'entryable_type'
+    )
+    unresolved_inverse = association(
+      'entries', :has_many, class_name: 'MissingEntry', as: :entryable,
+                            foreign_key: 'entryable_id', type: 'entryable_type'
+    )
+    mismatched_keys_inverse = association(
+      'entries', :has_many, klass: entry_model, as: :entryable,
+                            foreign_key: 'wrong_id', type: 'entryable_type'
+    )
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)]),
+       entity('Image', 'images'), entity('Post', 'posts'), entity('Video', 'videos')],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+          foreign_key: 'entryable_id', foreign_type: 'entryable_type',
+          targets: [
+            delegated_type_target(ruby_constant: 'Image', entity_id: 'entities/images', status: :selected),
+            delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected),
+            delegated_type_target(ruby_constant: 'Video', entity_id: 'entities/videos', status: :selected)
+          ]
+        )
+      ]
+    )
+
+    result = build(
+      domain,
+      'Entry' => owner_model(belongs_to('entryable', polymorphic: true)),
+      'Image' => owner_model(wrong_inverse),
+      'Post' => owner_model(unresolved_inverse),
+      'Video' => owner_model(mismatched_keys_inverse)
+    )
+
+    expect(result.domains.first.relationships.map(&:target_entity_id)).to eq(
+      %w[entities/images entities/posts entities/videos]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_POLYMORPHIC_OMITTED ASSOCIATION_TARGET_UNRESOLVED ASSOCIATION_POLYMORPHIC_OMITTED]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('subject_id') }).to eq(
+      %w[images.entries posts.entries videos.entries]
+    )
+  end
+
+  it 'emits only the structural root diagnostic for an ineligible delegated family' do
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)])],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+          foreign_key: 'entryable_id', foreign_type: 'entryable_type',
+          root_diagnostic_code: 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED',
+          targets: [
+            delegated_type_target(
+              ruby_constant: 'Missing', status: :unresolved,
+              diagnostic_code: 'ASSOCIATION_TARGET_UNRESOLVED'
+            )
+          ]
+        )
+      ]
+    )
+
+    result = build(domain, 'Entry' => owner_model(belongs_to('entryable', polymorphic: true)))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_NON_PRIMARY_KEY_OMITTED']
+    )
+  end
+
+  it 'fences delegated-expanded entities out of ordinary owner inventory' do
+    entry_model = renderable_model('Entry', 'entries')
+    message_inverse = association(
+      'entries', :has_many, klass: entry_model, as: :entryable,
+                            foreign_key: 'entryable_id', type: 'entryable_type', scope: -> { raise 'scope executed' }
+    )
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)]),
+       entity('Message', 'messages', columns: [column('id', false), column('author_id', true)],
+                                     selection_origin: :delegated_type_expanded),
+       entity('Author', 'authors')],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries',
+          owner_ruby_constant: 'Entry',
+          association_name: 'entryable',
+          foreign_key: 'entryable_id',
+          foreign_type: 'entryable_type',
+          targets: [
+            delegated_type_target(ruby_constant: 'Message', entity_id: 'entities/messages', status: :expanded)
+          ]
+        )
+      ]
+    )
+
+    result = build(
+      domain,
+      'Entry' => owner_model(belongs_to('entryable', polymorphic: true)),
+      'Message' => owner_model(
+        belongs_to('author', klass: renderable_model('Author', 'authors')),
+        message_inverse
+      ),
+      'Author' => owner_model
+    )
+
+    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(
+      ['relationships/entries/polymorphic/entryable/entryable_id/entryable_type/messages']
+    )
+    expect(result.domains.first.relationships.first.metadata).to eq(scoped: true)
+    expect(result.diagnostics).to eq([])
+  end
+
+  it 'contains unreadable delegated family and target metadata' do
+    root = belongs_to('entryable', polymorphic: true)
+    entry = entity(
+      'Entry', 'entries',
+      columns: [column('id', false), column('entryable_id', false), column('entryable_type', false)]
+    )
+    unreadable_domain = domain_result('core', [entry])
+    unreadable_domain.define_singleton_method(:delegated_type_families) { raise 'families unavailable' }
+
+    unreadable_family = delegated_type_family(
+      owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+      foreign_key: 'entryable_id', foreign_type: 'entryable_type', targets: []
+    )
+    unreadable_family.define_singleton_method(:targets) { raise 'targets unavailable' }
+    family_domain = domain_result('core', [entry], delegated_type_families: [unreadable_family])
+
+    results = [unreadable_domain, family_domain].map do |domain|
+      build(domain, 'Entry' => owner_model(root))
+    end
+
+    expect(results.map { |result| result.domains.first.relationships }).to eq([[], []])
+    expect(results.map { |result| result.diagnostics.first.fetch('code') }).to eq(
+      %w[ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'emits delegated target diagnostics in declared order followed by one root warning' do
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)])],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries',
+          owner_ruby_constant: 'Entry',
+          association_name: 'entryable',
+          foreign_key: 'entryable_id',
+          foreign_type: 'entryable_type',
+          targets: [
+            delegated_type_target(ruby_constant: 'MissingEntryable', status: :unresolved,
+                                  diagnostic_code: 'ASSOCIATION_TARGET_UNRESOLVED'),
+            delegated_type_target(ruby_constant: 'ElsewhereEntryable', status: :other_domain,
+                                  diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED'),
+            delegated_type_target(ruby_constant: 'HiddenEntryable', status: :not_renderable,
+                                  diagnostic_code: 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
+          ]
+        )
+      ]
+    )
+
+    result = build(domain, 'Entry' => owner_model(belongs_to('entryable', polymorphic: true)))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[
+        ASSOCIATION_TARGET_UNRESOLVED
+        DOMAIN_RELATIONSHIP_OMITTED
+        ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED
+        ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED
+      ]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'target_constant') }).to eq(
+      ['MissingEntryable', 'ElsewhereEntryable', 'HiddenEntryable', nil]
+    )
+  end
+
   it 'builds an inferred-source has-many-through semantic edge beside direct physical edges' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
@@ -1216,15 +1476,44 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     described_class.new(model_resolver: ->(name) { models.fetch(name) }).build(domains: [domain])
   end
 
-  def domain_result(domain_id, entities, join_tables: [])
+  DelegatedTypeFamily = Struct.new(
+    :owner_entity_id,
+    :owner_ruby_constant,
+    :association_name,
+    :foreign_key,
+    :foreign_type,
+    :scoped,
+    :root_diagnostic_code,
+    :targets,
+    keyword_init: true
+  )
+  DelegatedTypeTarget = Struct.new(
+    :ruby_constant,
+    :entity_id,
+    :status,
+    :diagnostic_code,
+    keyword_init: true
+  )
+
+  def domain_result(domain_id, entities, join_tables: [], delegated_type_families: [])
     RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: domain_id, entities: entities, join_tables: join_tables, diagnostics: []
-    )
+    ).tap do |result|
+      next if delegated_type_families.empty?
+
+      result.define_singleton_method(:delegated_type_families) { delegated_type_families }
+    end
   end
 
   def entity(ruby_constant, table_name, columns: [column('id', false)], primary_key: 'id', foreign_keys: [],
-             indexes: [])
-    RailsMmd::SchemaProbe::Entity.new(
+             indexes: [], selection_origin: nil)
+    attributes = entity_attributes(ruby_constant:, table_name:, columns:, primary_key:, foreign_keys:, indexes:)
+
+    decorate_entity_selection_origin(RailsMmd::SchemaProbe::Entity.new(**attributes), selection_origin)
+  end
+
+  def entity_attributes(ruby_constant:, table_name:, columns:, primary_key:, foreign_keys:, indexes:)
+    {
       ruby_constant: ruby_constant,
       table_name: table_name,
       connection_context_id: '{"name":"primary"}',
@@ -1232,7 +1521,23 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       primary_key: primary_key,
       foreign_keys: foreign_keys,
       indexes: indexes
-    )
+    }
+  end
+
+  def decorate_entity_selection_origin(result, selection_origin)
+    result.tap do
+      next if selection_origin.nil?
+
+      result.define_singleton_method(:selection_origin) { selection_origin }
+    end
+  end
+
+  def delegated_type_family(**attributes)
+    DelegatedTypeFamily.new(**attributes)
+  end
+
+  def delegated_type_target(**attributes)
+    DelegatedTypeTarget.new(**attributes)
   end
 
   def column(name, nullable)

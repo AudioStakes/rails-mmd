@@ -1,0 +1,113 @@
+[
+  {
+    "code": "ASSOCIATION_POLYMORPHIC_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "delegated_type_undeclared_inverse_targets.delegated_type_same_leaf_namespace_holders",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "DelegatedTypeUndeclaredInverseTarget",
+      "association_name": "delegated_type_same_leaf_namespace_holders"
+    }
+  },
+  {
+    "code": "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "delegated_type_same_leaf_namespace_holders.same_leaf_reference",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "DelegatedTypeSameLeafNamespaceHolder",
+      "association_name": "same_leaf_reference",
+      "target_constant": "DelegatedTypeStiLeaf"
+    }
+  },
+  {
+    "code": "DOMAIN_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "delegated_type_same_leaf_namespace_holders.same_leaf_reference",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "DelegatedTypeSameLeafNamespaceHolder",
+      "association_name": "same_leaf_reference",
+      "target_constant": "DelegatedTypeSecondDomainTarget"
+    }
+  },
+  {
+    "code": "DOMAIN_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "delegated_type_same_leaf_namespace_holders.same_leaf_reference",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "DelegatedTypeSameLeafNamespaceHolder",
+      "association_name": "same_leaf_reference",
+      "target_constant": "DelegatedTypeExcludedTarget"
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 5,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:SAME_LEAF_REFERENCE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "SAME_LEAF_REFERENCE",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 5,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:SAME_LEAF_REFERENCE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "SAME_LEAF_REFERENCE",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  }
+]

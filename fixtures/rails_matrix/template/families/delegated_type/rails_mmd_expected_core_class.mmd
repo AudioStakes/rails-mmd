@@ -1,0 +1,24 @@
+classDiagram
+  direction LR
+  class DELEGATED_TYPE_NAMESPACE_A_SAME_LEAF_TARGET {
+    +integer id
+  }
+  class DELEGATED_TYPE_NAMESPACE_B_SAME_LEAF_TARGET {
+    +integer id
+  }
+  class DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER {
+    +integer id
+    +integer same_leaf_reference_id
+    +string same_leaf_reference_type
+  }
+  class DELEGATED_TYPE_STI_BASE {
+    +integer id
+  }
+  class DELEGATED_TYPE_STI_LEAF["DelegatedTypeStiLeaf"]
+  class DELEGATED_TYPE_UNDECLARED_INVERSE_TARGET {
+    +integer id
+  }
+  DELEGATED_TYPE_STI_BASE <|-- DELEGATED_TYPE_STI_LEAF
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER "0..*" --> "0..1" DELEGATED_TYPE_NAMESPACE_A_SAME_LEAF_TARGET : same_leaf_reference
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER "0..*" --> "0..1" DELEGATED_TYPE_NAMESPACE_B_SAME_LEAF_TARGET : same_leaf_reference
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER "0..*" --> "0..1" DELEGATED_TYPE_STI_BASE : same_leaf_reference

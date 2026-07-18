@@ -47,12 +47,40 @@ module RailsMmd
 
       def entities = domain.entities
 
+      def owner_entities
+        @owner_entities ||= entities.reject do |entity|
+          selection_origin = safe_value(entity, :selection_origin)
+          selection_origin == :delegated_type_expanded
+        end
+      end
+
       def join_table_by_name
         @join_table_by_name ||= Array(domain.join_tables).to_h { |table| [table.table_name, table] }
       end
 
       def entity_by_constant
         @entity_by_constant ||= entities.to_h { |entity| [entity.ruby_constant, entity] }
+      end
+
+      def entity_by_id
+        @entity_by_id ||= entities.to_h { |entity| ["entities/#{entity.table_name}", entity] }
+      end
+
+      def delegated_type_families
+        @delegated_type_families ||= begin
+          families = safe_value(domain, :delegated_type_families)
+          Array(families)
+        end
+      end
+
+      private
+
+      def safe_value(object, method_name)
+        return unless object.respond_to?(method_name)
+
+        object.public_send(method_name)
+      rescue LoadError, SyntaxError, StandardError
+        nil
       end
     end
 
@@ -99,7 +127,7 @@ module RailsMmd
     end
 
     def reflection_entries(context)
-      context.entities.flat_map do |owner|
+      context.owner_entities.flat_map do |owner|
         owner_model = resolve_model(owner.ruby_constant)
         next [] unless owner_model
 
@@ -277,6 +305,12 @@ module RailsMmd
         return polymorphic_failure(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED')
       end
 
+      family = delegated_type_family(context, owner, sanitized_name)
+      if family
+        root_diagnostic_code = delegated_family_root_diagnostic_code(family)
+        return polymorphic_failure(context, owner, sanitized_name, root_diagnostic_code) if root_diagnostic_code
+      end
+
       keys = polymorphic_key_columns(reflection)
       return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED') unless keys
       unless default_polymorphic_keys?(sanitized_name, keys)
@@ -286,9 +320,18 @@ module RailsMmd
         return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING')
       end
 
-      candidates, candidate_diagnostics, handled = polymorphic_candidates(
-        context, root, inverses, sanitized_name, keys
-      )
+      candidates, candidate_diagnostics, handled =
+        if family
+          delegated_polymorphic_candidates(
+            context,
+            root,
+            inverses,
+            family,
+            { association_name: sanitized_name, keys: keys }
+          )
+        else
+          polymorphic_candidates(context, root, inverses, sanitized_name, keys)
+        end
       if candidates.empty?
         candidate_diagnostics << omitted(
           context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED'
@@ -340,7 +383,123 @@ module RailsMmd
           valid << candidate
         end
       end
-      canonical = valid.group_by { |candidate| entity_id(candidate.owner) }.values.map do |duplicates|
+      canonical = canonical_polymorphic_candidates(valid)
+      [canonical, output_diagnostics, handled]
+    end
+
+    def delegated_polymorphic_candidates(context, root, inverses, family, root_details)
+      diagnostics = []
+      handled = []
+      candidates = []
+
+      delegated_family_targets(family).each do |target|
+        target_constant = delegated_target_ruby_constant(target)
+        diagnostic_code = delegated_target_diagnostic_code(target)
+        if diagnostic_code
+          diagnostics << omitted(
+            context, root.owner, root_details.fetch(:association_name), diagnostic_code, target_constant
+          ).last
+          next
+        end
+
+        target_entity = delegated_target_entity(context, target)
+        next unless target_entity
+
+        valid_inverses, target_diagnostics, target_handled = delegated_inverse_candidates(
+          context, root, inverses, root_details, target_entity
+        )
+        diagnostics.concat(target_diagnostics)
+        handled.concat(target_handled)
+
+        scoped_metadata = delegated_relationship_metadata(root.reflection, family, valid_inverses)
+        chosen_inverse = canonical_polymorphic_candidates(valid_inverses).first
+        candidates << ReflectionEntry.new(
+          owner: target_entity,
+          reflection: chosen_inverse&.reflection,
+          metadata: scoped_metadata
+        )
+      end
+
+      [candidates, diagnostics, handled]
+    end
+
+    def delegated_inverse_candidates(context, root, inverses, root_details, target_entity)
+      candidates, handled = delegated_inverse_entries(
+        inverses,
+        root_details.fetch(:association_name),
+        target_entity
+      )
+      valid = []
+      diagnostics = []
+
+      candidates.each do |candidate|
+        handled << candidate.reflection if inverses.include?(candidate)
+        target_model, resolution_diagnostic = delegated_inverse_target(context, root, candidate)
+        if resolution_diagnostic
+          diagnostics << resolution_diagnostic
+          next
+        end
+
+        diagnostic = polymorphic_candidate_diagnostic(
+          context,
+          candidate,
+          root_details.fetch(:keys),
+          target_model
+        )
+        if diagnostic
+          diagnostics << diagnostic
+        else
+          valid << candidate
+        end
+      end
+
+      [valid, diagnostics, handled]
+    end
+
+    def delegated_inverse_target(context, root, candidate)
+      target_model, target_constant = resolve_target(candidate.reflection)
+      unless target_model
+        diagnostic = omitted(
+          context, candidate.owner, reflection_name(candidate.reflection),
+          'ASSOCIATION_TARGET_UNRESOLVED', target_constant
+        ).last
+        return [nil, diagnostic]
+      end
+      return [target_model, nil] if target_constant == root.owner.ruby_constant
+
+      diagnostic = omitted(
+        context, candidate.owner, reflection_name(candidate.reflection),
+        'ASSOCIATION_POLYMORPHIC_OMITTED'
+      ).last
+      [nil, diagnostic]
+    end
+
+    def delegated_inverse_entries(inverses, association_name, target_entity)
+      explicit_entries = inverses.select do |entry|
+        entry.owner.equal?(target_entity) && inverse_interface(entry.reflection) == association_name
+      end
+      return [explicit_entries, []] unless explicit_entries.empty?
+
+      target_model = resolve_model(target_entity.ruby_constant)
+      return [[], []] unless target_model
+
+      targeted = association_reflections(target_model).filter_map do |reflection|
+        next unless polymorphic_inverse?(reflection)
+        next unless inverse_interface(reflection) == association_name
+
+        ReflectionEntry.new(owner: target_entity, reflection: reflection)
+      end
+      [targeted, []]
+    end
+
+    def delegated_relationship_metadata(root_reflection, family, valid_inverses)
+      scoped = scoped?(root_reflection) || delegated_family_scoped?(family) ||
+               valid_inverses.any? { |candidate| scoped?(candidate.reflection) }
+      { scoped: true } if scoped
+    end
+
+    def canonical_polymorphic_candidates(candidates)
+      candidates.group_by { |candidate| entity_id(candidate.owner) }.values.map do |duplicates|
         winner = duplicates.min_by do |candidate|
           [MACRO_PRIORITY.fetch(reflection_macro(candidate.reflection)), reflection_name(candidate.reflection)]
         end
@@ -348,7 +507,6 @@ module RailsMmd
           candidate.metadata = { scoped: true } if duplicates.any? { |entry| scoped?(entry.reflection) }
         end
       end
-      [canonical, output_diagnostics, handled]
     end
 
     def polymorphic_candidate_diagnostic(context, candidate, root_keys, target_model)
@@ -385,6 +543,46 @@ module RailsMmd
       reflection_options(reflection)[:as].to_s
     rescue LoadError, SyntaxError, StandardError
       ''
+    end
+
+    def delegated_type_family(context, owner, association_name)
+      context.delegated_type_families.find do |family|
+        delegated_family_owner_entity_id(family) == entity_id(owner) &&
+          delegated_family_association_name(family) == association_name
+      end
+    end
+
+    def delegated_family_targets(family)
+      Array(safe_value(family, :targets))
+    end
+
+    def delegated_family_root_diagnostic_code(family)
+      safe_value(family, :root_diagnostic_code)
+    end
+
+    def delegated_family_owner_entity_id(family)
+      safe_value(family, :owner_entity_id)
+    end
+
+    def delegated_family_association_name(family)
+      safe_value(family, :association_name)
+    end
+
+    def delegated_family_scoped?(family)
+      safe_value(family, :scoped) == true
+    end
+
+    def delegated_target_ruby_constant(target)
+      safe_value(target, :ruby_constant)
+    end
+
+    def delegated_target_diagnostic_code(target)
+      safe_value(target, :diagnostic_code)
+    end
+
+    def delegated_target_entity(context, target)
+      entity = context.entity_by_id[safe_value(target, :entity_id)]
+      entity || context.entity_by_constant[delegated_target_ruby_constant(target)]
     end
 
     def build_direct_reflection(context, owner, reflection)
@@ -833,6 +1031,14 @@ module RailsMmd
 
     def safe_reflection_value(reflection, method_name)
       reflection_value(reflection, method_name)
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def safe_value(object, method_name)
+      return unless object.respond_to?(method_name)
+
+      object.public_send(method_name)
     rescue LoadError, SyntaxError, StandardError
       nil
     end

@@ -5,7 +5,8 @@ require 'json'
 require 'open3'
 require 'tmpdir'
 
-# rubocop:disable RSpec/DescribeClass, RSpec/MultipleMemoizedHelpers, Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
+# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleMemoizedHelpers
+# rubocop:disable Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
 RSpec.describe 'the Rails compatibility matrix Rake command' do
   let(:matching_fake_app_asdf) { fake_generated_app_asdf }
 
@@ -157,6 +158,18 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     )
   end
 
+  def missing_expected_delegated_runtime_asdf
+    fake_generated_app_asdf(expected_delegated_runtime: nil)
+  end
+
+  def malformed_delegated_runtime_asdf
+    fake_generated_app_asdf(actual_delegated_runtime: '{not-json')
+  end
+
+  def mismatched_expected_delegated_runtime_asdf
+    fake_generated_app_asdf(expected_delegated_runtime: '[{"association_name":"wrong"}]')
+  end
+
   def generic_expected_relationship
     {
       relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
@@ -186,6 +199,8 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     expected_inheritances: '[]',
     expected_runtime: '[]',
     actual_runtime: '[]',
+    expected_delegated_runtime: '[]',
+    actual_delegated_runtime: '[]',
     actual_diagnostics_fixture: nil
   )
     <<~SH
@@ -195,8 +210,11 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/sti_runtime.json', actual_runtime)}          exit 0 ;;
+        *"exec ruby bin/rails runner script/rails_mmd_delegated_type_runtime_oracle.rb"*)
+          mkdir -p tmp/rails_mmd
+#{write_file_shell('tmp/rails_mmd/delegated_type_runtime.json', actual_delegated_runtime)}          exit 0 ;;
         *"exec rails-mmd generate"*)
-#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
+#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/#{actual_er_plan_fixture}" tmp/rails_mmd/core.er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{actual_class_plan_fixture}" tmp/rails_mmd/core.class.render_plan.json
 #{copy_fixture_shell('tmp/rails_mmd/core.diagnostics.json', actual_diagnostics_fixture)}
@@ -306,11 +324,11 @@ EOF
     ]
   end
 
-  def run_matrix(path: ENV.fetch('PATH'), pair: nil)
-    stdout, stderr, status = Open3.capture3(
-      { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd },
-      'bundle', 'exec', 'rake', 'verify:rails_matrix'
-    )
+  def run_matrix(path: ENV.fetch('PATH'), pair: nil, fixture_family: nil)
+    env = { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd }
+    env['RAILS_MMD_MATRIX_FIXTURE_FAMILY'] = fixture_family if fixture_family
+
+    stdout, stderr, status = Open3.capture3(env, 'bundle', 'exec', 'rake', 'verify:rails_matrix')
     { success: status.success?, stdout: stdout, stderr: stderr, output: stdout + stderr }
   end
 
@@ -345,6 +363,98 @@ EOF
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result[:output]).not_to include('Missing matrix Ruby 3.3.12')
+    end
+  end
+
+  it 'runs every configured fixture family for a selected matrix pair' do
+    with_fake_asdf(matching_fake_app_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(
+        success: true,
+        output: include(
+          'PASS ruby-4.0.6-rails-8.1 [default]',
+          'PASS ruby-4.0.6-rails-8.1 [delegated_type]'
+        )
+      )
+    end
+  end
+
+  it 'passes delegated-type fixture-family selection through to the runner' do
+    with_fake_asdf(invalid_artifact_asdf) do |path|
+      result = run_matrix(
+        path: path,
+        pair: 'ruby-4.0.6-rails-8.1',
+        fixture_family: 'delegated_type'
+      )
+
+      expect(result).to include(success: false, output: include('schema-invalid core.er.render_plan.json'))
+    end
+  end
+
+  it 'does not leak the fixture selector into the real Rails application' do
+    isolated_asdf = <<~SH
+      [ "$1" = "where" ] && exit 0
+      case "$*" in *--version*) exit 0 ;; esac
+      [ -n "$RAILS_MMD_MATRIX_FIXTURE_FAMILY" ] && exit 9
+      #{matching_fake_app_asdf}
+    SH
+
+    with_fake_asdf(isolated_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'delegated_type')
+
+      expect(result).to include(success: true)
+    end
+  end
+
+  it 'reuses the same mismatch assertions for delegated-type fixture-family oracles' do
+    with_fake_asdf(missing_expected_relationships_asdf) do |path|
+      result = run_matrix(
+        path: path,
+        pair: 'ruby-4.0.6-rails-8.1',
+        fixture_family: 'delegated_type'
+      )
+
+      expect(result).to include(success: false, output: include('relationships did not match expectation'))
+    end
+  end
+
+  it 'rejects a missing delegated-type runtime expectation' do
+    with_fake_asdf(missing_expected_delegated_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'delegated_type')
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_delegated_type_runtime.json')
+      )
+    end
+  end
+
+  it 'rejects malformed delegated-type runtime output' do
+    with_fake_asdf(malformed_delegated_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'delegated_type')
+
+      expect(result).to include(success: false, output: include('published invalid delegated_type_runtime.json'))
+    end
+  end
+
+  it 'rejects mismatched delegated-type runtime output' do
+    with_fake_asdf(mismatched_expected_delegated_runtime_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'delegated_type')
+
+      expect(result).to include(success: false, output: include('delegated type runtime did not match expectation'))
+    end
+  end
+
+  it 'rejects an unknown delegated-type fixture family name' do
+    with_fake_asdf('exit 0') do |path|
+      result = run_matrix(
+        path: path,
+        pair: 'ruby-4.0.6-rails-8.1',
+        fixture_family: 'does_not_exist'
+      )
+
+      expect(result).to include(success: false, output: include('Unknown rails matrix fixture family: does_not_exist'))
     end
   end
 
@@ -484,4 +594,5 @@ EOF
     expect(rake_prerequisites).to match(/rake default\n(?: {4}.+\n)* {4}verify:rails_matrix/)
   end
 end
-# rubocop:enable RSpec/DescribeClass, RSpec/MultipleMemoizedHelpers, Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
+# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleMemoizedHelpers
+# rubocop:enable Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation

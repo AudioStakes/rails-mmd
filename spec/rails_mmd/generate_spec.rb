@@ -47,6 +47,8 @@ RSpec.describe RailsMmd::Generate do
     expect(result.exit_code).to eq(0)
     expect(schema_probe_handoff.received.fetch(:inventory_records)).to eq(inventory_records)
     expect(schema_probe_handoff.received.fetch(:domains).map(&:domain_id)).to eq(['core'])
+    expect(schema_probe_handoff.received.fetch(:domains).map(&:excluded_ruby_constants)).to eq([[]])
+    expect(schema_probe_handoff.received.fetch(:owned_domain_ids_by_constant)).to eq('Vehicle' => ['core'])
     expect(publisher.received.fetch(:artifacts).fetch('core').keys).to eq(%w[er class])
   end
   # rubocop:enable RSpec/ExampleLength
@@ -167,7 +169,11 @@ RSpec.describe RailsMmd::Generate do
   end
 
   def domain_resolver
-    @domain_resolver ||= fake_stage(domains: [domain_result], diagnostics: [warning_diagnostic])
+    @domain_resolver ||= fake_stage(
+      domains: [domain_result],
+      diagnostics: [warning_diagnostic],
+      owned_domain_ids_by_constant: { 'Vehicle' => ['core'] }
+    )
   end
 
   def schema_probe
@@ -252,7 +258,9 @@ RSpec.describe RailsMmd::Generate do
   end
 
   def domain_result
-    Struct.new(:domain_id, :diagnostics, :records, :entities, :relationships).new('core', [], [], [], [])
+    Struct.new(:domain_id, :diagnostics, :records, :entities, :relationships, :excluded_ruby_constants).new(
+      'core', [], [], [], [], []
+    )
   end
 
   def fake_loader(result)
@@ -263,14 +271,14 @@ RSpec.describe RailsMmd::Generate do
     end.new(result)
   end
 
-  def fake_stage(domains:, diagnostics:)
-    Struct.new(:domains, :diagnostics) do
+  def fake_stage(domains:, diagnostics:, owned_domain_ids_by_constant: {})
+    Struct.new(:domains, :diagnostics, :owned_domain_ids_by_constant) do
       def resolve(**) = self
 
       def probe(**) = self
 
       def build(**) = self
-    end.new(domains, diagnostics)
+    end.new(domains, diagnostics, owned_domain_ids_by_constant)
   end
 
   def success_result(config_value, application: nil)

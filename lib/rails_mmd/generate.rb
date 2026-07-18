@@ -57,7 +57,11 @@ module RailsMmd
     def internal_payloads(config, application)
       inventory = inventory_for(application)
       resolved = domain_resolver.resolve(config: config, inventory_records: inventory.records)
-      probed = schema_probe.probe(domains: resolved.domains, inventory_records: inventory.records)
+      probed = schema_probe.probe(
+        domains: resolved.domains,
+        inventory_records: inventory.records,
+        owned_domain_ids_by_constant: resolved.owned_domain_ids_by_constant
+      )
       relationships = relationship_builder.build(domains: probed.domains)
       ir_payload = ir_builder(config).build(domains: probed.domains, relationship_domains: relationships.domains)
       [resolved, probed, relationships, ir_payload]

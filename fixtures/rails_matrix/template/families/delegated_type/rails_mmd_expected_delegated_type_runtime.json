@@ -1,0 +1,20 @@
+[
+  {
+    "ruby_constant": "DelegatedTypeSameLeafNamespaceHolder",
+    "association_name": "same_leaf_reference",
+    "macro": "belongs_to",
+    "polymorphic": true,
+    "foreign_key": "same_leaf_reference_id",
+    "foreign_type": "same_leaf_reference_type",
+    "types": [
+      "DelegatedTypeNamespaceA::SameLeafTarget",
+      "DelegatedTypeNamespaceB::SameLeafTarget",
+      "DelegatedTypeStiBase",
+      "DelegatedTypeStiLeaf",
+      "DelegatedTypeExcludedTarget",
+      "DelegatedTypeSecondDomainTarget"
+    ],
+    "generated_source_matches_runtime_delegated_type_source": true,
+    "generated_source_suffix": "activerecord/lib/active_record/delegated_type.rb"
+  }
+]

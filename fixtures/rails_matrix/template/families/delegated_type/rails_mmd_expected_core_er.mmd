@@ -1,0 +1,22 @@
+erDiagram
+  direction LR
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER }o..o| DELEGATED_TYPE_NAMESPACE_A_SAME_LEAF_TARGET : same_leaf_reference
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER }o..o| DELEGATED_TYPE_NAMESPACE_B_SAME_LEAF_TARGET : same_leaf_reference
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER }o..o| DELEGATED_TYPE_STI_BASE : same_leaf_reference
+  DELEGATED_TYPE_NAMESPACE_A_SAME_LEAF_TARGET {
+    integer id PK
+  }
+  DELEGATED_TYPE_NAMESPACE_B_SAME_LEAF_TARGET {
+    integer id PK
+  }
+  DELEGATED_TYPE_SAME_LEAF_NAMESPACE_HOLDER {
+    integer id PK
+    integer same_leaf_reference_id FK
+    string same_leaf_reference_type FK
+  }
+  DELEGATED_TYPE_STI_BASE {
+    integer id PK
+  }
+  DELEGATED_TYPE_UNDECLARED_INVERSE_TARGET {
+    integer id PK
+  }
