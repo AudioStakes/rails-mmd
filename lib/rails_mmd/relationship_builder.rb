@@ -3,7 +3,7 @@
 require 'rails_mmd/diagnostics'
 
 module RailsMmd
-  # Builds selected-domain direct belongs_to relationship records.
+  # Builds selected-domain direct and through relationship records.
   # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
   class RelationshipBuilder
     DomainResult = Struct.new(:domain_id, :relationships, :diagnostics, keyword_init: true)
@@ -13,6 +13,8 @@ module RailsMmd
       :target_entity_id,
       :association_name,
       :association_macro,
+      :relationship_kind,
+      :through_path,
       :foreign_key_holder_entity_id,
       :foreign_key_column,
       :referenced_primary_key_column,
@@ -94,6 +96,7 @@ module RailsMmd
 
     def classify_reflection(context, owner, reflection)
       return build_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
+      return build_through_reflection(context, owner, reflection) if through?(reflection)
       return build_direct_reflection(context, owner, reflection) if direct_has?(reflection)
 
       [nil, omitted_macro(context, owner, reflection)]
@@ -105,7 +108,6 @@ module RailsMmd
 
     def build_direct_reflection(context, owner, reflection)
       association_name = reflection_name(reflection)
-      return [nil, omitted_macro(context, owner, reflection)] if through?(reflection)
       if inverse_polymorphic?(reflection)
         return omitted(context, owner, association_name,
                        'ASSOCIATION_POLYMORPHIC_OMITTED')
@@ -137,6 +139,45 @@ module RailsMmd
       end
 
       [direct_relationship_for(owner, target, sanitized_name, reflection_macro(reflection), keys), nil]
+    end
+
+    def build_through_reflection(context, owner, reflection)
+      association_name = reflection_name(reflection)
+      return [nil, omitted_macro(context, owner, reflection)] if explicit_through_source?(reflection)
+      if through_source_type?(reflection)
+        return omitted(context, owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED')
+      end
+
+      sanitized_name = sanitize_association_name(association_name)
+      return omitted(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED') unless sanitized_name
+
+      through_reflection = safe_reflection_value(reflection, :through_reflection)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_THROUGH_UNRESOLVED') unless through_reflection
+
+      source_reflection = safe_reflection_value(reflection, :source_reflection)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless source_reflection
+
+      source_lineage = through_source_lineage(source_reflection)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless source_lineage
+
+      chain = through_chain(reflection)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless chain
+
+      chain_omission = through_chain_omission_code(chain + source_lineage + [through_reflection])
+      return [nil, omitted_macro(context, owner, reflection)] if chain_omission == 'ASSOCIATION_MACRO_OMITTED'
+      return omitted(context, owner, sanitized_name, chain_omission) if chain_omission
+
+      path_names = chain.map { |hop| sanitize_association_name(reflection_name(hop)) }
+      path_names[-1] = sanitize_association_name(reflection_name(source_lineage.last))
+      if path_names.any?(&:nil?)
+        return omitted(context, owner, association_name,
+                       'ASSOCIATION_NAME_UNSUPPORTED_OMITTED')
+      end
+
+      entities, diagnostic = through_entities(context, owner, sanitized_name, chain)
+      return [nil, diagnostic] if diagnostic
+
+      [through_relationship_for(owner, entities.last, sanitized_name, reflection_macro(reflection), path_names), nil]
     end
 
     def omitted_macro(context, owner, reflection)
@@ -198,6 +239,7 @@ module RailsMmd
         target_entity_id: entity_id(target),
         association_name: association_name,
         association_macro: :belongs_to,
+        relationship_kind: :direct,
         foreign_key_holder_entity_id: entity_id(owner),
         foreign_key_column: owner_fk,
         referenced_primary_key_column: target_pk,
@@ -224,6 +266,7 @@ module RailsMmd
         target_entity_id: entity_id(target),
         association_name: association_name,
         association_macro: macro,
+        relationship_kind: :direct,
         foreign_key_holder_entity_id: entity_id(target),
         foreign_key_column: foreign_key,
         referenced_primary_key_column: referenced_primary_key,
@@ -238,6 +281,24 @@ module RailsMmd
       )
     end
 
+    def through_relationship_for(owner, target, association_name, macro, path_names)
+      relationship_id = [
+        'relationships', owner.table_name, 'through', *path_names, target.table_name
+      ].join('/')
+      Relationship.new(
+        relationship_id: relationship_id,
+        owner_entity_id: entity_id(owner),
+        target_entity_id: entity_id(target),
+        association_name: association_name,
+        association_macro: macro,
+        relationship_kind: :through,
+        through_path: path_names,
+        physical_key: "through|#{entity_id(owner)}|#{path_names.join('|')}|#{entity_id(target)}",
+        owner_cardinality: '0..many',
+        target_cardinality: macro == :has_one ? '0..1' : '0..many'
+      )
+    end
+
     def deduplicate_relationships(relationships)
       relationships.group_by(&:physical_key).map do |_key, candidates|
         canonical_relationship(candidates)
@@ -245,6 +306,8 @@ module RailsMmd
     end
 
     def canonical_relationship(candidates)
+      return canonical_through_relationship(candidates) if candidates.first.relationship_kind == :through
+
       winner = candidates.min_by do |candidate|
         [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
       end
@@ -257,6 +320,12 @@ module RailsMmd
       canonical.owner_cardinality = canonical_holder_cardinality(candidates)
       canonical.target_cardinality = canonical_referenced_cardinality(candidates)
       canonical
+    end
+
+    def canonical_through_relationship(candidates)
+      candidates.min_by do |candidate|
+        [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
+      end
     end
 
     def referenced_entity_id(relationship)
@@ -403,6 +472,89 @@ module RailsMmd
       return unless reflection.respond_to?(method_name)
 
       reflection.public_send(method_name)
+    end
+
+    def safe_reflection_value(reflection, method_name)
+      reflection_value(reflection, method_name)
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def reflection_options(reflection)
+      reflection.respond_to?(:options) ? reflection.options : {}
+    end
+
+    def explicit_through_source?(reflection)
+      reflection_options(reflection).key?(:source)
+    end
+
+    def through_source_type?(reflection)
+      !reflection_options(reflection)[:source_type].nil?
+    end
+
+    def through_scoped?(reflection)
+      return !!reflection.has_scope? if reflection.respond_to?(:has_scope?)
+
+      scoped?(reflection)
+    end
+
+    def through_chain(reflection)
+      chain = Array(reflection.collect_join_chain).reverse
+      chain unless chain.empty?
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def through_source_lineage(source_reflection)
+      lineage = []
+      seen = {}.compare_by_identity
+      current = source_reflection
+      loop do
+        return if seen.key?(current)
+
+        seen[current] = true
+        lineage << current
+        break if explicit_through_source?(current) || through_source_type?(current) || polymorphic?(current)
+        break unless through?(current)
+
+        current = safe_reflection_value(current, :source_reflection)
+        return unless current
+      end
+      lineage
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def through_chain_omission_code(chain)
+      return 'ASSOCIATION_MACRO_OMITTED' if chain.any? { |hop| explicit_through_source?(hop) }
+      return 'ASSOCIATION_POLYMORPHIC_OMITTED' if chain.any? { |hop| through_source_type?(hop) || polymorphic?(hop) }
+      return 'ASSOCIATION_SCOPED_OMITTED' if chain.any? { |hop| through_scoped?(hop) || scoped?(hop) }
+
+      nil
+    rescue LoadError, SyntaxError, StandardError
+      'ASSOCIATION_SOURCE_UNRESOLVED'
+    end
+
+    def through_entities(context, owner, association_name, chain)
+      entities = []
+      chain.each_with_index do |hop, index|
+        model, constant = resolve_target(hop)
+        code = index.zero? ? 'ASSOCIATION_THROUGH_UNRESOLVED' : 'ASSOCIATION_SOURCE_UNRESOLVED'
+        return [nil, omitted(context, owner, association_name, code, constant).last] unless model
+        unless renderable_model?(model)
+          return [nil, omitted(context, owner, association_name,
+                               'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', constant).last]
+        end
+
+        entity = context.entity_by_constant[constant]
+        unless entity
+          return [nil,
+                  omitted(context, owner, association_name, 'DOMAIN_RELATIONSHIP_OMITTED', constant).last]
+        end
+
+        entities << entity
+      end
+      [entities, nil]
     end
 
     def scalar_key(value)

@@ -1,5 +1,61 @@
 [
   {
+    "relationship_id": "relationships/account_memberships/account_id/accounts/id",
+    "owner_safe_token": "ACCOUNT_MEMBERSHIP",
+    "target_safe_token": "ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/account_memberships/author_id/authors/id",
+    "owner_safe_token": "ACCOUNT_MEMBERSHIP",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/accounts/through/account_membership/author/authors",
+    "owner_safe_token": "ACCOUNT",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/authors/through/account_membership/account/accounts",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/authors/through/memberships/team/teams",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "TEAM",
+    "label": "teams",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/authors/through/partnerships/collaborator/teams",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "TEAM",
+    "label": "collaborators",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/authors/through/posts/labelings/label/labels",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "LABEL",
+    "label": "labels",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
     "relationship_id": "relationships/drafts/author_id/authors/id",
     "owner_safe_token": "DRAFT",
     "target_safe_token": "AUTHOR",
@@ -16,10 +72,66 @@
     "target_cardinality": "0..1"
   },
   {
+    "relationship_id": "relationships/labelings/label_id/labels/id",
+    "owner_safe_token": "LABELING",
+    "target_safe_token": "LABEL",
+    "label": "label",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/labelings/post_id/posts/id",
+    "owner_safe_token": "LABELING",
+    "target_safe_token": "POST",
+    "label": "post",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/labels/through/labelings/post/posts",
+    "owner_safe_token": "LABEL",
+    "target_safe_token": "POST",
+    "label": "posts",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/memberships/author_id/authors/id",
+    "owner_safe_token": "MEMBERSHIP",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/memberships/team_id/teams/id",
+    "owner_safe_token": "MEMBERSHIP",
+    "target_safe_token": "TEAM",
+    "label": "team",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
     "relationship_id": "relationships/notes/author_id/authors/id",
     "owner_safe_token": "NOTE",
     "target_safe_token": "AUTHOR",
     "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/partnerships/author_id/authors/id",
+    "owner_safe_token": "PARTNERSHIP",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/partnerships/collaborator_id/teams/id",
+    "owner_safe_token": "PARTNERSHIP",
+    "target_safe_token": "TEAM",
+    "label": "collaborator",
     "owner_cardinality": "0..many",
     "target_cardinality": "1..1"
   },
@@ -32,11 +144,27 @@
     "target_cardinality": "1..1"
   },
   {
+    "relationship_id": "relationships/posts/through/labelings/label/labels",
+    "owner_safe_token": "POST",
+    "target_safe_token": "LABEL",
+    "label": "labels",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
     "relationship_id": "relationships/profiles/author_id/authors/id",
     "owner_safe_token": "PROFILE",
     "target_safe_token": "AUTHOR",
     "label": "author",
     "owner_cardinality": "0..1",
     "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/teams/through/memberships/author/authors",
+    "owner_safe_token": "TEAM",
+    "target_safe_token": "AUTHOR",
+    "label": "authors",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
   }
 ]

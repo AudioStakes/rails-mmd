@@ -341,8 +341,8 @@ A relationship is eligible only when all conditions hold:
 P1-03 extends Rails 7.2/8.1 eligibility to direct, unscoped,
 non-polymorphic-owner `has_many` and `has_one`. Their scalar target FK must exist,
 their `active_record_primary_key` must equal the declaring owner's actual
-primary key, and both entities must be selected in the same domain. Through and
-`as:` variants remain omitted. Same-physical-tuple declarations are grouped by
+primary key, and both entities must be selected in the same domain. `as:`
+variants remain omitted. Same-physical-tuple declarations are grouped by
 the P1-04 rule below without an additional warning.
 
 P1-04 canonicalizes every supported direct physical tuple regardless of
@@ -352,6 +352,17 @@ is FK holder to referenced entity. The public ID is
 label priority is `belongs_to`, `has_one`, `has_many`, then lexical declaration
 ID. Thus inverse declarations and enumeration order do not change the edge.
 
+P1-05 supports unscoped, non-polymorphic `has_many :through` and
+`has_one :through` when Rails infers the source and every model in the full
+reflection chain resolves, is renderable, and is selected in the same domain.
+The normalized path is `collect_join_chain` in owner-forward order, with its
+outer declaration hop replaced by the resolved terminal source-reflection name.
+Direct physical edges remain, and one semantic edge is added per normalized path with
+ID `relationships/<owner_table>/through/<path...>/<target_table>`. Its owner
+cardinality is `0..many`; target cardinality is `0..many` for `has_many` and
+`0..1` for `has_one`. Explicit `source:`, `source_type:`, scopes, and
+polymorphic hops remain omitted for later priorities.
+
 Omitted relationship diagnostics:
 
 | condition | diagnostic |
@@ -359,6 +370,8 @@ Omitted relationship diagnostics:
 | Polymorphic `belongs_to` | `ASSOCIATION_POLYMORPHIC_OMITTED` |
 | Scoped `belongs_to` | `ASSOCIATION_SCOPED_OMITTED` |
 | Unresolved target | `ASSOCIATION_TARGET_UNRESOLVED` |
+| Unresolved through reflection/intermediate | `ASSOCIATION_THROUGH_UNRESOLVED` |
+| Unresolved through source/nested chain | `ASSOCIATION_SOURCE_UNRESOLVED` |
 | Target non-renderable | `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED` |
 | Target outside domain | `DOMAIN_RELATIONSHIP_OMITTED` |
 | Composite key | `ASSOCIATION_COMPOSITE_KEY_OMITTED` |
@@ -514,6 +527,8 @@ Closed diagnostic codes:
 - `MODEL_TABLE_MISSING`
 - `MODEL_PRIMARY_KEY_UNSUPPORTED`
 - `ASSOCIATION_TARGET_UNRESOLVED`
+- `ASSOCIATION_THROUGH_UNRESOLVED`
+- `ASSOCIATION_SOURCE_UNRESOLVED`
 - `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED`
 - `ASSOCIATION_POLYMORPHIC_OMITTED`
 - `ASSOCIATION_SCOPED_OMITTED`
@@ -546,6 +561,8 @@ Diagnostic catalog:
 | `MODEL_TABLE_MISSING` | error | 2 | schema_probe | model | diagnostics JSON | blocks selected artifacts |
 | `MODEL_PRIMARY_KEY_UNSUPPORTED` | error | 2 | schema_probe | model | diagnostics JSON | blocks selected artifacts |
 | `ASSOCIATION_TARGET_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
+| `ASSOCIATION_THROUGH_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
+| `ASSOCIATION_SOURCE_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_POLYMORPHIC_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_SCOPED_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |

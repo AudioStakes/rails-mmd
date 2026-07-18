@@ -159,6 +159,13 @@ RSpec.describe 'P0 contract schemas' do
       diagnostics/invalid/association_macro_missing.json
       diagnostics/invalid/association_macro_extra.json
       diagnostics/invalid/association_macro_malformed.json
+    ] + through_association_invalid_fixtures
+  end
+
+  def through_association_invalid_fixtures
+    %w[
+      diagnostics/invalid/association_through_extra.json
+      diagnostics/invalid/association_source_extra.json
     ]
   end
 

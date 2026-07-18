@@ -150,7 +150,340 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     expect(result.domains.first.relationships).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
-      %w[ASSOCIATION_MACRO_OMITTED ASSOCIATION_SCOPED_OMITTED ASSOCIATION_POLYMORPHIC_OMITTED]
+      %w[ASSOCIATION_THROUGH_UNRESOLVED ASSOCIATION_SCOPED_OMITTED ASSOCIATION_POLYMORPHIC_OMITTED]
+    )
+  end
+
+  it 'builds an inferred-source has-many-through semantic edge beside direct physical edges' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    team_source = belongs_to('team', klass: team_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    author = owner_model(memberships, teams)
+    membership = owner_model(
+      belongs_to('author', klass: renderable_model('Author', 'authors')),
+      team_source
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity('Membership', 'memberships',
+               columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+        entity('Team', 'teams')
+      ]
+    )
+
+    result = build(domain, 'Author' => author, 'Membership' => membership)
+    through = result.domains.first.relationships.find { |relationship| relationship.relationship_kind == :through }
+
+    expect(result.diagnostics).to eq([])
+    expect(through).to have_attributes(
+      relationship_id: 'relationships/authors/through/memberships/team/teams',
+      owner_entity_id: 'entities/authors', target_entity_id: 'entities/teams',
+      association_name: 'teams', owner_cardinality: '0..many', target_cardinality: '0..many'
+    )
+  end
+
+  it 'uses singular target cardinality for an inferred-source has-one-through edge' do
+    account_model = renderable_model('Account', 'accounts')
+    account_membership = association(
+      'account_membership', :has_one,
+      klass: renderable_model('AccountMembership', 'account_memberships'), foreign_key: 'author_id'
+    )
+    account = through_association(
+      'account', :has_one, through_reflection: account_membership,
+                           source_reflection: belongs_to('account', klass: account_model), klass: account_model
+    )
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'), entity('AccountMembership', 'account_memberships'), entity('Account', 'accounts')]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(account_membership, account))
+                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+
+    expect(relationship).to have_attributes(
+      relationship_id: 'relationships/authors/through/account_membership/account/accounts',
+      owner_cardinality: '0..many', target_cardinality: '0..1'
+    )
+  end
+
+  it 'uses the full owner-forward path for nested inferred-source through associations' do
+    post_model = renderable_model('Post', 'posts')
+    tagging_model = renderable_model('Tagging', 'taggings')
+    tag_model = renderable_model('Tag', 'tags')
+    posts = association('posts', :has_many, klass: post_model, foreign_key: 'author_id')
+    taggings = association('taggings', :has_many, klass: tagging_model, foreign_key: 'post_id')
+    inner_tags = through_association(
+      'tags', :has_many, through_reflection: taggings,
+                         source_reflection: belongs_to('tag', klass: tag_model), klass: tag_model
+    )
+    tags = through_association(
+      'tags', :has_many, through_reflection: posts,
+                         source_reflection: inner_tags, klass: tag_model,
+                         chain: [association('tags', :has_many, klass: tag_model), taggings, posts]
+    )
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'), entity('Post', 'posts'), entity('Tagging', 'taggings'), entity('Tag', 'tags')]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(posts, tags))
+                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+
+    expect(relationship).to have_attributes(
+      relationship_id: 'relationships/authors/through/posts/taggings/tag/tags',
+      through_path: %w[posts taggings tag], target_entity_id: 'entities/tags'
+    )
+  end
+
+  it 'deduplicates an identical through path with has-one label priority' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    team_source = belongs_to('team', klass: team_model)
+    has_many_teams = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    has_one_team = through_association(
+      'teams', :has_one, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    through = build(domain, 'Author' => owner_model(has_many_teams, has_one_team))
+              .domains.first.relationships.select { |candidate| candidate.relationship_kind == :through }
+
+    expect(through).to contain_exactly(
+      have_attributes(association_macro: :has_one, target_cardinality: '0..1')
+    )
+  end
+
+  it 'routes unsupported and unresolved through variants to stable diagnostics' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    team_source = belongs_to('team', klass: team_model)
+    owner = owner_model(
+      through_association('explicit_teams', :has_many, through_reflection: memberships,
+                                                       source_reflection: team_source, klass: team_model,
+                                                       source: :team),
+      through_association('typed_teams', :has_many, through_reflection: memberships,
+                                                    source_reflection: team_source, klass: team_model,
+                                                    source_type: 'ManagedTeam'),
+      through_association('scoped_teams', :has_many, through_reflection: memberships,
+                                                     source_reflection: team_source, klass: team_model,
+                                                     has_scope: true),
+      association('missing_through', :has_many, through: true),
+      association('missing_source', :has_many, through: true, through_reflection: memberships)
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    result = build(domain, 'Author' => owner)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[
+        ASSOCIATION_MACRO_OMITTED
+        ASSOCIATION_POLYMORPHIC_OMITTED
+        ASSOCIATION_SCOPED_OMITTED
+        ASSOCIATION_THROUGH_UNRESOLVED
+        ASSOCIATION_SOURCE_UNRESOLVED
+      ]
+    )
+    expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
+  end
+
+  it 'applies through eligibility checks to every nested hop' do
+    post_model = renderable_model('Post', 'posts')
+    tag_model = renderable_model('Tag', 'tags')
+    posts = association('posts', :has_many, klass: post_model)
+    owner = owner_model(
+      nested_through('explicit_tags', posts, association('taggings', :has_many, source: :tag), tag_model),
+      nested_through('typed_tags', posts, association('taggings', :has_many, source_type: 'Tag'), tag_model),
+      nested_through('scoped_tags', posts, association('taggings', :has_many, scope: -> {}), tag_model),
+      nested_through('polymorphic_tags', posts, association('taggings', :has_many, polymorphic: true), tag_model)
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Post', 'posts'), entity('Tagging', 'taggings'),
+               entity('Tag', 'tags')]
+    )
+
+    result = build(domain, 'Author' => owner)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[
+        ASSOCIATION_MACRO_OMITTED
+        ASSOCIATION_POLYMORPHIC_OMITTED
+        ASSOCIATION_SCOPED_OMITTED
+        ASSOCIATION_POLYMORPHIC_OMITTED
+      ]
+    )
+  end
+
+  it 'finds nested explicit and typed sources through source-reflection lineage' do
+    post_model = renderable_model('Post', 'posts')
+    labeling_model = renderable_model('Labeling', 'labelings')
+    label_model = renderable_model('Label', 'labels')
+    posts = association('posts', :has_many, klass: post_model)
+    labelings = association('labelings', :has_many, klass: labeling_model)
+    label_source = belongs_to('label', klass: label_model)
+    explicit_inner = through_association(
+      'labels', :has_many, through_reflection: labelings,
+                           source_reflection: label_source, klass: label_model, source: :label
+    )
+    typed_inner = through_association(
+      'labels', :has_many, through_reflection: labelings,
+                           source_reflection: label_source, klass: label_model, source_type: 'ManagedLabel'
+    )
+    outer = lambda do |inner|
+      through_association(
+        'labels', :has_many, through_reflection: posts, source_reflection: inner, klass: label_model,
+                             chain: [association('labels', :has_many, klass: label_model), labelings, posts]
+      )
+    end
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Post', 'posts'),
+               entity('Labeling', 'labelings'), entity('Label', 'labels')]
+    )
+
+    codes = [explicit_inner, typed_inner].map do |inner|
+      build(domain, 'Author' => owner_model(outer.call(inner))).diagnostics.first.fetch('code')
+    end
+
+    expect(codes).to eq(%w[ASSOCIATION_MACRO_OMITTED ASSOCIATION_POLYMORPHIC_OMITTED])
+  end
+
+  it 'reuses renderability and domain diagnostics after through models resolve' do
+    team_model = renderable_model('Team', 'teams')
+    hidden_memberships = association(
+      'hidden_memberships', :has_many,
+      klass: renderable_model('HiddenMembership', 'hidden_memberships', renderable: false)
+    )
+    memberships = association(
+      'memberships', :has_many, klass: renderable_model('Membership', 'memberships')
+    )
+    owner = owner_model(
+      through_association('hidden_teams', :has_many, through_reflection: hidden_memberships,
+                                                     source_reflection: belongs_to('team', klass: team_model),
+                                                     klass: team_model),
+      through_association('external_teams', :has_many, through_reflection: memberships,
+                                                       source_reflection: belongs_to('team', klass: team_model),
+                                                       klass: team_model)
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('HiddenMembership', 'hidden_memberships'),
+               entity('Membership', 'memberships')]
+    )
+
+    result = build(domain, 'Author' => owner)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED DOMAIN_RELATIONSHIP_OMITTED]
+    )
+  end
+
+  it 'stabilizes an unreadable nested join chain as source unresolved' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships,
+                          source_reflection: belongs_to('team', klass: team_model), klass: team_model,
+                          chain: -> { raise ArgumentError, 'invalid nested chain' }
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    result = build(domain, 'Author' => owner_model(teams))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_SOURCE_UNRESOLVED']
+    )
+  end
+
+  it 'stabilizes an unreadable Rails through scope state as source unresolved' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships,
+                          source_reflection: belongs_to('team', klass: team_model), klass: team_model,
+                          has_scope: -> { raise NoMethodError, 'missing source scope state' }
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+    )
+
+    result = build(domain, 'Author' => owner_model(teams))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_SOURCE_UNRESOLVED']
+    )
+  end
+
+  it 'stabilizes unreadable nested source lineage as source unresolved' do
+    post_model = renderable_model('Post', 'posts')
+    label_model = renderable_model('Label', 'labels')
+    posts = association('posts', :has_many, klass: post_model)
+    missing_inner_source = association(
+      'labels', :has_many, through: true,
+                           source_reflection: -> { raise ArgumentError, 'invalid inner source' }, klass: label_model
+    )
+    broken_options_source = belongs_to('label', klass: label_model)
+    broken_options_source.define_singleton_method(:options) { raise ArgumentError, 'invalid source options' }
+    outer = lambda do |source|
+      through_association(
+        'labels', :has_many, through_reflection: posts, source_reflection: source, klass: label_model
+      )
+    end
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Post', 'posts'), entity('Label', 'labels')]
+    )
+
+    codes = [missing_inner_source, broken_options_source].map do |source|
+      build(domain, 'Author' => owner_model(outer.call(source))).diagnostics.first.fetch('code')
+    end
+
+    expect(codes).to eq(%w[ASSOCIATION_SOURCE_UNRESOLVED ASSOCIATION_SOURCE_UNRESOLVED])
+  end
+
+  it 'uses scope fallback and rejects unsafe names on nested join-chain hops' do
+    post_model = renderable_model('Post', 'posts')
+    labeling_model = renderable_model('Labeling', 'labelings')
+    label_model = renderable_model('Label', 'labels')
+    posts = association('posts', :has_many, klass: post_model)
+    label_source = belongs_to('label', klass: label_model)
+    scoped_hop = scope_only_reflection('labelings', labeling_model)
+    unsafe_hop = association('BadName', :has_many, klass: labeling_model)
+    outer = lambda do |name, hop|
+      through_association(
+        name, :has_many, through_reflection: posts, source_reflection: label_source, klass: label_model,
+                         chain: [association(name, :has_many, klass: label_model), hop, posts]
+      )
+    end
+    owner = owner_model(outer.call('scoped_labels', scoped_hop), outer.call('unsafe_labels', unsafe_hop))
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Post', 'posts'),
+               entity('Labeling', 'labelings'), entity('Label', 'labels')]
+    )
+
+    result = build(domain, 'Author' => owner)
+
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_SCOPED_OMITTED ASSOCIATION_NAME_UNSUPPORTED_OMITTED]
     )
   end
 
@@ -427,6 +760,34 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     Reflection.new(name, macro, options)
   end
 
+  def through_association(name, macro, through_reflection:, source_reflection:, klass:, chain: nil, **options)
+    reflection = Reflection.new(
+      name, macro,
+      options.merge(through: true, through_reflection: through_reflection,
+                    source_reflection: source_reflection, klass: klass)
+    )
+    reflection.options[:collect_join_chain] = chain || [reflection, through_reflection]
+    reflection
+  end
+
+  def nested_through(name, root, middle, target_model)
+    through_association(
+      name, :has_many, through_reflection: root,
+                       source_reflection: belongs_to('tag', klass: target_model), klass: target_model,
+                       chain: [association(name, :has_many, klass: target_model), middle, root]
+    )
+  end
+
+  def scope_only_reflection(name, model)
+    reflection = Object.new
+    reflection.define_singleton_method(:name) { name }
+    reflection.define_singleton_method(:macro) { :has_many }
+    reflection.define_singleton_method(:scope) { -> {} }
+    reflection.define_singleton_method(:polymorphic?) { false }
+    reflection.define_singleton_method(:klass) { model }
+    reflection
+  end
+
   def simple_reflection(name)
     Struct.new(:name, :macro, :foreign_key, :association_primary_key) do
       def polymorphic? = false
@@ -436,7 +797,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   end
 
   class Reflection
-    attr_reader :name, :macro
+    attr_reader :name, :macro, :options
 
     def initialize(name, macro, options)
       @name = name
@@ -458,6 +819,23 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     def active_record_primary_key = @options.fetch(:active_record_primary_key, 'id')
 
     def through_reflection? = @options.fetch(:through, false)
+
+    def through_reflection = @options[:through_reflection]
+
+    def source_reflection
+      value = @options[:source_reflection]
+      value.respond_to?(:call) ? value.call : value
+    end
+
+    def collect_join_chain
+      value = @options.fetch(:collect_join_chain)
+      value.respond_to?(:call) ? value.call : value
+    end
+
+    def has_scope?
+      value = @options.fetch(:has_scope, false)
+      value.respond_to?(:call) ? value.call : value
+    end
 
     def type = @options[:type]
 

@@ -60,3 +60,7 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   `fixtures/rails_matrix/matrix.yml` as an explicit `pairs:` list and keep
   documentation aligned in `docs/p1/01-runtime-compatibility/*` to avoid
   accidental Cartesian matrix drift.
+- For association features, verify Rails reflection behavior in the shared real
+  app and extend its exact relationship oracle on every declared matrix pair;
+  keep isolated unit doubles for failure paths that real model declarations
+  cannot express.

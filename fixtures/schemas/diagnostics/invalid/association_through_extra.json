@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "core",
+  "diagnostics": [
+    {
+      "diagnostic_id": "d_through_extra",
+      "code": "ASSOCIATION_THROUGH_UNRESOLVED",
+      "severity": "warning",
+      "phase": "relationship_build",
+      "scope": "relationship",
+      "subject_id": "authors.teams",
+      "message": "through reflection unresolved",
+      "metadata": {
+        "domain_id": "core",
+        "owner_constant": "Author",
+        "association_name": "teams",
+        "through_name": "memberships"
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
