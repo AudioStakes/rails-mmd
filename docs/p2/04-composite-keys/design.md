@@ -180,10 +180,12 @@ it. A valid tuple must be non-empty, distinct, and wholly present in the probed
 columns. Failure remains fatal `MODEL_PRIMARY_KEY_UNSUPPORTED` with exit code 2.
 Scalar models become one-element tuples and otherwise keep existing behavior.
 
-Schema probing may initialize model primary-key metadata as it already does.
-It must not call association-specific `foreign_key`,
+Selected entity/schema probing may initialize model primary-key metadata as it
+already does. It must not call association-specific `foreign_key`,
 `association_primary_key`, or `active_record_primary_key` readers. An
-instrumented spec pins that phase boundary.
+instrumented spec pins that phase boundary. The later delegated-family
+discovery subphase may read only its root `foreign_key` and scalar
+`foreign_type`, as specified below; it must not read a concrete referenced key.
 
 ### Adapter foreign keys
 
