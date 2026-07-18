@@ -78,6 +78,7 @@
         "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED",
         "ASSOCIATION_POLYMORPHIC_OMITTED",
         "ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED",
+        "ASSOCIATION_JOIN_TABLE_INVALID",
         "ASSOCIATION_SCOPED_OMITTED",
         "ASSOCIATION_COMPOSITE_KEY_OMITTED",
         "ASSOCIATION_KEY_COLUMN_MISSING",
@@ -126,6 +127,7 @@
         { "$ref": "#/$defs/metadata_for_association_target_not_renderable_omitted" },
         { "$ref": "#/$defs/metadata_for_association_polymorphic_omitted" },
         { "$ref": "#/$defs/metadata_for_association_polymorphic_targets_unresolved" },
+        { "$ref": "#/$defs/metadata_for_association_join_table_invalid" },
         { "$ref": "#/$defs/metadata_for_association_scoped_omitted" },
         { "$ref": "#/$defs/metadata_for_association_composite_key_omitted" },
         { "$ref": "#/$defs/metadata_for_association_key_column_missing" },
@@ -303,6 +305,21 @@
         "target_constant": { "$ref": "#/$defs/ruby_constant" }
       }
     },
+    "metadata_shape_association_join_table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain_id", "owner_constant", "association_name", "join_table", "reason"],
+      "properties": {
+        "domain_id": { "$ref": "#/$defs/domain_id" },
+        "owner_constant": { "$ref": "#/$defs/ruby_constant" },
+        "association_name": { "$ref": "#/$defs/sanitized_string" },
+        "target_constant": { "$ref": "#/$defs/ruby_constant" },
+        "join_table": { "$ref": "#/$defs/structured_id" },
+        "reason": {
+          "enum": ["unresolved", "primary_key_present", "join_column_missing", "extra_columns", "ambiguous_columns"]
+        }
+      }
+    },
     "metadata_shape_association_macro": {
       "type": "object",
       "additionalProperties": false,
@@ -384,6 +401,7 @@
     "metadata_for_association_target_not_renderable_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_polymorphic_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_POLYMORPHIC_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_polymorphic_targets_unresolved": { "if": { "properties": { "code": { "const": "ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
+    "metadata_for_association_join_table_invalid": { "if": { "properties": { "code": { "const": "ASSOCIATION_JOIN_TABLE_INVALID" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association_join_table" } } } },
     "metadata_for_association_scoped_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_SCOPED_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_composite_key_omitted": { "if": { "properties": { "code": { "const": "ASSOCIATION_COMPOSITE_KEY_OMITTED" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },
     "metadata_for_association_key_column_missing": { "if": { "properties": { "code": { "const": "ASSOCIATION_KEY_COLUMN_MISSING" } }, "required": ["code"] }, "then": { "properties": { "metadata": { "$ref": "#/$defs/metadata_shape_association" } } } },

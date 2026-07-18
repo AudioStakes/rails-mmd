@@ -13,7 +13,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | P1-04 | `inverse_of` | 対応 | inverse有無に依存せず物理関連をcanonical edgeへ統合済み | 同じ論理関連を1本のcanonical edgeへ統合する |
 | P1-05 | `has_many :through` / `has_one :through` | 対応 | 推論sourceの1段・nested経路をsemantic edgeとして描画済み | 中間modelと到達先を重複なく描画する |
 | P1-06 | polymorphic | 対応 | 選択済みinverse候補を対象別edgeへ正規化済み | 型列と対象候補を重複なく描画する |
-| P1-07 | `has_and_belongs_to_many` | 未対応 | 無言で省略 | join tableを検証し、単一の多対多関連として描画する |
+| P1-07 | `has_and_belongs_to_many` | 対応 | hidden join tableを検証し、正規化した単一の多対多関連として描画済み | join tableを検証し、単一の多対多関連として描画する |
 
 ## 後続候補
 
@@ -39,6 +39,7 @@ Rails 7.2/8.1で次を対応済み。
 - same-domain限定のER/Class出力
 - 対応範囲内の`belongs_to`除外診断
 - direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
+- hidden join tableを持つunscoped scalar `has_and_belongs_to_many`
 
 ## 根拠
 

@@ -6,6 +6,16 @@ ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
     t.string 'name', null: false
   end
 
+  create_table 'tags', force: :cascade do |t|
+    t.string 'name', null: false
+  end
+
+  create_table 'authors_tags', id: false, force: :cascade do |t|
+    t.integer 'author_id', null: false
+    t.integer 'tag_id', null: false
+    t.index %w[author_id tag_id], name: 'index_authors_tags_unique', unique: true
+  end
+
   create_table 'posts', force: :cascade do |t|
     t.string 'title', null: false
     t.integer 'author_id', null: false

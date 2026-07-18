@@ -24,6 +24,14 @@
     "target_cardinality": "0..1"
   },
   {
+    "relationship_id": "relationships/authors/habtm/authors_tags/author_id/tags/tag_id",
+    "owner_safe_token": "AUTHOR",
+    "target_safe_token": "TAG",
+    "label": "tags",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
     "relationship_id": "relationships/authors/through/account_membership/account/accounts",
     "owner_safe_token": "AUTHOR",
     "target_safe_token": "ACCOUNT",

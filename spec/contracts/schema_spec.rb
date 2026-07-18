@@ -167,6 +167,7 @@ RSpec.describe 'P0 contract schemas' do
       diagnostics/invalid/association_through_extra.json
       diagnostics/invalid/association_source_extra.json
       diagnostics/invalid/association_polymorphic_targets_extra.json
+      diagnostics/invalid/association_join_table_extra.json
     ]
   end
 

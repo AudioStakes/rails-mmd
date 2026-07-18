@@ -7,7 +7,7 @@ module RailsMmd
   # Reads selected-domain-only schema metadata for resolved renderable records.
   # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
   class SchemaProbe
-    DomainResult = Struct.new(:domain_id, :entities, :diagnostics, keyword_init: true)
+    DomainResult = Struct.new(:domain_id, :entities, :join_tables, :diagnostics, keyword_init: true)
     Entity = Struct.new(
       :ruby_constant,
       :table_name,
@@ -19,6 +19,7 @@ module RailsMmd
       keyword_init: true
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
+    JoinTable = Struct.new(:table_name, :columns, :primary_key, keyword_init: true)
     ForeignKey = Struct.new(:from_table, :column, :to_table, :primary_key, keyword_init: true)
     Index = Struct.new(:columns, :unique, :where, :using, :expression, keyword_init: true)
     # Carries valid metadata records when only some optional adapter rows degrade.
@@ -60,18 +61,26 @@ module RailsMmd
       return domain_result(domain, [], [connection_diagnostic]) if connection_diagnostic
 
       entities = []
+      entity_models = []
       output_diagnostics = []
       domain.records.each do |record|
-        entity, record_diagnostics = probe_record(domain.domain_id, record)
-        entities << entity if entity
+        model = model_for(record)
+        entity, record_diagnostics = probe_record(domain.domain_id, record, model)
+        if entity
+          entities << entity
+          entity_models << model
+        end
         output_diagnostics.concat(record_diagnostics)
       end
 
-      domain_result(domain, entities, output_diagnostics)
+      domain_result(domain, entities, output_diagnostics, probe_join_tables(entity_models))
     end
 
-    def domain_result(domain, entities, output_diagnostics)
-      DomainResult.new(domain_id: domain.domain_id, entities: entities, diagnostics: output_diagnostics)
+    def domain_result(domain, entities, output_diagnostics, join_tables = [])
+      DomainResult.new(
+        domain_id: domain.domain_id, entities: entities,
+        join_tables: join_tables, diagnostics: output_diagnostics
+      )
     end
 
     def multi_db_diagnostic(domain)
@@ -88,8 +97,7 @@ module RailsMmd
       )
     end
 
-    def probe_record(domain_id, record)
-      model = model_for(record)
+    def probe_record(domain_id, record, model)
       return invalid_record(domain_id, record, :table) if model.nil?
 
       return invalid_record(domain_id, record, :table) unless table_exists?(model)
@@ -154,13 +162,69 @@ module RailsMmd
     def read_columns(model)
       return [] unless model.respond_to?(:columns)
 
-      model.columns.map do |column|
-        Column.new(
-          name: value_from(column, :name),
-          type: value_from(column, :type),
-          nullable: value_from(column, :null)
-        )
+      model.columns.map { |column| column_record(column) }
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def probe_join_tables(models)
+      join_table_requests(models).group_by(&:last).filter_map do |table_name, requests|
+        requests.lazy.filter_map { |model, _name| read_join_table(model, table_name) }.first
+      end.sort_by(&:table_name)
+    end
+
+    def join_table_requests(models)
+      models.flat_map do |model|
+        habtm_reflections(model).filter_map do |reflection|
+          table_name = safe_value_from(reflection, :join_table)
+          [model, table_name] if table_name.is_a?(String) && !table_name.empty?
+        end
       end
+    end
+
+    def join_table_connection(model, table_name)
+      return unless model.respond_to?(:connection)
+
+      connection = model.connection
+      return unless connection.respond_to?(:data_source_exists?) && connection.data_source_exists?(table_name)
+      return unless connection.respond_to?(:columns) && connection.respond_to?(:primary_key)
+
+      connection
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def habtm_reflections(model)
+      return [] unless model.respond_to?(:reflect_on_all_associations)
+
+      Array(model.reflect_on_all_associations(:has_and_belongs_to_many))
+    rescue LoadError, SyntaxError, StandardError
+      []
+    end
+
+    def read_join_table(model, table_name)
+      connection = join_table_connection(model, table_name)
+      return unless connection
+
+      JoinTable.new(
+        table_name: table_name,
+        columns: Array(connection.columns(table_name)).map { |column| column_record(column) },
+        primary_key: connection.primary_key(table_name)
+      )
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def column_record(column)
+      Column.new(
+        name: value_from(column, :name),
+        type: value_from(column, :type),
+        nullable: value_from(column, :null)
+      )
+    end
+
+    def safe_value_from(object, method_name)
+      value_from(object, method_name)
     rescue LoadError, SyntaxError, StandardError
       nil
     end

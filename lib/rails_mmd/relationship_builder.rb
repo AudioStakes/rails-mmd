@@ -14,6 +14,8 @@ module RailsMmd
       :association_name,
       :association_macro,
       :relationship_kind,
+      :join_table_name,
+      :declaration_owner_entity_id,
       :through_path,
       :foreign_key_holder_entity_id,
       :foreign_key_column,
@@ -36,12 +38,17 @@ module RailsMmd
     end
 
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
+    STRUCTURED_COLUMN_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
     MACRO_PRIORITY = { belongs_to: 0, has_one: 1, has_many: 2 }.freeze
     ReflectionEntry = Struct.new(:owner, :reflection, keyword_init: true)
     DomainContext = Struct.new(:domain, keyword_init: false) do
       def domain_id = domain.domain_id
 
       def entities = domain.entities
+
+      def join_table_by_name
+        @join_table_by_name ||= Array(domain.join_tables).to_h { |table| [table.table_name, table] }
+      end
 
       def entity_by_constant
         @entity_by_constant ||= entities.to_h { |entity| [entity.ruby_constant, entity] }
@@ -113,10 +120,112 @@ module RailsMmd
 
     def classify_reflection(context, owner, reflection)
       return build_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
+      return build_habtm_reflection(context, owner, reflection) if habtm?(reflection)
       return build_through_reflection(context, owner, reflection) if through?(reflection)
       return build_direct_reflection(context, owner, reflection) if direct_has?(reflection)
 
       [nil, omitted_macro(context, owner, reflection)]
+    end
+
+    def habtm?(reflection)
+      reflection_macro(reflection) == :has_and_belongs_to_many
+    end
+
+    def build_habtm_reflection(context, owner, reflection)
+      association_name = reflection_name(reflection)
+      sanitized_name = sanitize_association_name(association_name)
+      return omitted(context, owner, association_name, 'ASSOCIATION_SCOPED_OMITTED') if scoped?(reflection)
+      return omitted(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED') unless sanitized_name
+
+      target_model, target_constant = resolve_target(reflection)
+      unless target_model
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_TARGET_UNRESOLVED',
+                       target_constant)
+      end
+      unless renderable_model?(target_model)
+        return omitted(context, owner, sanitized_name,
+                       'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_constant)
+      end
+
+      target = context.entity_by_constant[target_constant]
+      return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
+
+      keys = habtm_keys(reflection)
+      return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
+
+      join_table = context.join_table_by_name[keys.fetch(:join_table)]
+      invalid_reason = habtm_join_table_invalid_reason(join_table, keys)
+      if invalid_reason
+        return habtm_join_table_invalid(
+          context, owner,
+          keys.merge(association_name: sanitized_name, target_constant: target_constant),
+          invalid_reason
+        )
+      end
+
+      [habtm_relationship_for(owner, target, sanitized_name, keys), nil]
+    end
+
+    def habtm_keys(reflection)
+      values = {
+        join_table: safe_reflection_value(reflection, :join_table),
+        owner_column: safe_reflection_value(reflection, :foreign_key),
+        target_column: safe_reflection_value(reflection, :association_foreign_key)
+      }
+      return unless values.values.all? { |value| value.is_a?(String) && value.match?(STRUCTURED_COLUMN_PATTERN) }
+
+      values
+    end
+
+    def habtm_join_table_invalid_reason(join_table, keys)
+      return 'ambiguous_columns' if keys.fetch(:owner_column) == keys.fetch(:target_column)
+      return 'unresolved' unless join_table
+      return 'primary_key_present' unless join_table.primary_key.nil?
+
+      actual = join_table.columns.map(&:name)
+      required = [keys.fetch(:owner_column), keys.fetch(:target_column)]
+      return 'join_column_missing' unless (required - actual).empty?
+
+      'extra_columns' unless actual.sort == required.sort
+    end
+
+    def habtm_join_table_invalid(context, owner, details, reason)
+      association_name = details.fetch(:association_name)
+      metadata = association_metadata(context.domain_id, owner, association_name, details.fetch(:target_constant))
+                 .merge(join_table: details.fetch(:join_table), reason: reason)
+      [
+        nil,
+        diagnostics.build(
+          code: 'ASSOCIATION_JOIN_TABLE_INVALID',
+          message: omission_message(owner, association_name, 'ASSOCIATION_JOIN_TABLE_INVALID'),
+          subject_id: "#{owner.table_name}.#{safe_subject_association(association_name)}",
+          metadata: metadata
+        )
+      ]
+    end
+
+    def habtm_relationship_for(owner, target, association_name, keys)
+      left, right = [
+        [entity_id(owner), owner.table_name, keys.fetch(:owner_column)],
+        [entity_id(target), target.table_name, keys.fetch(:target_column)]
+      ].sort_by { |entity, _table, column| [entity, column] }
+      join_table = keys.fetch(:join_table)
+      relationship_id = [
+        'relationships', left[1], 'habtm', join_table, left[2], right[1], right[2]
+      ].join('/')
+      Relationship.new(
+        relationship_id: relationship_id,
+        owner_entity_id: left[0],
+        target_entity_id: right[0],
+        association_name: association_name,
+        association_macro: :has_and_belongs_to_many,
+        relationship_kind: :habtm,
+        join_table_name: join_table,
+        declaration_owner_entity_id: entity_id(owner),
+        physical_key: "habtm|#{join_table}|#{left[0]}|#{left[2]}|#{right[0]}|#{right[2]}",
+        owner_cardinality: '0..many',
+        target_cardinality: '0..many'
+      )
     end
 
     def direct_has?(reflection)
@@ -512,6 +621,7 @@ module RailsMmd
     def canonical_relationship(candidates)
       return canonical_through_relationship(candidates) if candidates.first.relationship_kind == :through
       return candidates.min_by(&:relationship_id) if candidates.first.relationship_kind == :polymorphic
+      return canonical_habtm_relationship(candidates) if candidates.first.relationship_kind == :habtm
 
       winner = candidates.min_by do |candidate|
         [MACRO_PRIORITY.fetch(candidate.association_macro), candidate.relationship_id]
@@ -525,6 +635,13 @@ module RailsMmd
       canonical.owner_cardinality = canonical_holder_cardinality(candidates)
       canonical.target_cardinality = canonical_referenced_cardinality(candidates)
       canonical
+    end
+
+    def canonical_habtm_relationship(candidates)
+      candidates.min_by do |candidate|
+        owner_priority = candidate.declaration_owner_entity_id == candidate.owner_entity_id ? 0 : 1
+        [owner_priority, candidate.association_name, candidate.relationship_id]
+      end
     end
 
     def canonical_through_relationship(candidates)

@@ -116,6 +116,27 @@ RSpec.describe RailsMmd::IrBuilder do
     )
   end
 
+  it 'does not project hidden HABTM join columns onto endpoint attributes' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core', entities: [entity('Author', 'authors'), entity('Tag', 'tags')], diagnostics: []
+    )
+    habtm = relationship(
+      'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
+      'entities/authors', 'entities/tags', 'tags'
+    )
+    habtm.relationship_kind = :habtm
+    habtm.owner_foreign_key_column = nil
+    habtm.foreign_key_column = nil
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core', relationships: [habtm], diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+
+    expect(payload.fetch('entities').flat_map { |item| item.fetch('attributes') }.map { |item| item.fetch('role') })
+      .to eq(%w[primary_key primary_key])
+  end
+
   it 'falls back to unknown when selected key column type metadata is unavailable' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core',

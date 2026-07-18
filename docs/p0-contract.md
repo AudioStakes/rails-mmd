@@ -379,12 +379,27 @@ declarations retain `ASSOCIATION_POLYMORPHIC_OMITTED` without suppressing valid
 candidates. STI expansion, scopes, through polymorphism, `source_type:`, and
 custom/composite keys remain deferred.
 
+P1-07 supports unscoped `has_and_belongs_to_many` declarations whose resolved
+target is renderable and selected in the same domain. The resolved scalar join
+table and two distinct scalar join columns must use structured identifiers. The
+hidden join table must exist, have no primary key, and contain exactly those two
+columns. One-sided, reciprocal, alias, custom table/key, `class_name`, and
+self-HABTM declarations share one normalized physical signature. Each valid
+signature emits one edge with ID
+`relationships/<left_table>/habtm/<join_table>/<left_column>/<right_table>/<right_column>`;
+endpoint tuples are ordered lexically and both cardinalities are `0..many`.
+Hidden join-table columns are not projected as entity attributes. Invalid table
+shape emits `ASSOCIATION_JOIN_TABLE_INVALID`; scopes, unresolved targets,
+domain boundaries, unsafe names, and unsupported key shapes retain their
+existing specific diagnostics.
+
 Omitted relationship diagnostics:
 
 | condition | diagnostic |
 |---|---|
 | Deferred or conflicting polymorphic shape | `ASSOCIATION_POLYMORPHIC_OMITTED` |
 | Polymorphic root with no selected matching target | `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED` |
+| Missing or invalid HABTM join table | `ASSOCIATION_JOIN_TABLE_INVALID` |
 | Scoped supported or polymorphic association shape | `ASSOCIATION_SCOPED_OMITTED` |
 | Unresolved target | `ASSOCIATION_TARGET_UNRESOLVED` |
 | Unresolved through reflection/intermediate | `ASSOCIATION_THROUGH_UNRESOLVED` |
@@ -517,6 +532,10 @@ Per-code metadata schemas are intentionally small and closed:
   `ruby_constant`, `metadata_kind`, and `reason`.
 - Association omission codes have `domain_id`, `owner_constant`,
   `association_name`, and optional `target_constant`.
+- `ASSOCIATION_JOIN_TABLE_INVALID` instead has `domain_id`, `owner_constant`,
+  `association_name`, optional `target_constant`, `join_table`, and `reason`.
+  `reason` is one of `unresolved`, `primary_key_present`,
+  `join_column_missing`, `extra_columns`, or `ambiguous_columns`.
 - `ASSOCIATION_MACRO_OMITTED` instead has `domain_id`, `owner_constant`,
   `association_name`, and required snake-case `association_macro`.
 - Token/serialization/publish/internal codes: `SAFE_TOKEN_COLLISION` has
@@ -549,6 +568,7 @@ Closed diagnostic codes:
 - `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED`
 - `ASSOCIATION_POLYMORPHIC_OMITTED`
 - `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED`
+- `ASSOCIATION_JOIN_TABLE_INVALID`
 - `ASSOCIATION_SCOPED_OMITTED`
 - `ASSOCIATION_COMPOSITE_KEY_OMITTED`
 - `ASSOCIATION_KEY_COLUMN_MISSING`
@@ -584,6 +604,7 @@ Diagnostic catalog:
 | `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_POLYMORPHIC_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit polymorphic group |
+| `ASSOCIATION_JOIN_TABLE_INVALID` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_SCOPED_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_COMPOSITE_KEY_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_KEY_COLUMN_MISSING` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
@@ -800,6 +821,9 @@ P1-04 normalizes those bounds to canonical FK orientation: the holder endpoint
 is `0..1` when any group candidate is `has_one` or the FK has a total plain
 unique index, otherwise `0..many`; the referenced endpoint is `1..1` only with
 DB-FK and non-null evidence, otherwise `0..1`.
+
+HABTM cardinality evidence (P1-07): both normalized endpoints are always
+`0..many`. Join-table indexes and database FKs do not strengthen either bound.
 
 ClassDiagram relationship syntax:
 

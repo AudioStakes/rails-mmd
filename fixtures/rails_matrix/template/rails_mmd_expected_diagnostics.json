@@ -1,15 +1,1 @@
-[
-  {
-    "code": "ASSOCIATION_MACRO_OMITTED",
-    "severity": "warning",
-    "phase": "relationship_build",
-    "scope": "relationship",
-    "subject_id": "authors.tags",
-    "metadata": {
-      "domain_id": "core",
-      "owner_constant": "Author",
-      "association_name": "tags",
-      "association_macro": "has_and_belongs_to_many"
-    }
-  }
-]
+[]
