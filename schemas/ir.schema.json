@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "domain_id", "entities", "relationships", "diagnostic_ids", "digest_sha256"],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "entities": {
       "type": "array",
@@ -76,7 +76,16 @@
         "target_entity_id": { "type": "string", "minLength": 1 },
         "association_name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?$" },
         "owner_cardinality": { "$ref": "#/$defs/cardinality" },
-        "target_cardinality": { "$ref": "#/$defs/cardinality" }
+        "target_cardinality": { "$ref": "#/$defs/cardinality" },
+        "metadata": { "$ref": "#/$defs/relationship_metadata" }
+      }
+    },
+    "relationship_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scoped"],
+      "properties": {
+        "scoped": { "const": true }
       }
     },
     "cardinality": { "enum": ["0..1", "1..1", "0..many", "1..many"] }

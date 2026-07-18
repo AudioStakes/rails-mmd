@@ -172,9 +172,12 @@ module RailsMatrix
     end
 
     def relationship_projection(relationship)
-      %w[relationship_id owner_safe_token target_safe_token label owner_cardinality target_cardinality].to_h do |key|
+      keys = %w[relationship_id owner_safe_token target_safe_token label owner_cardinality target_cardinality]
+      projection = keys.to_h do |key|
         [key, relationship.fetch(key)]
       end
+      projection['metadata'] = relationship.fetch('metadata') if relationship.key?('metadata')
+      projection
     end
 
     def validate_expected_polymorphic_groups(app_root, render_plan, pair)

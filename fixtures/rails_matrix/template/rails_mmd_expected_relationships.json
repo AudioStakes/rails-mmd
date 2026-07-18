@@ -165,7 +165,10 @@
     "target_safe_token": "AUTHOR",
     "label": "author",
     "owner_cardinality": "0..many",
-    "target_cardinality": "1..1"
+    "target_cardinality": "1..1",
+    "metadata": {
+      "scoped": true
+    }
   },
   {
     "relationship_id": "relationships/posts/through/labelings/label/labels",

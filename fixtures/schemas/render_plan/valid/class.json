@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "artifact_kind": "class",
   "domain_id": "core",
   "direction": "BT",
@@ -19,7 +19,8 @@
       "er_left_marker": "|o",
       "er_right_marker": "o{",
       "class_owner_multiplicity": "0..1",
-      "class_target_multiplicity": "0..*"
+      "class_target_multiplicity": "0..*",
+      "metadata": { "scoped": true }
     }
   ],
   "comments": [],

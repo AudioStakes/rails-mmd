@@ -107,6 +107,16 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     )
   end
 
+  def changed_expected_scoped_metadata_asdf
+    relationship = generic_expected_relationship.dup
+    relationship.delete(:metadata)
+    missing_expected_relationships_asdf.sub(
+      'mkdir -p tmp/rails_mmd',
+      "printf '%s\\n' '#{JSON.generate([relationship])}' > rails_mmd_expected_relationships.json\n          " \
+      'mkdir -p tmp/rails_mmd'
+    )
+  end
+
   def missing_expected_habtm_asdf
     relationships = [generic_expected_relationship, habtm_expected_relationship]
     missing_expected_relationships_asdf.sub(
@@ -119,7 +129,7 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
   def generic_expected_relationship
     {
       relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
-      label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1'
+      label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1', metadata: { scoped: true }
     }
   end
 
@@ -199,6 +209,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
 
   it 'rejects generated relationships that do not match the real-app expectation' do
     with_fake_asdf(missing_expected_relationships_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('relationships did not match expectation'))
+    end
+  end
+
+  it 'rejects an expected relationship whose scoped metadata was removed' do
+    with_fake_asdf(changed_expected_scoped_metadata_asdf) do |path|
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('relationships did not match expectation'))

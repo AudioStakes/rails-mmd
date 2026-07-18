@@ -15,7 +15,7 @@
     "digest_sha256"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "artifact_kind": { "enum": ["er", "class"] },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "direction": { "enum": ["TB", "BT", "LR", "RL"] },
@@ -118,7 +118,16 @@
         "er_left_marker": { "enum": ["|o", "||", "}o", "}|"] },
         "er_right_marker": { "enum": ["o|", "||", "o{", "|{"] },
         "class_owner_multiplicity": { "enum": ["0..1", "1", "0..*", "1..*"] },
-        "class_target_multiplicity": { "enum": ["0..1", "1", "0..*", "1..*"] }
+        "class_target_multiplicity": { "enum": ["0..1", "1", "0..*", "1..*"] },
+        "metadata": { "$ref": "#/$defs/relationship_metadata" }
+      }
+    },
+    "relationship_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scoped"],
+      "properties": {
+        "scoped": { "const": true }
       }
     },
     "comment": {
