@@ -1,6 +1,6 @@
 # P2-02 Single-Table Inheritance Implementation
 
-Status: implementation and specialist review complete; final repository gate pending
+Status: complete
 
 ## Baseline
 
@@ -60,8 +60,9 @@ Status: implementation and specialist review complete; final repository gate pen
 
 ## Verification evidence
 
-- RuboCop: 99 files inspected, no offenses before the final coverage additions; focused changed specs remain clean.
+- RuboCop: 99 files inspected, no offenses.
 - RSpec coverage gate: 296 examples, 0 failures.
 - Undercover: no coverage missing in the P2-02 changes.
-- Bundler Audit: no vulnerabilities found before the final coverage additions.
-- The complete default gate and direct Git hooks are rerun after the final documentation/test commit.
+- Bundler Audit: no vulnerabilities found.
+- Rails compatibility matrix: PASS 3/3 pairs.
+- Default `rake` gate: passed after the complete implementation and review commits.
