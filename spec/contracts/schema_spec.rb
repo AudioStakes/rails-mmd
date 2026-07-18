@@ -156,6 +156,9 @@ RSpec.describe 'P0 contract schemas' do
       diagnostics/invalid/machine_local_metadata.json
       diagnostics/invalid/absolute_artifact_path.json
       diagnostics/invalid/raw_backtrace.json
+      diagnostics/invalid/association_macro_missing.json
+      diagnostics/invalid/association_macro_extra.json
+      diagnostics/invalid/association_macro_malformed.json
     ]
   end
 

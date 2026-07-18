@@ -347,8 +347,11 @@ Omitted relationship diagnostics:
 | Missing owner or target key column | `ASSOCIATION_KEY_COLUMN_MISSING` |
 | Custom or non-primary target key | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` |
 | Unsafe association name | `ASSOCIATION_NAME_UNSUPPORTED_OMITTED` |
+| Non-`belongs_to` macro (P1-02) | `ASSOCIATION_MACRO_OMITTED` |
 
-P0 emits no warnings for non-`belongs_to` associations.
+The P0 baseline emitted no warnings for non-`belongs_to` associations. P1-02
+extends Rails 7.2/8.1 output with one warning per omitted macro; rendering
+eligibility remains unchanged until its owning P1 feature is implemented.
 
 For P0, scoped `belongs_to` means the association reflection itself has a scope
 lambda or proc (`reflection.scope.present?`). A target model `default_scope` does
@@ -465,6 +468,8 @@ Per-code metadata schemas are intentionally small and closed:
   `ruby_constant`, `metadata_kind`, and `reason`.
 - Association omission codes have `domain_id`, `owner_constant`,
   `association_name`, and optional `target_constant`.
+- `ASSOCIATION_MACRO_OMITTED` instead has `domain_id`, `owner_constant`,
+  `association_name`, and required snake-case `association_macro`.
 - Token/serialization/publish/internal codes: `SAFE_TOKEN_COLLISION` has
   `artifact_kind`, `domain_id`, `token_kind`, `base_safe_token`,
   `collision_subject_count`, and `resolved`; `MERMAID_SERIALIZATION_FAILED` has
@@ -497,6 +502,7 @@ Closed diagnostic codes:
 - `ASSOCIATION_KEY_COLUMN_MISSING`
 - `ASSOCIATION_NON_PRIMARY_KEY_OMITTED`
 - `ASSOCIATION_NAME_UNSUPPORTED_OMITTED`
+- `ASSOCIATION_MACRO_OMITTED`
 - `DOMAIN_RELATIONSHIP_OMITTED`
 - `DB_METADATA_DEGRADED`
 - `SAFE_TOKEN_COLLISION`
@@ -528,6 +534,7 @@ Diagnostic catalog:
 | `ASSOCIATION_KEY_COLUMN_MISSING` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_NAME_UNSUPPORTED_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
+| `ASSOCIATION_MACRO_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `DOMAIN_RELATIONSHIP_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `DB_METADATA_DEGRADED` | warning | 0 | schema_probe | domain | diagnostics JSON | weaken metadata evidence only |
 | `SAFE_TOKEN_COLLISION` | warning or fatal | 0 or 3 | tokenization | artifact | diagnostics JSON | warning when suffix resolves; fatal when suffix exhaustion remains |

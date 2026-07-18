@@ -1,0 +1,41 @@
+[
+  {
+    "code": "ASSOCIATION_MACRO_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "authors.posts",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "Author",
+      "association_name": "posts",
+      "association_macro": "has_many"
+    }
+  },
+  {
+    "code": "ASSOCIATION_MACRO_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "authors.profile",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "Author",
+      "association_name": "profile",
+      "association_macro": "has_one"
+    }
+  },
+  {
+    "code": "ASSOCIATION_MACRO_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "authors.tags",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "Author",
+      "association_name": "tags",
+      "association_macro": "has_and_belongs_to_many"
+    }
+  }
+]

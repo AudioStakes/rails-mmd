@@ -53,6 +53,42 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     SH
   end
 
+  let(:missing_expected_diagnostics_asdf) do
+    <<~'SH'
+      [ "$1" = "where" ] && exit 0
+      case "$*" in
+        *--version*) exit 0 ;;
+        *"exec rails-mmd generate"*)
+          mkdir -p tmp/rails_mmd
+          cp "$RAILS_MMD_TEST_ROOT/fixtures/schemas/render_plan/valid/er.json" \
+            tmp/rails_mmd/core.er.render_plan.json
+          cp "$RAILS_MMD_TEST_ROOT/fixtures/schemas/render_plan/valid/class.json" \
+            tmp/rails_mmd/core.class.render_plan.json
+          printf '%s\n' \
+            'erDiagram' \
+            '  direction LR' \
+            '  %% sanitized comment' \
+            '  USER }o..|| ACCOUNT : account' \
+            '  USER {' \
+            '    bigint id PK' \
+            '    bigint account_id FK' \
+            '  }' \
+            '  ACCOUNT {' \
+            '    bigint id PK' \
+            '  }' > tmp/rails_mmd/core.er.mmd
+          printf '%s\n' \
+            'classDiagram' \
+            '  direction BT' \
+            '  class ORDER' \
+            '  class ACCOUNT' \
+            '  ORDER "0..1" --> "0..*" ACCOUNT : billing_account' \
+            > tmp/rails_mmd/core.class.mmd
+          exit 0 ;;
+        *) exit 0 ;;
+      esac
+    SH
+  end
+
   def run_matrix(path: ENV.fetch('PATH'), pair: nil)
     stdout, stderr, status = Open3.capture3(
       { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd },
@@ -108,6 +144,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('does not match core.er.render_plan.json'))
+    end
+  end
+
+  it 'rejects generated diagnostics that do not match the real-app expectation' do
+    with_fake_asdf(missing_expected_diagnostics_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('diagnostics did not match expectation'))
     end
   end
 

@@ -8,7 +8,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | 優先順位 | Active Record機能 | rails-mmd | 現在の不足 | 完了条件 |
 |---|---|---|---|---|
 | P1-01 | Rails 7.2/8.1実行互換 | 対応 | 3組のRuby/Rails境界matrixがpre-pushでPASS | 3組のRuby/Rails境界matrixをpre-pushで通す |
-| P1-02 | 全関連macroの検出 | 未対応 | `belongs_to`以外を無言で省略 | 全reflectionを分類し、未対応macroを診断する |
+| P1-02 | 全関連macroの検出 | 対応 | 全reflectionを分類し、未対応macroを診断済み | 全reflectionを分類し、未対応macroを診断する |
 | P1-03 | `has_many` / `has_one` | 未対応 | 描画しない | direct関連とself joinの多重度を検証する |
 | P1-04 | `inverse_of` | 未対応 | 逆関連を照合しない | 同じ論理関連を1本のcanonical edgeへ統合する |
 | P1-05 | `has_many :through` / `has_one :through` | 未対応 | through経路を展開しない | 中間modelと到達先を重複なく描画する |

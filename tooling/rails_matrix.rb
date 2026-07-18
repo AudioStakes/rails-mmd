@@ -53,7 +53,10 @@ module RailsMatrix
     def validate(app_root, pair)
       output = app_root.join('tmp/rails_mmd')
       ARTIFACT_KINDS.each { |kind| validate_artifact(output, kind, pair) }
-      output.glob('*.diagnostics.json').each { |path| validate_json(path, pair, :diagnostics) }
+      diagnostics = output.glob('*.diagnostics.json').flat_map do |path|
+        validate_json(path, pair, :diagnostics).fetch('diagnostics')
+      end
+      validate_expected_diagnostics(app_root, diagnostics, pair)
     end
 
     private
@@ -82,6 +85,25 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} published schema-invalid #{path.basename}"
     rescue Errno::ENOENT, JSON::ParserError => e
       raise VerificationError, "#{pair.name} published invalid #{path.basename}: #{e.message}"
+    end
+
+    def validate_expected_diagnostics(app_root, diagnostics, pair)
+      expected = JSON.parse(app_root.join('rails_mmd_expected_diagnostics.json').read)
+      expected_codes = expected.map { |diagnostic| diagnostic.fetch('code') }.uniq
+      actual = diagnostics
+               .select { |diagnostic| expected_codes.include?(diagnostic.fetch('code')) }
+               .map { |diagnostic| diagnostic_projection(diagnostic) }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} diagnostics did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+
+    def diagnostic_projection(diagnostic)
+      %w[code severity phase scope subject_id metadata].to_h do |key|
+        [key, diagnostic.fetch(key)]
+      end
     end
   end
 
