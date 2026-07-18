@@ -363,12 +363,29 @@ cardinality is `0..many`; target cardinality is `0..many` for `has_many` and
 `0..1` for `has_one`. Explicit `source:`, `source_type:`, scopes, and
 polymorphic hops remain omitted for later priorities.
 
+P1-06 supports direct, unscoped polymorphic `belongs_to` roots when both scalar
+id/type holder columns exist. Selected same-domain direct `has_many` / `has_one
+..., as:` reflections are candidates only when their interface, child model,
+id/type columns, and owner primary key match the root. The root's `klass` is
+never resolved. One edge is emitted per unique concrete target with ID
+`relationships/<holder_table>/polymorphic/<interface>/<id_column>/<type_column>/<target_table>`;
+the label is the root association name. Both holder columns are rendered as FK
+attributes. Target cardinality is always `0..1`; holder cardinality is `0..1`
+for a canonical `has_one` inverse or an exact total plain unique index on the
+id/type pair, otherwise `0..many`. Candidate aliases are canonicalized by
+`has_one`, `has_many`, then lexical association name. No matching target emits
+`ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED`; conflicting/deferred inverse
+declarations retain `ASSOCIATION_POLYMORPHIC_OMITTED` without suppressing valid
+candidates. STI expansion, scopes, through polymorphism, `source_type:`, and
+custom/composite keys remain deferred.
+
 Omitted relationship diagnostics:
 
 | condition | diagnostic |
 |---|---|
-| Polymorphic `belongs_to` | `ASSOCIATION_POLYMORPHIC_OMITTED` |
-| Scoped `belongs_to` | `ASSOCIATION_SCOPED_OMITTED` |
+| Deferred or conflicting polymorphic shape | `ASSOCIATION_POLYMORPHIC_OMITTED` |
+| Polymorphic root with no selected matching target | `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED` |
+| Scoped supported or polymorphic association shape | `ASSOCIATION_SCOPED_OMITTED` |
 | Unresolved target | `ASSOCIATION_TARGET_UNRESOLVED` |
 | Unresolved through reflection/intermediate | `ASSOCIATION_THROUGH_UNRESOLVED` |
 | Unresolved through source/nested chain | `ASSOCIATION_SOURCE_UNRESOLVED` |
@@ -531,6 +548,7 @@ Closed diagnostic codes:
 - `ASSOCIATION_SOURCE_UNRESOLVED`
 - `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED`
 - `ASSOCIATION_POLYMORPHIC_OMITTED`
+- `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED`
 - `ASSOCIATION_SCOPED_OMITTED`
 - `ASSOCIATION_COMPOSITE_KEY_OMITTED`
 - `ASSOCIATION_KEY_COLUMN_MISSING`
@@ -565,6 +583,7 @@ Diagnostic catalog:
 | `ASSOCIATION_SOURCE_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_POLYMORPHIC_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
+| `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit polymorphic group |
 | `ASSOCIATION_SCOPED_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_COMPOSITE_KEY_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_KEY_COLUMN_MISSING` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |

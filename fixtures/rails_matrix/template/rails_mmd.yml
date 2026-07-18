@@ -5,8 +5,10 @@ domains:
       - Author
       - Account
       - AccountMembership
+      - Comment
       - Draft
       - Employee
+      - Image
       - Label
       - Labeling
       - Membership

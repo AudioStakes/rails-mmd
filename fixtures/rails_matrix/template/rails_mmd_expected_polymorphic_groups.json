@@ -1,0 +1,9 @@
+[
+  {
+    "group_id": "relationships/comments/polymorphic/commentable/commentable_id/commentable_type",
+    "holder_safe_token": "COMMENT",
+    "root_label": "commentable",
+    "candidate_target_safe_tokens": ["IMAGE", "POST"],
+    "foreign_key_attributes": ["commentable_id", "commentable_type"]
+  }
+]

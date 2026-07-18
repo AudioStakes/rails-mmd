@@ -87,6 +87,35 @@ RSpec.describe RailsMmd::IrBuilder do
     )
   end
 
+  it 'marks both polymorphic id and type columns as foreign keys' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [entity('Comment', 'comments',
+                        columns: [column('id'), column('commentable_id'), column('commentable_type')]),
+                 entity('Post', 'posts')],
+      diagnostics: []
+    )
+    polymorphic = relationship(
+      'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/posts',
+      'entities/comments', 'entities/posts', 'commentable'
+    )
+    polymorphic.foreign_key_holder_entity_id = 'entities/comments'
+    polymorphic.foreign_key_column = 'commentable_id'
+    polymorphic.foreign_type_column = 'commentable_type'
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core', relationships: [polymorphic], diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+    comment = payload.fetch('entities').find do |entity_payload|
+      entity_payload.fetch('entity_id') == 'entities/comments'
+    end
+
+    expect(comment.fetch('attributes').map { |attribute| [attribute.fetch('name'), attribute.fetch('role')] }).to eq(
+      [%w[id primary_key], %w[commentable_id foreign_key], %w[commentable_type foreign_key]]
+    )
+  end
+
   it 'falls back to unknown when selected key column type metadata is unavailable' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core',

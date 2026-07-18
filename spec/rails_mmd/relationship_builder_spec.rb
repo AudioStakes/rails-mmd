@@ -154,6 +154,246 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'keeps a rootless scoped polymorphic inverse on the scoped omission path' do
+    inverse = association(
+      'comments', :has_many, klass: renderable_model('Comment', 'comments'), as: :commentable,
+                             scope: -> {}, foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result('core', [entity('Post', 'posts')])
+
+    result = build(domain, 'Post' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_SCOPED_OMITTED']
+    )
+  end
+
+  it 'builds one polymorphic edge per matching inverse candidate' do
+    comment_model = renderable_model('Comment', 'comments')
+    renderable_model('Post', 'posts')
+    renderable_model('Image', 'images')
+    commentable = belongs_to('commentable', polymorphic: true)
+    post_comments = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    image_comment = association(
+      'comment', :has_one, klass: comment_model, as: :commentable,
+                           foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                               column('commentable_type', false)]),
+       entity('Post', 'posts'), entity('Image', 'images')]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(commentable),
+      'Post' => owner_model(post_comments),
+      'Image' => owner_model(image_comment)
+    )
+    polymorphic = result.domains.first.relationships.select do |relationship|
+      relationship.relationship_kind == :polymorphic
+    end
+
+    expect(result.diagnostics).to eq([])
+    expect(polymorphic).to contain_exactly(
+      have_attributes(
+        relationship_id: 'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/posts',
+        owner_entity_id: 'entities/comments', target_entity_id: 'entities/posts',
+        association_name: 'commentable', foreign_key_column: 'commentable_id',
+        foreign_type_column: 'commentable_type', owner_cardinality: '0..many', target_cardinality: '0..1'
+      ),
+      have_attributes(
+        relationship_id: 'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/images',
+        owner_entity_id: 'entities/comments', target_entity_id: 'entities/images',
+        association_name: 'commentable', foreign_key_column: 'commentable_id',
+        foreign_type_column: 'commentable_type', owner_cardinality: '0..1', target_cardinality: '0..1'
+      )
+    )
+  end
+
+  it 'deduplicates same-target polymorphic inverses with singular and lexical priority' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    many = association('comments', :has_many, klass: comment_model, as: :commentable,
+                                              foreign_key: 'commentable_id', type: 'commentable_type')
+    singular_alias = association('featured_comment', :has_one, klass: comment_model, as: :commentable,
+                                                               foreign_key: 'commentable_id', type: 'commentable_type')
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                               column('commentable_type', false)]),
+       entity('Post', 'posts')]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(root),
+      'Post' => owner_model(many, singular_alias)
+    )
+    polymorphic = result.domains.first.relationships.select do |relationship|
+      relationship.relationship_kind == :polymorphic
+    end
+
+    expect(result.diagnostics).to eq([])
+    expect(polymorphic).to contain_exactly(have_attributes(owner_cardinality: '0..1'))
+  end
+
+  it 'publishes valid polymorphic candidates while diagnosing conflicting inverses' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    valid = association('comments', :has_many, klass: comment_model, as: :commentable,
+                                               foreign_key: 'commentable_id', type: 'commentable_type')
+    conflicting = association('comment', :has_one, klass: comment_model, as: :commentable,
+                                                   foreign_key: 'commentable_id', type: 'wrong_type')
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                               column('commentable_type', false)]),
+       entity('Post', 'posts'), entity('Image', 'images')]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(root),
+      'Post' => owner_model(valid),
+      'Image' => owner_model(conflicting)
+    )
+
+    expect(result.domains.first.relationships.map(&:target_entity_id)).to eq(['entities/posts'])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_POLYMORPHIC_OMITTED']
+    )
+  end
+
+  it 'diagnoses polymorphic roots with zero candidates or an incomplete key pair' do
+    root = belongs_to('commentable', polymorphic: true)
+    complete = domain_result(
+      'core', [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                                       column('commentable_type', false)])]
+    )
+    incomplete = domain_result(
+      'core', [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false)])]
+    )
+
+    zero_candidates = build(complete, 'Comment' => owner_model(root))
+    missing_column = build(incomplete, 'Comment' => owner_model(root))
+
+    expect(zero_candidates.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED']
+    )
+    expect(missing_column.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_KEY_COLUMN_MISSING']
+    )
+  end
+
+  it 'diagnoses unsafe and composite polymorphic roots without resolving a target class' do
+    domain = domain_result('core', [entity('Comment', 'comments')])
+
+    unsafe = build(domain, 'Comment' => owner_model(belongs_to('BadName', polymorphic: true)))
+    composite = build(
+      domain,
+      'Comment' => owner_model(belongs_to('commentable', polymorphic: true,
+                                                         foreign_key: %w[commentable_id tenant_id]))
+    )
+
+    expect(unsafe.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_NAME_UNSUPPORTED_OMITTED']
+    )
+    expect(composite.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
+    )
+  end
+
+  it 'defers custom scalar polymorphic key names' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true, foreign_key: 'subject_id',
+                                     foreign_type: 'subject_kind')
+    inverse = association('comments', :has_many, klass: comment_model, as: :commentable,
+                                                 foreign_key: 'subject_id', type: 'subject_kind')
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('subject_id', false),
+                                               column('subject_kind', false)]), entity('Post', 'posts')]
+    )
+
+    result = build(domain, 'Comment' => owner_model(root), 'Post' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to contain_exactly(
+      'ASSOCIATION_POLYMORPHIC_OMITTED', 'ASSOCIATION_POLYMORPHIC_OMITTED'
+    )
+  end
+
+  it 'diagnoses invalid polymorphic candidate scopes and primary keys independently' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    scoped = association('comments', :has_many, klass: comment_model, as: :commentable, scope: -> {},
+                                                foreign_key: 'commentable_id', type: 'commentable_type')
+    wrong_primary = association('comments', :has_many, klass: comment_model, as: :commentable,
+                                                       foreign_key: 'commentable_id', type: 'commentable_type',
+                                                       active_record_primary_key: 'uuid')
+    missing_primary = association('comment', :has_one, klass: comment_model, as: :commentable,
+                                                       foreign_key: 'commentable_id', type: 'commentable_type',
+                                                       active_record_primary_key: 'uuid')
+    non_renderable = association(
+      'comments', :has_many, klass: renderable_model('Comment', 'comments', renderable: false), as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                               column('commentable_type', false)]),
+       entity('Post', 'posts'), entity('Image', 'images'),
+       entity('Video', 'videos', primary_key: 'uuid'), entity('Audio', 'audios')]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(root), 'Post' => owner_model(scoped),
+      'Image' => owner_model(wrong_primary), 'Video' => owner_model(missing_primary),
+      'Audio' => owner_model(non_renderable)
+    )
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to contain_exactly(
+      'ASSOCIATION_SCOPED_OMITTED',
+      'ASSOCIATION_NON_PRIMARY_KEY_OMITTED',
+      'ASSOCIATION_KEY_COLUMN_MISSING',
+      'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED',
+      'ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED'
+    )
+  end
+
+  it 'contains unreadable inverse options and strengthens an exact unique polymorphic key pair' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    valid = association('comments', :has_many, klass: comment_model, as: :commentable,
+                                               foreign_key: 'commentable_id', type: 'commentable_type')
+    unreadable = unreadable_polymorphic_inverse(comment_model)
+    domain = domain_result(
+      'core',
+      [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                               column('commentable_type', false)],
+                                     indexes: [index(%w[commentable_type commentable_id], true)]),
+       entity('Post', 'posts'), entity('Image', 'images')]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(root), 'Post' => owner_model(valid), 'Image' => owner_model(unreadable)
+    )
+
+    expect(result.domains.first.relationships).to contain_exactly(have_attributes(owner_cardinality: '0..1'))
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_POLYMORPHIC_OMITTED']
+    )
+  end
+
   it 'builds an inferred-source has-many-through semantic edge beside direct physical edges' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
@@ -618,7 +858,6 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(result.domains.first.relationships).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[
-        ASSOCIATION_POLYMORPHIC_OMITTED
         ASSOCIATION_SCOPED_OMITTED
         ASSOCIATION_TARGET_UNRESOLVED
         ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED
@@ -627,6 +866,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         ASSOCIATION_KEY_COLUMN_MISSING
         ASSOCIATION_NON_PRIMARY_KEY_OMITTED
         ASSOCIATION_NAME_UNSUPPORTED_OMITTED
+        ASSOCIATION_KEY_COLUMN_MISSING
       ]
     )
     expect(result.diagnostics).to all(satisfy { |diagnostic| schema_valid_diagnostic?(diagnostic) })
@@ -809,6 +1049,12 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     reflection
   end
 
+  def unreadable_polymorphic_inverse(model)
+    reflection = association('comments', :has_many, klass: model, type: 'commentable_type')
+    reflection.define_singleton_method(:options) { raise 'options unavailable' }
+    reflection
+  end
+
   def simple_reflection(name)
     Struct.new(:name, :macro, :foreign_key, :association_primary_key) do
       def polymorphic? = false
@@ -836,6 +1082,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     end
 
     def association_primary_key = @options.fetch(:association_primary_key, 'id')
+
+    def foreign_type = @options.fetch(:foreign_type, "#{name}_type")
 
     def active_record_primary_key = @options.fetch(:active_record_primary_key, 'id')
 

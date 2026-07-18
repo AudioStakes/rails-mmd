@@ -64,3 +64,6 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   app and extend its exact relationship oracle on every declared matrix pair;
   keep isolated unit doubles for failure paths that real model declarations
   cannot express.
+- Resolve polymorphic associations from a two-pass reflection inventory. Never
+  call `klass` on a polymorphic `belongs_to`; derive concrete targets only from
+  selected matching inverse `as:` reflections.

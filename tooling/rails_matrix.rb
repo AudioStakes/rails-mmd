@@ -40,6 +40,58 @@ module RailsMatrix
     attr_reader :data
   end
 
+  # Builds the exact-oracle view of target-specific polymorphic edges.
+  class PolymorphicGroupProjector
+    def self.call(render_plan)
+      new(render_plan).call
+    end
+
+    def initialize(render_plan)
+      @render_plan = render_plan
+      @entities = render_plan.fetch('entities').to_h { |entity| [entity.fetch('safe_token'), entity] }
+    end
+
+    def call
+      projections = relationships.group_by { |relationship| group_id(relationship) }.map do |id, candidates|
+        projection(id, candidates)
+      end
+      projections.sort_by { |group| group.fetch('group_id') }
+    end
+
+    private
+
+    attr_reader :entities, :render_plan
+
+    def relationships
+      render_plan.fetch('relationships').select do |relationship|
+        relationship.fetch('relationship_id').include?('/polymorphic/')
+      end
+    end
+
+    def group_id(relationship)
+      relationship.fetch('relationship_id').split('/')[0...-1].join('/')
+    end
+
+    def projection(id, candidates)
+      holder = candidates.first.fetch('owner_safe_token')
+      {
+        'group_id' => id,
+        'holder_safe_token' => holder,
+        'root_label' => candidates.first.fetch('label'),
+        'candidate_target_safe_tokens' => candidates.map { |item| item.fetch('target_safe_token') }.uniq.sort,
+        'foreign_key_attributes' => key_attributes(id, holder)
+      }
+    end
+
+    def key_attributes(id, holder)
+      key_names = id.split('/').last(2)
+      entities.fetch(holder).fetch('attributes').filter_map do |attribute|
+        label = attribute.fetch('label')
+        label if key_names.include?(label) && attribute.fetch('key_marker') == 'FK'
+      end.uniq.sort
+    end
+  end
+
   # Verifies the user-visible files emitted by a real matrix application.
   class ArtifactValidator
     ARTIFACT_KINDS = %w[er class].freeze
@@ -58,6 +110,7 @@ module RailsMatrix
       end
       validate_expected_diagnostics(app_root, diagnostics, pair)
       validate_expected_relationships(app_root, plans.fetch('er').fetch('relationships'), pair)
+      validate_expected_polymorphic_groups(app_root, plans.fetch('er'), pair)
     end
 
     private
@@ -122,6 +175,16 @@ module RailsMatrix
       %w[relationship_id owner_safe_token target_safe_token label owner_cardinality target_cardinality].to_h do |key|
         [key, relationship.fetch(key)]
       end
+    end
+
+    def validate_expected_polymorphic_groups(app_root, render_plan, pair)
+      expected = JSON.parse(app_root.join('rails_mmd_expected_polymorphic_groups.json').read)
+      actual = PolymorphicGroupProjector.call(render_plan)
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} polymorphic groups did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
     end
   end
 

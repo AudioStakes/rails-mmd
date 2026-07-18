@@ -12,7 +12,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | P1-03 | `has_many` / `has_one` | 対応 | direct関連・self join・暫定重複抑止を検証済み | direct関連とself joinの多重度を検証する |
 | P1-04 | `inverse_of` | 対応 | inverse有無に依存せず物理関連をcanonical edgeへ統合済み | 同じ論理関連を1本のcanonical edgeへ統合する |
 | P1-05 | `has_many :through` / `has_one :through` | 対応 | 推論sourceの1段・nested経路をsemantic edgeとして描画済み | 中間modelと到達先を重複なく描画する |
-| P1-06 | polymorphic | 未対応 | 診断して省略 | 型列と対象候補を重複なく描画する |
+| P1-06 | polymorphic | 対応 | 選択済みinverse候補を対象別edgeへ正規化済み | 型列と対象候補を重複なく描画する |
 | P1-07 | `has_and_belongs_to_many` | 未対応 | 無言で省略 | join tableを検証し、単一の多対多関連として描画する |
 
 ## 後続候補
@@ -38,6 +38,7 @@ Rails 7.2/8.1で次を対応済み。
 - FK、nullability、unique indexによる保守的な多重度
 - same-domain限定のER/Class出力
 - 対応範囲内の`belongs_to`除外診断
+- direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
 
 ## 根拠
 

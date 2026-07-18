@@ -75,10 +75,14 @@ module RailsMmd
     def foreign_key_names(entity, relationship_domain)
       return [] unless relationship_domain
 
-      relationship_domain.relationships.filter_map do |relationship|
+      relationship_domain.relationships.flat_map do |relationship|
         holder_id = relationship.foreign_key_holder_entity_id || relationship.owner_entity_id
-        column = relationship.foreign_key_column || relationship.owner_foreign_key_column
-        column if holder_id == entity_id(entity)
+        next [] unless holder_id == entity_id(entity)
+
+        [
+          relationship.foreign_key_column || relationship.owner_foreign_key_column,
+          relationship.foreign_type_column
+        ].compact
       end
     end
 
