@@ -17,7 +17,10 @@ must not load them until future issues need them:
 
 - `json_schemer`
 - `json-canonicalization`
-- `activesupport`
+
+Active Support and Active Record come from the target Rails application bundle.
+`rails-mmd` must not constrain their series unless shipped code directly needs
+an Active Support API.
 
 ## development-test
 

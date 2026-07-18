@@ -26,7 +26,7 @@ RSpec.describe Rake::Task do
   end
 
   it 'runs read-only diagnostics by default' do
-    expect(described_class[:default].prerequisites).to eq(%w[rubocop spec bundle:audit coverage])
+    expect(described_class[:default].prerequisites).to eq(%w[rubocop spec bundle:audit coverage verify:rails_matrix])
   end
 
   it 'defines an explicit autocorrect task' do

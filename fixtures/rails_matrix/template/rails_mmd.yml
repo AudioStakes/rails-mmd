@@ -1,0 +1,12 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - Author
+      - Post
+    exclude_models: []
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

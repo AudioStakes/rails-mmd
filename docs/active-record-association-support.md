@@ -1,32 +1,46 @@
-# Active Record 関連機能対応マトリクス（Rails 7+）
+# Active Record 関連機能対応マトリクス（Rails 7.2 / 8.1）
 
-この表は対応状況と次期優先順位を示し、現行挙動は [P0 contract](p0-contract.md) に従う。
-状態は「対応」「条件付き」「未対応」で決定する。
-「対応」は実装とテストが完了、「条件付き」は一部の対象版または条件だけ対応、「未対応」はレンダ不可または未検証（診断付き省略を含む）を表す。
-優先順位はP1、P2、P3の順とし、同一優先度内は番号順に実装する。
-Rails 7+対象版は7.0、7.1、7.2、8.0、8.1で統一する。
-「Rails提供版」はRails側の機能提供範囲であり、rails-mmdの実行検証範囲ではない。
+rails-mmdの対象版はRails 7.2と8.1。
+状態は「対応」「条件付き」「未対応」。次は番号が最小の未完了P1を実装する。
 
-| 優先順位 | 分類 | Rails機能 | Rails提供版 | rails-mmd | 現在の制約 | 完了条件 | 根拠 |
-|---|---|---|---|---|---|---|---|
-| P1-01 | ランタイム互換性 | Rails 7/8 系の実行互換 | 7.0/7.1/7.2/8.0/8.1 | 条件付き | `required_ruby_version >= 4.0.5, < 4.1` と `activesupport ~> 8.1` のため、Rails 7.x/8.0とは同じbundleで共存できない | 対応するRuby/Railsの組合せを定めて依存制約を緩和し、各Rails版の実アプリfixtureをローカルpre-pushで通す | [gemspec](../rails-mmd.gemspec), [Rails 7.0 ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html) |
-| P1-02 | 検出基盤 | 全関連マクロの棚卸しと省略診断 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | `belongs_to`だけを走査し、ほかのマクロは無言で省略する | 全関連reflectionを分類し、未対応マクロごとの省略診断とfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [p0-contract](p0-contract.md) |
-| P1-03 | 直接関連 | `has_many` / `has_one` | 7.0/7.1/7.2/8.0/8.1 | 未対応 | `belongs_to`だけを走査する | 直接`has_many`/`has_one`を描画し、self joinを含むfixtureで多重度を検証する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb) |
-| P1-04 | 双方向関連 | `inverse_of`による逆関連照合 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | 逆関連を照合せず、将来両方向を走査すると重複しうる | `inverse_of`とキー情報で同じ論理関連を照合し、1本のcanonical edgeへ統合する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html) |
-| P1-05 | through関連 | `has_many :through` / `has_one :through` | 7.0/7.1/7.2/8.0/8.1 | 未対応 | through経路を展開しない | `through_reflection`と`source`を解決し、中間モデルと到達先を重複なく描画する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html) |
-| P1-06 | polymorphic | 多態関連 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | `ASSOCIATION_POLYMORPHIC_OMITTED` で省略し、型列と対象候補を図式化しない | 型列と対象候補を解決し、interfaceまたは具象関連として重複なく描画するfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html), [p0-contract](p0-contract.md) |
-| P1-07 | HABTM | `has_and_belongs_to_many` | 7.0/7.1/7.2/8.0/8.1 | 未対応 | 非`belongs_to`として無言で省略する | join tableをスキーマから検証し、単一の多対多関連として描画するfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [p0-contract](p0-contract.md) |
-| P2-01 | scoped関連 | スコープ付き関連 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | `ASSOCIATION_SCOPED_OMITTED` で省略する | スコープの存在を関連メタデータとして保持し、誤った無条件関連に見えない描画規則とfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html), [p0-contract](p0-contract.md) |
-| P2-02 | STI関連 | STI/継承関連 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | STIサブクラスをレンダ対象から除外する | 基底クラスと派生クラスの表示規則を定め、関連先の型を保持するfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [p0-contract](p0-contract.md) |
-| P2-03 | delegated_type | `delegated_type` | 7.0+（6.1導入済み） | 未対応 | polymorphic関連として省略する | `delegated_type` の宣言と具象型を抽出し、委譲元と各具象型を描画するfixtureを追加する | [Rails 7.0 DelegatedType](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/DelegatedType.html), [Rails 8.1 DelegatedType](https://api.rubyonrails.org/v8.1.0/classes/ActiveRecord/DelegatedType.html), [p0-contract](p0-contract.md) |
-| P2-04 | 複合キー | 複合主キー / 複合`foreign_key` / `query_constraints` | 7.1/7.2/8.0/8.1 | 未対応 | キー配列を `ASSOCIATION_COMPOSITE_KEY_OMITTED` で省略する | キー列配列を保持して対応する列組を照合し、多重度を判定するfixtureを追加する | [7.1 リリースノート](https://guides.rubyonrails.org/v7.1/7_1_release_notes.html), [Composite Primary Keys](https://guides.rubyonrails.org/active_record_composite_primary_keys.html), [p0-contract](p0-contract.md) |
-| P2-05 | 参照オプション | 非標準 `primary_key` / `source` / `source_type` / `as` | 7.0/7.1/7.2/8.0/8.1 | 未対応 | 標準主キーを指すscalar `belongs_to`以外は省略する | オプション別に対象とキーを解決し、関連種別ごとのfixtureを追加する | [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html), [p0-contract](p0-contract.md) |
-| P2-06 | 接続境界 | cross-domain / multi-DB | 7.0/7.1/7.2/8.0/8.1 | 未対応 | ドメイン外関連を省略し、複数接続をエラーにする | ドメイン境界と接続IDを保持し、外部ノードまたは診断として一貫して表現するfixtureを追加する | [p0-contract](p0-contract.md) |
-| P2-07 | 関連オプション | `dependent` / `touch` / `counter_cache` 等 | 7.0/7.1/7.2/8.0/8.1 | 未対応 | 構造と多重度以外の関連動作を出力しない | 図へ載せる関連動作を定義し、メタデータまたはラベルとして検証するfixtureを追加する | [association_basics](https://guides.rubyonrails.org/association_basics.html), [p0-contract](p0-contract.md) |
-| 完了 | belongs_to | 非`polymorphic`・`unscoped`・`scalar` direct `belongs_to` | 7.0/7.1/7.2/8.0/8.1 | 対応 | 既存P0ルールの対象範囲 | 実装とテストを満たしている | [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [render_plan_builder.rb](../lib/rails_mmd/render_plan_builder.rb), [relationship_builder_spec.rb](../spec/rails_mmd/relationship_builder_spec.rb), [render_plan_builder_spec.rb](../spec/rails_mmd/render_plan_builder_spec.rb), [p0-contract](p0-contract.md), [association_basics](https://guides.rubyonrails.org/association_basics.html) |
-| 完了 | belongs_toオプション | `class_name` | 7.0/7.1/7.2/8.0/8.1 | 対応 | 対応条件外は未対応として除外する実装済み | 実装とテストを満たしている | [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [relationship_builder_spec.rb](../spec/rails_mmd/relationship_builder_spec.rb), [p0-contract](p0-contract.md), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html) |
-| 完了 | belongs_toオプション | `foreign_key`（scalar） | 7.0/7.1/7.2/8.0/8.1 | 対応 | 非`scalar`は除外対象として扱う | 実装とテストを満たしている | [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [relationship_builder_spec.rb](../spec/rails_mmd/relationship_builder_spec.rb), [p0-contract](p0-contract.md), [ClassMethods](https://api.rubyonrails.org/v7.0/classes/ActiveRecord/Associations/ClassMethods.html) |
-| 完了 | カーディナリティ | FK/nullability/unique index による保守推定 | 7.0/7.1/7.2/8.0/8.1 | 対応 | 制約不足時は `0..1` または `0..many` へ弱める | 実装とテストを満たしている | [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [render_plan_builder.rb](../lib/rails_mmd/render_plan_builder.rb), [relationship_builder_spec.rb](../spec/rails_mmd/relationship_builder_spec.rb), [p0-contract](p0-contract.md), [association_basics](https://guides.rubyonrails.org/association_basics.html) |
-| 完了 | レンダ対象 | same-domain 限定 | 7.0/7.1/7.2/8.0/8.1 | 対応 | ドメイン外は除外対象 | 実装とテストを満たしている | [render_plan_builder.rb](../lib/rails_mmd/render_plan_builder.rb), [domain_resolver.rb](../lib/rails_mmd/domain_resolver.rb), [render_plan_builder_spec.rb](../spec/rails_mmd/render_plan_builder_spec.rb), [p0-contract](p0-contract.md) |
-| 完了 | 出力 | ER/Class 多重度出力 | 7.0/7.1/7.2/8.0/8.1 | 対応 | `er` と `class` の既定出力の既存仕様 | 実装とテストを満たしている | [render_plan_builder.rb](../lib/rails_mmd/render_plan_builder.rb), [mermaid_serializer.rb](../lib/rails_mmd/mermaid_serializer.rb), [render_plan_builder_spec.rb](../spec/rails_mmd/render_plan_builder_spec.rb), [p0-contract](p0-contract.md) |
-| 完了 | 診断 | 対応範囲内の`belongs_to`除外診断 | 7.0/7.1/7.2/8.0/8.1 | 対応 | 非`belongs_to`は無言で省略する | 対応範囲内の除外条件と診断をテスト済み | [relationship_builder.rb](../lib/rails_mmd/relationship_builder.rb), [diagnostics.rb](../lib/rails_mmd/diagnostics.rb), [relationship_builder_spec.rb](../spec/rails_mmd/relationship_builder_spec.rb), [p0-contract](p0-contract.md) |
+## 優先対応
+
+| 優先順位 | Active Record機能 | rails-mmd | 現在の不足 | 完了条件 |
+|---|---|---|---|---|
+| P1-01 | Rails 7.2/8.1実行互換 | 対応 | 3組のRuby/Rails境界matrixがpre-pushでPASS | 3組のRuby/Rails境界matrixをpre-pushで通す |
+| P1-02 | 全関連macroの検出 | 未対応 | `belongs_to`以外を無言で省略 | 全reflectionを分類し、未対応macroを診断する |
+| P1-03 | `has_many` / `has_one` | 未対応 | 描画しない | direct関連とself joinの多重度を検証する |
+| P1-04 | `inverse_of` | 未対応 | 逆関連を照合しない | 同じ論理関連を1本のcanonical edgeへ統合する |
+| P1-05 | `has_many :through` / `has_one :through` | 未対応 | through経路を展開しない | 中間modelと到達先を重複なく描画する |
+| P1-06 | polymorphic | 未対応 | 診断して省略 | 型列と対象候補を重複なく描画する |
+| P1-07 | `has_and_belongs_to_many` | 未対応 | 無言で省略 | join tableを検証し、単一の多対多関連として描画する |
+
+## 後続候補
+
+| 優先順位 | Active Record機能 | rails-mmd | 完了条件 |
+|---|---|---|---|
+| P2-01 | scoped関連 | 未対応 | scopeの存在をmetadataとして保持する |
+| P2-02 | STI | 未対応 | 基底・派生classの表示規則を定める |
+| P2-03 | `delegated_type` | 未対応 | 委譲元と具象型を描画する |
+| P2-04 | 複合primary/foreign key、`query_constraints` | 未対応 | 対応する列組を保持・照合する |
+| P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |
+| P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
+| P2-07 | `dependent` / `touch` / `counter_cache` | 未対応 | 図へ載せる動作metadataを定義する |
+| P3-01 | `disable_joins` / `strict_loading` / async | 未対応 | 実行特性の表示要否を決める |
+| P3-02 | association extension | 未対応 | 構造と無関係な拡張を診断またはmetadata化する |
+
+## 対応済み基盤
+
+Rails 7.2/8.1で次を対応済み。
+
+- 非polymorphic・unscoped・scalar direct `belongs_to`
+- scalar `foreign_key`と`class_name`
+- FK、nullability、unique indexによる保守的な多重度
+- same-domain限定のER/Class出力
+- 対応範囲内の`belongs_to`除外診断
+
+## 根拠
+
+- 現行契約: [P0 contract](p0-contract.md)
+- 実装: [relationship builder](../lib/rails_mmd/relationship_builder.rb)、[render plan builder](../lib/rails_mmd/render_plan_builder.rb)
+- Rails仕様: [Association Basics](https://guides.rubyonrails.org/association_basics.html)、[Rails 7.2 API](https://api.rubyonrails.org/v7.2/classes/ActiveRecord/Associations/ClassMethods.html)、[Rails 8.1 API](https://api.rubyonrails.org/v8.1/classes/ActiveRecord/Associations/ClassMethods.html)

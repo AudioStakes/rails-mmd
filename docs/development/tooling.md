@@ -8,24 +8,25 @@ RuboCop is the only formatter and autocorrect owner.
 Run repair before diagnostics when using local hooks:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake rubocop:auto_correct
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake rubocop:auto_correct
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake
 ```
 
 Read-only diagnostics do not autocorrect:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake rubocop
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake spec
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake coverage
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake bundle:audit
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake rubocop
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake spec
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake coverage
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake bundle:audit
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake verify:rails_matrix
 ```
 
 Refresh Bundler Audit advisory data explicitly before read-only diagnostics when
 network access is intended:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake bundle:audit:update
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake bundle:audit:update
 ```
 
 Set `UNDERCOVER_COMPARE` when a stacked PR should compare changed-code coverage
@@ -33,7 +34,7 @@ against a specific base branch:
 
 ```sh
 UNDERCOVER_COMPARE=issue/9-bootstrap-ruby-gem-and-cli-skeleton \
-  ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec rake coverage
+  ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake coverage
 ```
 
 Specs start SimpleCov before application code through `.rspec`. RSpec randomizes

@@ -7,7 +7,7 @@ directory.
 ## Command
 
 ```sh
-ASDF_RUBY_VERSION=4.0.5 asdf exec bundle exec exe/rails-mmd generate \
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd generate \
   --config rails_mmd.yml \
   --output-dir docs/rails_mmd \
   --domain core \
