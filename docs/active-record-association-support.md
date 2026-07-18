@@ -24,7 +24,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | P2-03 | `delegated_type` | 対応 | Rails生成type whitelistを安全に検出し、委譲元から描画可能な宣言済み具象型へ具体edgeを描画する |
 | P2-04 | 複合primary/foreign key、`query_constraints` | 対応 | 順序付き列組を全層で保持し、完全一致するDB制約・nullability・unique根拠を照合する。複合HABTMは対応Railsで実用不可のため診断して省略する |
 | P2-05 | `primary_key` / `source` / `source_type` / `as` | 対応 | Railsが解決した物理bindingとtyped source targetを使い、custom scalar/composite keyを決定的に描画する |
-| P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
+| P2-06 | cross-domain / multi-DB | 対応 | domain境界とconnection-context境界を原因別warningで省略し、異context同名tableの公開ID衝突だけをfatal診断する |
 | P2-07 | `dependent` / `touch` / `counter_cache` | 未対応 | 図へ載せる動作metadataを定義する |
 | P3-01 | `disable_joins` / `strict_loading` / async | 未対応 | 実行特性の表示要否を決める |
 | P3-02 | association extension | 未対応 | 構造と無関係な拡張を診断またはmetadata化する |

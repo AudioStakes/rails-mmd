@@ -60,7 +60,13 @@ module RailsMmd
       keyword_init: true
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
-    JoinTable = Struct.new(:table_name, :columns, :primary_key_columns, keyword_init: true)
+    JoinTable = Struct.new(
+      :table_name,
+      :connection_context_id,
+      :columns,
+      :primary_key_columns,
+      keyword_init: true
+    )
     ForeignKey = Struct.new(:from_table, :columns, :to_table, :primary_key_columns, keyword_init: true)
     Index = Struct.new(:columns, :unique, :where, :using, :expression, keyword_init: true)
     # Carries valid metadata records when only some optional adapter rows degrade.
@@ -106,7 +112,6 @@ module RailsMmd
       return domain_result(domain, [], [connection_diagnostic]) if connection_diagnostic
 
       entities = []
-      entity_models = []
       selected_entities = []
       explicit_entity_by_constant = {}
       output_diagnostics = []
@@ -115,7 +120,6 @@ module RailsMmd
         entity, record_diagnostics = probe_record(domain.domain_id, record, model)
         if entity
           entities << entity
-          entity_models << model
           selected_entities << { entity: entity, model: model, record: record }
           explicit_entity_by_constant[record.ruby_constant] = entity
         end
@@ -131,11 +135,15 @@ module RailsMmd
       )
       output_diagnostics.concat(delegated_diagnostics)
 
+      all_entities = entities + expanded_entities
+      connection_diagnostic = entity_identity_collision_diagnostic(domain.domain_id, all_entities)
+      return domain_result(domain, [], [connection_diagnostic]) if connection_diagnostic
+
       domain_result(
         domain,
-        entities + expanded_entities,
+        all_entities,
         output_diagnostics,
-        probe_join_tables(entity_models),
+        probe_join_tables(selected_entities),
         probe_sti_subtypes(selected_entities, inventory_records),
         delegated_type_families
       )
@@ -273,22 +281,29 @@ module RailsMmd
 
       record = records_by_constant[ruby_constant]
       return delegated_target(ruby_constant, nil, :unresolved, 'ASSOCIATION_TARGET_UNRESOLVED') unless record
-      unless same_connection?(owner_record, record)
-        return delegated_target(ruby_constant, nil, :other_connection, 'DOMAIN_RELATIONSHIP_OMITTED')
-      end
-      if owned_by_other_domain?(owned_domain_ids_by_constant, domain.domain_id, ruby_constant)
-        return delegated_target(ruby_constant, nil, :other_domain, 'DOMAIN_RELATIONSHIP_OMITTED')
-      end
       unless record.renderable
         return delegated_target(ruby_constant, nil, :not_renderable, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
       end
 
       explicit_entity = explicit_entity_by_constant[ruby_constant]
       if explicit_entity
+        unless same_connection?(owner_record, record)
+          return delegated_target(
+            ruby_constant, nil, :other_connection, 'CONNECTION_RELATIONSHIP_OMITTED'
+          )
+        end
         return delegated_target(ruby_constant, entity_id_for(explicit_entity.table_name), :selected, nil)
       end
       if explicit_selected_constants.include?(ruby_constant)
         return delegated_target(ruby_constant, nil, :not_renderable, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
+      end
+      if owned_by_other_domain?(owned_domain_ids_by_constant, domain.domain_id, ruby_constant)
+        return delegated_target(ruby_constant, nil, :other_domain, 'DOMAIN_RELATIONSHIP_OMITTED')
+      end
+      unless same_connection?(owner_record, record)
+        return delegated_target(
+          ruby_constant, nil, :other_connection, 'CONNECTION_RELATIONSHIP_OMITTED'
+        )
       end
 
       expanded_probe = expanded_probe_result(
@@ -598,16 +613,23 @@ module RailsMmd
     end
 
     def multi_db_diagnostic(domain)
-      raw_context_ids = domain.records.map(&:connection_context_id)
-      return if raw_context_ids.uniq.length < 2
+      entity_identity_collision_diagnostic(domain.domain_id, domain.records)
+    end
 
-      connection_context_ids = raw_context_ids.map { |context_id| redactor.sanitize(context_id) }.sort
+    def entity_identity_collision_diagnostic(domain_id, records)
+      collision_records = records.group_by(&:table_name).values.select do |group|
+        group.map(&:connection_context_id).uniq.length > 1
+      end.flatten
+      raw_context_ids = collision_records.map(&:connection_context_id).uniq.sort
+      return if raw_context_ids.empty?
+
+      connection_context_ids = raw_context_ids.map { |context_id| redactor.sanitize(context_id) }
 
       diagnostics.build(
         code: 'MULTI_DB_UNSUPPORTED',
-        message: "Domain #{domain.domain_id} selects multiple connection contexts",
-        subject_id: domain.domain_id,
-        metadata: { domain_id: domain.domain_id, connection_context_ids: connection_context_ids }
+        message: "Domain #{domain_id} has colliding entity identities across connection contexts",
+        subject_id: domain_id,
+        metadata: { domain_id: domain_id, connection_context_ids: connection_context_ids }
       )
     end
 
@@ -684,17 +706,25 @@ module RailsMmd
       nil
     end
 
-    def probe_join_tables(models)
-      join_table_requests(models).group_by(&:last).filter_map do |table_name, requests|
-        requests.lazy.filter_map { |model, _name| read_join_table(model, table_name) }.first
-      end.sort_by(&:table_name)
+    def probe_join_tables(selected_entities)
+      grouped_requests = join_table_requests(selected_entities).group_by do |_model, connection_context_id, table_name|
+        [connection_context_id, table_name]
+      end
+      tables = grouped_requests.filter_map do |(connection_context_id, table_name), requests|
+        requests.lazy.filter_map do |model, _context_id, _name|
+          read_join_table(model, table_name, connection_context_id)
+        end.first
+      end
+      tables.sort_by { |table| [table.connection_context_id, table.table_name] }
     end
 
-    def join_table_requests(models)
-      models.flat_map do |model|
+    def join_table_requests(selected_entities)
+      selected_entities.flat_map do |selected|
+        model = selected.fetch(:model)
+        connection_context_id = selected.fetch(:entity).connection_context_id
         habtm_reflections(model).filter_map do |reflection|
           table_name = safe_value_from(reflection, :join_table)
-          [model, table_name] if table_name.is_a?(String) && !table_name.empty?
+          [model, connection_context_id, table_name] if table_name.is_a?(String) && !table_name.empty?
         end
       end
     end
@@ -719,7 +749,7 @@ module RailsMmd
       []
     end
 
-    def read_join_table(model, table_name)
+    def read_join_table(model, table_name, connection_context_id)
       connection = join_table_connection(model, table_name)
       return unless connection
 
@@ -729,6 +759,7 @@ module RailsMmd
 
       JoinTable.new(
         table_name: table_name,
+        connection_context_id: connection_context_id,
         columns: Array(connection.columns(table_name)).map { |column| column_record(column) },
         primary_key_columns: primary_key_columns
       )

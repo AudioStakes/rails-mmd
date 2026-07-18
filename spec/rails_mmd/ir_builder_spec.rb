@@ -59,6 +59,18 @@ RSpec.describe RailsMmd::IrBuilder do
     end.to raise_error(ArgumentError, /unsupported attribute roles/)
   end
 
+  it 'rejects duplicate physical entity identities before any hash projection' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core',
+      entities: [entity('PrimaryUser', 'users'), entity('ArchiveUser', 'users')],
+      diagnostics: []
+    )
+
+    expect do
+      described_class.new.build(domains: [domain], relationship_domains: [])
+    end.to raise_error(ArgumentError, %r{duplicate physical entity_id: entities/users})
+  end
+
   it 'emits schema v4 STI base and subtype entity metadata' do
     domain = domain_with_sti(
       domain_id: 'core',

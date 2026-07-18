@@ -497,7 +497,11 @@ RSpec.describe RailsMmd::SchemaProbe do
           table_name: 'other_connections',
           connection_context_id: '{"name":"replica","role":"reading","shard":"default"}'
         ),
-        inventory_record('OtherDomain', table_name: 'other_domains'),
+        inventory_record(
+          'OtherDomain',
+          table_name: 'other_domains',
+          connection_context_id: '{"name":"replica","role":"reading","shard":"default"}'
+        ),
         inventory_record('StiLeaf', table_name: 'selecteds', renderable: false, reason: 'sti_subclass')
       ],
       owned_domain_ids_by_constant: { 'OtherDomain' => ['billing'] }
@@ -550,7 +554,7 @@ RSpec.describe RailsMmd::SchemaProbe do
                                         ruby_constant: 'OtherConnection',
                                         entity_id: nil,
                                         status: :other_connection,
-                                        diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED'
+                                        diagnostic_code: 'CONNECTION_RELATIONSHIP_OMITTED'
                                       ),
                                       have_attributes(
                                         ruby_constant: 'OtherDomain',
@@ -870,14 +874,69 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
   end
 
-  it 'guards only selected renderable entity connection contexts' do
+  it 'keeps identically named hidden join tables isolated by connection context' do
+    reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'memberships')
+    primary = model(table_exists: true, columns: [column('id', :integer, false)])
+    archive = model(table_exists: true, columns: [column('id', :integer, false)])
+    [primary, archive].each do |candidate|
+      candidate.define_singleton_method(:reflect_on_all_associations) { |_macro| [reflection] }
+    end
+    primary_connection = join_table_connection([column('primary_id', :integer, false)])
+    archive_connection = join_table_connection([column('archive_id', :integer, false)])
+    primary.define_singleton_method(:connection) { primary_connection }
+    archive.define_singleton_method(:connection) { archive_connection }
+    primary_context = '{"name":"primary"}'
+    archive_context = '{"name":"archive"}'
+
+    result = described_class.new(
+      model_resolver: ->(name) { { 'Author' => primary, 'Audit' => archive }.fetch(name) }
+    ).probe(
+      domains: [
+        domain_result(
+          'core',
+          [
+            record('Author', connection_context_id: primary_context),
+            record('Audit', connection_context_id: archive_context)
+          ]
+        )
+      ]
+    )
+
+    expect(result.domains.first.join_tables).to contain_exactly(
+      have_attributes(table_name: 'memberships', connection_context_id: primary_context),
+      have_attributes(table_name: 'memberships', connection_context_id: archive_context)
+    )
+  end
+
+  it 'probes distinct public table identities across selected connection contexts' do
     first = record('User', connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
     second = record('Account', connection_context_id: '{"name":"animals","role":"writing","shard":"default"}')
     outside = record('Outside', connection_context_id: '{"name":"outside","role":"writing","shard":"default"}')
     domain = domain_result('core', [first, second])
+    models = {
+      'User' => model(table_exists: true, columns: [column('id', :integer, false)]),
+      'Account' => model(table_exists: true, columns: [column('id', :integer, false)])
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(domains: [domain])
+
+    expect(result).to be_success
+    expect(result.exit_code).to eq(0)
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(%w[User Account])
+    expect(outside.connection_context_id).to include('outside')
+  end
+
+  it 'fails only when selected contexts collide on the same public table identity' do
+    first = record('User', table_name: 'shared_rows',
+                           connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
+    second = record('Account', table_name: 'shared_rows',
+                               connection_context_id: '{"name":"archive","role":"writing","shard":"default"}')
     calls = []
 
-    result = described_class.new(model_resolver: ->(name) { calls << name }).probe(domains: [domain])
+    result = described_class.new(model_resolver: ->(name) { calls << name }).probe(
+      domains: [domain_result('core', [first, second])]
+    )
 
     expect(result).not_to be_success
     expect(result.exit_code).to eq(2)
@@ -887,12 +946,60 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
     expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
     expect(calls).to eq([])
-    expect(outside.connection_context_id).to include('outside')
+  end
+
+  it 'isolates a colliding domain while preserving an independent normal domain' do
+    collision = domain_result(
+      'collision',
+      [
+        record('FirstShared', table_name: 'shared_rows', connection_context_id: '{"name":"primary"}'),
+        record('SecondShared', table_name: 'shared_rows', connection_context_id: '{"name":"archive"}')
+      ]
+    )
+    normal = domain_result('normal', [record('Account', table_name: 'accounts')])
+    account = model(table_exists: true, columns: [column('id', :integer, false)])
+
+    result = described_class.new(model_resolver: ->(name) { { 'Account' => account }.fetch(name) }).probe(
+      domains: [collision, normal]
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics).to contain_exactly(
+      include('code' => 'MULTI_DB_UNSUPPORTED', 'subject_id' => 'collision')
+    )
+    expect(result.domains.find { |domain| domain.domain_id == 'collision' }.entities).to eq([])
+    expect(result.domains.find { |domain| domain.domain_id == 'normal' }.entities.map(&:ruby_constant)).to eq(
+      ['Account']
+    )
+  end
+
+  it 'rechecks physical identity after delegated expansion before returning a domain handoff' do
+    primary = model(table_exists: true, columns: [column('id', :integer, false)])
+    expanded = RailsMmd::SchemaProbe::Entity.new(
+      ruby_constant: 'ExpandedUser',
+      table_name: 'users',
+      connection_context_id: '{"name":"archive"}',
+      columns: [RailsMmd::SchemaProbe::Column.new(name: 'id', type: :integer, nullable: false)],
+      primary_key_columns: ['id'],
+      foreign_keys: [],
+      indexes: [],
+      selection_origin: :delegated_type_expanded
+    )
+    probe = described_class.new(model_resolver: ->(_name) { primary })
+    allow(probe).to receive(:probe_delegated_type_families).and_return([[], [expanded], []])
+
+    result = probe.probe(domains: [domain_result('core', [record('User')])])
+
+    expect(result).not_to be_success
+    expect(result.diagnostics).to contain_exactly(include('code' => 'MULTI_DB_UNSUPPORTED'))
+    expect(result.domains.first.entities).to eq([])
   end
 
   it 'sanitizes multi-db connection context IDs before diagnostics output' do
-    first = record('User', connection_context_id: '{"name":"/Users/dev/app","role":"writing","shard":"default"}')
-    second = record('Account', connection_context_id: '{"name":"SECRET_TOKEN_1234","role":"writing","shard":"default"}')
+    first = record('User', table_name: 'shared_rows',
+                           connection_context_id: '{"name":"/Users/dev/app","role":"writing","shard":"default"}')
+    second = record('Account', table_name: 'shared_rows',
+                               connection_context_id: '{"name":"SECRET_TOKEN_1234","role":"writing","shard":"default"}')
 
     result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(
       domains: [domain_result('core', [first, second])]
@@ -904,8 +1011,8 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
 
   it 'detects multi-db even when redaction collapses distinct context IDs' do
-    first = record('User', connection_context_id: '{"database":"/Users/dev/app_one"}')
-    second = record('Account', connection_context_id: '{"database":"/tmp/app_two"}')
+    first = record('User', table_name: 'shared_rows', connection_context_id: '{"database":"/Users/dev/app_one"}')
+    second = record('Account', table_name: 'shared_rows', connection_context_id: '{"database":"/tmp/app_two"}')
 
     result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(
       domains: [domain_result('core', [first, second])]
@@ -919,8 +1026,8 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
 
   it 'detects multi-db after inventory preserves distinct structured database identifiers' do
-    user = inventory_model('User', database: '/Users/dev/app/db/primary.sqlite3')
-    account = inventory_model('Account', database: '/tmp/other.sqlite3')
+    user = inventory_model('User', database: '/Users/dev/app/db/primary.sqlite3', table_name: 'shared_rows')
+    account = inventory_model('Account', database: '/tmp/other.sqlite3', table_name: 'shared_rows')
     inventory_records = RailsMmd::ModelInventory.new(
       active_record_base: Struct.new(:descendants).new([user, account]),
       constant_resolver: ->(name) { { 'User' => user, 'Account' => account }.fetch(name) }
@@ -1257,12 +1364,13 @@ RSpec.describe RailsMmd::SchemaProbe do
   end
   # rubocop:enable Metrics/MethodLength
 
-  def record(ruby_constant, connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
+  def record(ruby_constant, table_name: nil,
+             connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
     RailsMmd::ModelInventory::Record.new(
       ruby_constant: ruby_constant,
       abstract_class: false,
       base_class: ruby_constant,
-      table_name: "#{ruby_constant.downcase}s",
+      table_name: table_name || "#{ruby_constant.downcase}s",
       connection_context_id: connection_context_id,
       renderable: true,
       renderability_reason: nil
@@ -1359,12 +1467,12 @@ RSpec.describe RailsMmd::SchemaProbe do
     model
   end
 
-  def inventory_model(name, database:)
+  def inventory_model(name, database:, table_name: nil)
     model = Class.new
     model.define_singleton_method(:name) { name }
     model.define_singleton_method(:abstract_class?) { false }
     model.define_singleton_method(:base_class) { model }
-    model.define_singleton_method(:table_name) { "#{name.downcase}s" }
+    model.define_singleton_method(:table_name) { table_name || "#{name.downcase}s" }
     define_db_config(model, database)
     model
   end
@@ -1439,6 +1547,14 @@ RSpec.describe RailsMmd::SchemaProbe do
 
   def habtm_reflection(join_table)
     Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, join_table)
+  end
+
+  def join_table_connection(columns)
+    Object.new.tap do |connection|
+      connection.define_singleton_method(:data_source_exists?) { |_name| true }
+      connection.define_singleton_method(:columns) { |_name| columns }
+      connection.define_singleton_method(:primary_key) { |_name| nil }
+    end
   end
 
   def define_db_config(model, database)

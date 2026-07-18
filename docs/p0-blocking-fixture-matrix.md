@@ -32,7 +32,7 @@ claimed complete.
 | `DOMAIN_EMPTY` | domain resolution | include/exclude rules leave no renderable selected models | 2 | diagnostics JSON | blocks selected artifacts |
 | `RAILS_LOAD_FAILED` | Rails boot | application environment raises before eager load | 2 | diagnostics JSON or stderr before output | blocks selected artifacts |
 | `RAILS_EAGER_LOAD_FAILED` | Rails boot | eager loading raises after Rails boot | 2 | diagnostics JSON or stderr before output | blocks selected artifacts |
-| `MULTI_DB_UNSUPPORTED` | schema probe | selected models require multiple connection contexts | 2 | diagnostics JSON | blocks selected artifacts |
+| `MULTI_DB_UNSUPPORTED` | schema probe | different selected connection contexts collide on the same `entities/<table_name>` identity | 2 | diagnostics JSON | blocks selected artifacts when different contexts collide on one physical entity ID |
 | `MODEL_TABLE_MISSING` | schema probe | selected model table is missing or inaccessible | 2 | diagnostics JSON | blocks selected artifacts |
 | `MODEL_PRIMARY_KEY_UNSUPPORTED` | schema probe | primary key metadata is missing, empty, nested, has duplicate members, or is otherwise invalid | 2 | diagnostics JSON | blocks selected artifacts |
 | `SAFE_TOKEN_COLLISION` | tokenization | suffix exhaustion leaves an unresolved safe-token collision | 0 or 3 | diagnostics JSON | warning when suffix resolves; fatal when suffix exhaustion remains |

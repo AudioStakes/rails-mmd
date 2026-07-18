@@ -320,9 +320,15 @@ Missing, empty, nested, duplicate-member, or otherwise invalid primary-key
 metadata is `MODEL_PRIMARY_KEY_UNSUPPORTED`. Scalar and ordered composite
 primary-key tuples are supported.
 
-Selected renderable entities must use exactly one connection context. Two or
-more selected connection contexts produce `MULTI_DB_UNSUPPORTED`.
-Domain-outside connection contexts are ignored.
+Selected renderable entities may use more than one connection context. Each
+entity is probed only through its own model connection. Relationships whose
+selected endpoints have different contexts are omitted with
+`CONNECTION_RELATIONSHIP_OMITTED`; same-context siblings remain publishable.
+
+Public physical entity identity remains `entities/<table_name>`. If two selected
+contexts expose the same table name, the identity is unrepresentable in schema
+v4 and produces the domain-fatal `MULTI_DB_UNSUPPORTED`. Domain-outside
+connection contexts are ignored and their schema is never read.
 
 `connection_context_id` is the canonical JSON serialization of the selected
 model connection's Rails `connection_db_config.name`, role, shard, adapter name,
@@ -444,6 +450,7 @@ Omitted relationship diagnostics:
 | Preserved precomputed delegated-family non-primary omission | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` |
 | Unsafe association name | `ASSOCIATION_NAME_UNSUPPORTED_OMITTED` |
 | Non-`belongs_to` macro (P1-02) | `ASSOCIATION_MACRO_OMITTED` |
+| Selected target on another connection context | `CONNECTION_RELATIONSHIP_OMITTED` |
 
 The P0 baseline emitted no warnings for non-`belongs_to` associations. P1-02
 extends Rails 7.2/8.1 output with one warning per omitted macro. P1-03 renders
@@ -608,6 +615,7 @@ Closed diagnostic codes:
 - `ASSOCIATION_NON_PRIMARY_KEY_OMITTED`
 - `ASSOCIATION_NAME_UNSUPPORTED_OMITTED`
 - `ASSOCIATION_MACRO_OMITTED`
+- `CONNECTION_RELATIONSHIP_OMITTED`
 - `DOMAIN_RELATIONSHIP_OMITTED`
 - `DB_METADATA_DEGRADED`
 - `SAFE_TOKEN_COLLISION`
@@ -628,7 +636,7 @@ Diagnostic catalog:
 | `DOMAIN_EMPTY` | error | 2 | domain_resolution | domain | diagnostics JSON | blocks selected artifacts |
 | `RAILS_LOAD_FAILED` | error | 2 | rails_load | invocation | diagnostics JSON or stderr before output | blocks selected artifacts |
 | `RAILS_EAGER_LOAD_FAILED` | error | 2 | rails_load | invocation | diagnostics JSON or stderr before output | blocks selected artifacts |
-| `MULTI_DB_UNSUPPORTED` | error | 2 | schema_probe | domain | diagnostics JSON | blocks selected artifacts |
+| `MULTI_DB_UNSUPPORTED` | error | 2 | schema_probe | domain | diagnostics JSON | blocks selected artifacts when different contexts collide on one physical entity ID |
 | `MODEL_TABLE_MISSING` | error | 2 | schema_probe | model | diagnostics JSON | blocks selected artifacts |
 | `MODEL_PRIMARY_KEY_UNSUPPORTED` | error | 2 | schema_probe | model | diagnostics JSON | blocks selected artifacts |
 | `ASSOCIATION_TARGET_UNRESOLVED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
@@ -644,6 +652,7 @@ Diagnostic catalog:
 | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_NAME_UNSUPPORTED_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `ASSOCIATION_MACRO_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
+| `CONNECTION_RELATIONSHIP_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `DOMAIN_RELATIONSHIP_OMITTED` | warning | 0 | relationship_build | relationship | diagnostics JSON | omit relationship |
 | `DB_METADATA_DEGRADED` | warning | 0 | schema_probe | domain | diagnostics JSON | weaken metadata evidence only |
 | `SAFE_TOKEN_COLLISION` | warning or fatal | 0 or 3 | tokenization | artifact | diagnostics JSON | warning when suffix resolves; fatal when suffix exhaustion remains |
