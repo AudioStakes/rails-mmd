@@ -7,7 +7,7 @@ require 'tmpdir'
 # rubocop:disable RSpec/DescribeClass
 RSpec.describe 'the Rails compatibility matrix Rake command' do
   let(:invalid_artifact_asdf) do
-    <<~SH
+    <<~'SH'
       [ "$1" = "where" ] && exit 0
       case "$*" in
         *--version*) exit 0 ;;
@@ -35,7 +35,7 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
   end
 
   let(:malformed_mermaid_asdf) do
-    <<~SH
+    <<~'SH'
       [ "$1" = "where" ] && exit 0
       case "$*" in
         *--version*) exit 0 ;;
