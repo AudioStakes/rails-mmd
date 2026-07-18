@@ -86,7 +86,10 @@ module RailsMmd
     end
 
     def polymorphic_parts(holder_table, interface, identifier_columns, type_column, target_table: nil)
-      parts = { holder_table: holder_table, interface: interface, identifier_columns: identifier_columns,
+      identifier_tuple = KeyTuple.normalize(identifier_columns)
+      raise RelationshipIdCodec::Error, 'polymorphic relationship key tuple is invalid' unless identifier_tuple
+
+      parts = { holder_table: holder_table, interface: interface, identifier_columns: identifier_tuple,
                 type_column: type_column }
       parts[:target_table] = target_table if target_table
       parts

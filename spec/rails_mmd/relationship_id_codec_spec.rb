@@ -140,6 +140,23 @@ RSpec.describe RailsMmd::RelationshipIdCodec do
       end
     end
 
+    it 'rejects malformed scalar and composite relationship key productions' do
+      malformed_ids = [
+        'relationships/events/polymorphic/subject//subject_type/posts',
+        'relationships/events/polymorphic/subject/not-tuple/WyJhIiwiYiJd/subject_type/posts',
+        'relationships/events/polymorphic/subject/tuple/not+base64/subject_type/posts'
+      ]
+
+      malformed_ids.each do |id|
+        expect { described_class.decode_polymorphic(id) }.to raise_error(described_class::Error)
+      end
+      expect do
+        described_class.decode_polymorphic_group(
+          'relationships/events/polymorphic/subject//subject_type'
+        )
+      end.to raise_error(described_class::Error)
+    end
+
     it 'rejects IDs outside the complete relationship and group grammars' do
       malformed_relationship_ids = [
         'other/events/polymorphic/subject/subject_id/subject_type/posts',

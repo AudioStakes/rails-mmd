@@ -91,7 +91,7 @@ PASS 3/3 Rails matrix pairs
 Exact completed slice gates:
 
 ```text
-key_tuple_spec + relationship_id_codec_spec: 14 examples, 0 failures
+key_tuple_spec + relationship_id_codec_spec: 15 examples, 0 failures
 schema_probe_spec: 37 examples, 0 failures
 ir_builder_spec + render_plan_builder_spec + contracts: 56 examples, 0 failures
 relationship_builder_spec: 58 examples, 0 failures
@@ -99,7 +99,7 @@ combined spec/rails_mmd + spec/contracts: 308 examples, 0 failures
 targeted RuboCop for each completed slice: no offenses
 rails_matrix_task_spec: 36 examples, 0 failures
 verify:rails_matrix: 3/3 pairs, 9/9 family runs passed
-latest full rake gate: 373 examples, 0 failures; 129 files, no offenses
+latest full rake gate: 374 examples, 0 failures; 129 files, no offenses
 bundler-audit: no vulnerabilities found
 Undercover: no coverage missing in latest changes
 pre-commit hook: passed
@@ -192,6 +192,9 @@ The follow-up Rails review confirmed the corrected contract and returned no
 findings. The final architecture review also returned no findings, and the
 preceding QA review returned no findings before the documentation-only cleanup.
 The pre-push coverage gate then exposed missing decoder examples; full-grammar
-rejection and scalar polymorphic round-trip coverage were added and the hook
-passed. The final focused QA review returned no findings. All specialist
-perspectives and repository hooks are clear.
+rejection and scalar polymorphic round-trip coverage were added. A focused QA
+review found that empty scalar polymorphic identifiers still decoded and that
+composite relationship marker/payload regressions were not explicit. Both were
+reproduced red, repaired through the shared `KeyTuple` validator, and covered.
+The final focused review returned no findings, and the pre-push hook passed with
+374 examples. All specialist perspectives and repository hooks are clear.
