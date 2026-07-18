@@ -7,7 +7,7 @@ require 'tmpdir'
 require_relative '../../tooling/rails_matrix'
 
 # rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleMemoizedHelpers
-# rubocop:disable Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
+# rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
 RSpec.describe 'the Rails compatibility matrix Rake command' do
   let(:matching_fake_app_asdf) { fake_generated_app_asdf }
   let(:matching_rails72_fake_app_asdf) do
@@ -60,6 +60,18 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
 
   let(:missing_expected_relationships_asdf) do
     fake_generated_app_asdf(expected_relationships: '[]')
+  end
+
+  it 'registers the specialized-options fixture family and runtime oracle' do
+    manifest = RailsMatrix::Manifest.new(
+      Pathname(__dir__).join('../../fixtures/rails_matrix/matrix.yml').expand_path
+    )
+    registration = {
+      fixture_family: manifest.fixture_families.include?('specialized_options'),
+      runtime_oracle: RailsMatrix::FAMILY_RUNTIME_ORACLES.key?('specialized_options')
+    }
+
+    expect(registration).to eq(fixture_family: true, runtime_oracle: true)
   end
 
   def missing_expected_polymorphic_groups_asdf
@@ -190,6 +202,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     fake_generated_app_asdf(expected_composite_runtime: '[{"ruby_constant":"Wrong"}]')
   end
 
+  def missing_expected_specialized_options_runtime_asdf
+    fake_generated_app_asdf(expected_specialized_options_runtime: nil)
+  end
+
+  def mismatched_expected_specialized_options_runtime_asdf
+    fake_generated_app_asdf(expected_specialized_options_runtime: '[{"binding":"wrong"}]')
+  end
+
   def failing_composite_habtm_probe_asdf
     fake_generated_app_asdf(
       composite_habtm_probe: {
@@ -237,6 +257,8 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     actual_delegated_runtime: '[]',
     expected_composite_runtime: '[]',
     actual_composite_runtime: '[]',
+    expected_specialized_options_runtime: '[]',
+    actual_specialized_options_runtime: '[]',
     composite_habtm_probe: {
       rails_version: '8.1.3',
       book_sql_has_full_owner_tuple: false,
@@ -259,12 +281,15 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"exec ruby bin/rails runner script/rails_mmd_composite_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/composite_runtime.json', actual_composite_runtime)}          exit 0 ;;
+        *"exec ruby bin/rails runner script/rails_mmd_specialized_options_runtime_oracle.rb"*)
+          mkdir -p tmp/rails_mmd
+#{write_file_shell('tmp/rails_mmd/specialized_options_runtime.json', actual_specialized_options_runtime)}          exit 0 ;;
         *"composite_habtm_probe.rb"*)
           printf '%s\n' '-- create_table(:p204_books, {id: false})'
           printf '%s\n' '#{JSON.generate(composite_habtm_probe)}'
           exit 0 ;;
         *"exec rails-mmd generate"*)
-#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
+#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_specialized_options_runtime.json', expected_specialized_options_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/#{actual_er_plan_fixture}" tmp/rails_mmd/core.er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{actual_class_plan_fixture}" tmp/rails_mmd/core.class.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{expected_er_plan_fixture}" rails_mmd_expected_core_er.render_plan.json
@@ -613,6 +638,44 @@ EOF
     end
   end
 
+  it 'passes specialized-options fixture-family selection through to the runner' do
+    with_fake_asdf(invalid_artifact_asdf) do |path|
+      result = run_matrix(
+        path: path,
+        pair: 'ruby-4.0.6-rails-8.1',
+        fixture_family: 'specialized_options'
+      )
+
+      expect(result).to include(success: false, output: include('schema-invalid core.er.render_plan.json'))
+    end
+  end
+
+  it 'rejects a missing specialized-options runtime expectation' do
+    with_fake_asdf(missing_expected_specialized_options_runtime_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'specialized_options'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_specialized_options_runtime.json')
+      )
+    end
+  end
+
+  it 'rejects mismatched specialized-options runtime output' do
+    with_fake_asdf(mismatched_expected_specialized_options_runtime_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'specialized_options'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('specialized options runtime did not match expectation')
+      )
+    end
+  end
+
   it 'rejects an unknown delegated-type fixture family name' do
     with_fake_asdf('exit 0') do |path|
       result = run_matrix(
@@ -762,4 +825,4 @@ EOF
   end
 end
 # rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleMemoizedHelpers
-# rubocop:enable Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation
+# rubocop:enable Metrics/AbcSize, Metrics/MethodLength, Metrics/ParameterLists, Layout/HeredocIndentation

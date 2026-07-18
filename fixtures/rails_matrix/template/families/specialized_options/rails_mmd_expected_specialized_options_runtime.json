@@ -1,0 +1,77 @@
+{
+  "direct_primary_key": {
+    "belongs_to": {
+      "foreign_key": ["owner_code"],
+      "referenced_key": ["account_code"],
+      "loaded": true
+    },
+    "has_many": {
+      "foreign_key": ["owner_code"],
+      "referenced_key": ["account_code"],
+      "loaded_ids": [1]
+    },
+    "has_one": {
+      "foreign_key": ["owner_code"],
+      "referenced_key": ["account_code"],
+      "loaded_id": 1
+    },
+    "composite_belongs_to": {
+      "foreign_key": ["owner_region_code", "owner_local_code"],
+      "referenced_key": ["region_code", "local_code"],
+      "loaded": true
+    },
+    "composite_has_many": {
+      "foreign_key": ["owner_region_code", "owner_local_code"],
+      "referenced_key": ["region_code", "local_code"],
+      "loaded_ids": [1]
+    },
+    "composite_has_one": {
+      "foreign_key": ["owner_region_code", "owner_local_code"],
+      "referenced_key": ["region_code", "local_code"],
+      "loaded_id": 1
+    }
+  },
+  "explicit_source": {
+    "source_name": "credited_writer",
+    "target_class": "P205Writer",
+    "chain": ["contributors", "p205_bylines"],
+    "loaded_ids": [1]
+  },
+  "source_type": {
+    "source_name": "resource",
+    "source_polymorphic": true,
+    "source_type": "P205Book",
+    "target_class": "P205Book",
+    "foreign_key": ["resource_code"],
+    "foreign_type": "resource_kind",
+    "referenced_key": ["catalog_code"],
+    "chain": ["p205_books", "p205_asset_links"],
+    "loaded_ids": [1]
+  },
+  "specialized_as": {
+    "root_foreign_key": ["resource_code"],
+    "root_foreign_type": "resource_kind",
+    "root_referenced_key": ["catalog_code"],
+    "many_interface": "resource",
+    "many_foreign_key": ["resource_code"],
+    "many_foreign_type": "resource_kind",
+    "many_referenced_key": ["catalog_code"],
+    "loaded_many_root": true,
+    "loaded_many_inverse_ids": [1],
+    "one_interface": "resource",
+    "one_foreign_key": ["resource_code"],
+    "one_foreign_type": "resource_kind",
+    "one_referenced_key": ["catalog_code"],
+    "loaded_one_root": true,
+    "loaded_one_inverse_id": 2
+  },
+  "delegated_type": {
+    "types": ["P205Article"],
+    "root_foreign_key": ["record_code"],
+    "root_foreign_type": "record_kind",
+    "root_referenced_key": ["slug"],
+    "loaded_root": true,
+    "generated_source_matches_runtime_delegated_type_source": true,
+    "generated_source_suffix": "activerecord/lib/active_record/delegated_type.rb"
+  }
+}

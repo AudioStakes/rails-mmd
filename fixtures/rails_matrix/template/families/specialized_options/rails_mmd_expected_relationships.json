@@ -1,0 +1,98 @@
+[
+  {
+    "relationship_id": "relationships/p205_asset_links/p205_collection_id/p205_collections/id",
+    "owner_safe_token": "P205_ASSET_LINK",
+    "target_safe_token": "P205_COLLECTION",
+    "label": "p205_collection",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_asset_links/polymorphic/resource/resource_code/resource_kind/p205_books",
+    "owner_safe_token": "P205_ASSET_LINK",
+    "target_safe_token": "P205_BOOK",
+    "label": "resource",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p205_asset_links/polymorphic/resource/resource_code/resource_kind/p205_covers",
+    "owner_safe_token": "P205_ASSET_LINK",
+    "target_safe_token": "P205_COVER",
+    "label": "resource",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p205_bylines/p205_publication_id/p205_publications/id",
+    "owner_safe_token": "P205_BYLINE",
+    "target_safe_token": "P205_PUBLICATION",
+    "label": "p205_publication",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_bylines/p205_writer_id/p205_writers/id",
+    "owner_safe_token": "P205_BYLINE",
+    "target_safe_token": "P205_WRITER",
+    "label": "credited_writer",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_collections/through/p205_asset_links/resource/p205_books",
+    "owner_safe_token": "P205_COLLECTION",
+    "target_safe_token": "P205_BOOK",
+    "label": "p205_books",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/p205_entries/polymorphic/entryable/record_code/record_kind/p205_articles",
+    "owner_safe_token": "P205_ENTRY",
+    "target_safe_token": "P205_ARTICLE",
+    "label": "entryable",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p205_members/owner_code/p205_accounts/account_code",
+    "owner_safe_token": "P205_MEMBER",
+    "target_safe_token": "P205_ACCOUNT",
+    "label": "p205_account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_members/tuple/WyJvd25lcl9yZWdpb25fY29kZSIsIm93bmVyX2xvY2FsX2NvZGUiXQ/p205_accounts/tuple/WyJyZWdpb25fY29kZSIsImxvY2FsX2NvZGUiXQ",
+    "owner_safe_token": "P205_MEMBER",
+    "target_safe_token": "P205_ACCOUNT",
+    "label": "tuple_account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_profiles/owner_code/p205_accounts/account_code",
+    "owner_safe_token": "P205_PROFILE",
+    "target_safe_token": "P205_ACCOUNT",
+    "label": "p205_account",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_profiles/tuple/WyJvd25lcl9yZWdpb25fY29kZSIsIm93bmVyX2xvY2FsX2NvZGUiXQ/p205_accounts/tuple/WyJyZWdpb25fY29kZSIsImxvY2FsX2NvZGUiXQ",
+    "owner_safe_token": "P205_PROFILE",
+    "target_safe_token": "P205_ACCOUNT",
+    "label": "tuple_account",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p205_publications/through/p205_bylines/credited_writer/p205_writers",
+    "owner_safe_token": "P205_PUBLICATION",
+    "target_safe_token": "P205_WRITER",
+    "label": "contributors",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  }
+]

@@ -1,6 +1,6 @@
 # P2-05 Specialized Association Options Implementation
 
-Status: in progress
+Status: complete
 
 ## Planned TDD slices
 
@@ -85,10 +85,46 @@ suite passes with 126 examples and no failures; seven changed Ruby/spec files ha
 
 The same Rails and architecture specialists then re-reviewed the repairs. Both returned `指摘なし`.
 
+### Slice 6: real Rails matrix family
+
+- RED: the integration contract expected `specialized_options` in the manifest and runtime-oracle
+  registry; the focused example failed because neither was registered.
+- GREEN: the family is registered and its focused integration example passes.
+- Real-app GREEN: `specialized_options` passes on every declared pair:
+  - Ruby 4.0.6 / Rails 7.2.3.1;
+  - Ruby 3.3.12 / Rails 8.1.3;
+  - Ruby 4.0.6 / Rails 8.1.3.
+
+The checked-in family covers scalar and composite direct `primary_key:` bindings in both
+orientations, direct `has_one`, explicit through `source:`, typed polymorphic `source_type:` with
+custom identifier/type/referenced columns, specialized `has_many` and `has_one ..., as:`, and a
+custom-key delegated type. Its runtime oracle verifies both reflection metadata and actual loads;
+its artifact oracles lock exact relationships, polymorphic groups, diagnostics, and Mermaid output.
+
+### Implementation review and repair loop 2
+
+The matrix QA review found one medium gap: generic registration was covered, but cheap fake-harness
+regressions did not select the new family or exercise missing/mismatched runtime expectations. Three
+tests were added regression-first. The two runtime cases failed with missing helper seams, then all
+three passed after wiring the specialized runtime knobs. Contract/documentation review found only the
+intentionally pending verification status; after clarifying it, the re-review returned `指摘なし`.
+
 ## Verification record
 
-Pending.
+- Full RSpec suite: 393 examples, 0 failures.
+- RuboCop: 146 files inspected, no offenses.
+- Bundler Audit: no vulnerabilities found.
+- Undercover: no coverage missing in the latest changes. The first run exposed four uncovered
+  branches; targeted regressions covered polymorphic-root reader failure, root-binding failure,
+  referenced-key mismatch, and nested physical-through recursion, while one logically redundant
+  post-equality column check was removed.
+- Rails matrix: all four fixture families pass on all three declared Ruby/Rails pairs.
+- Specialized-options harness spec: 41 examples, 0 failures.
+- Direct local pre-commit hook: passed with the complete staged change set.
+- Direct local pre-push hook: passed with the complete staged change set.
 
 ## Implementation review record
 
-Pending specialist review.
+- Core implementation Rails and architecture repair re-reviews: `指摘なし`.
+- Matrix QA repair re-review: `指摘なし`.
+- Contract/documentation repair re-review: `指摘なし`.

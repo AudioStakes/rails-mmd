@@ -116,6 +116,7 @@ RSpec.describe RailsMmd::AssociationBindingResolver do
             owner_primary_key_columns: ['id']
           )
         },
+        -> { described_class.polymorphic_root(reflection(foreign_key: -> { raise 'unreadable root key' })) },
         -> { described_class.polymorphic_root(reflection(foreign_type: nil)) }
       ]
 

@@ -628,12 +628,21 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     zero_candidates = build(complete, 'Comment' => owner_model(root))
     missing_column = build(incomplete, 'Comment' => owner_model(root))
+    unreadable_root = build(
+      complete,
+      'Comment' => owner_model(
+        belongs_to('commentable', polymorphic: true, foreign_key: -> { raise 'unreadable root key' })
+      )
+    )
 
     expect(zero_candidates.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       ['ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED']
     )
     expect(missing_column.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       ['ASSOCIATION_KEY_COLUMN_MISSING']
+    )
+    expect(unreadable_root.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
     )
   end
 
@@ -726,7 +735,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       'core',
       [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
                                                column('commentable_type', false)]),
-       entity('Post', 'posts'), entity('Image', 'images'),
+       entity('Post', 'posts'), entity('Image', 'images', columns: [column('id', false), column('uuid', false)]),
        entity('Video', 'videos', primary_key_columns: ['uuid']), entity('Audio', 'audios')]
     )
 
@@ -741,7 +750,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       have_attributes(target_entity_id: 'entities/posts', metadata: { scoped: true })
     )
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to contain_exactly(
-      'ASSOCIATION_KEY_COLUMN_MISSING',
+      'ASSOCIATION_POLYMORPHIC_OMITTED',
       'ASSOCIATION_KEY_COLUMN_MISSING',
       'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED'
     )
@@ -1636,6 +1645,29 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       relationship_id: 'relationships/authors/through/posts/taggings/tag/tags',
       through_path: %w[posts taggings tag], target_entity_id: 'entities/tags'
     )
+  end
+
+  it 'flattens a nested through reflection on the physical through side' do
+    post_model = renderable_model('Post', 'posts')
+    tagging_model = renderable_model('Tagging', 'taggings')
+    tag_model = renderable_model('Tag', 'tags')
+    posts = association('posts', :has_many, klass: post_model, foreign_key: 'author_id')
+    taggings = association('taggings', :has_many, klass: tagging_model, foreign_key: 'post_id')
+    inner = through_association(
+      'taggings', :has_many, through_reflection: posts,
+                             source_reflection: taggings, klass: tagging_model
+    )
+    outer = through_association(
+      'tags', :has_many, through_reflection: inner,
+                         source_reflection: belongs_to('tag', klass: tag_model), klass: tag_model
+    )
+
+    hops, diagnostic_code, = described_class.new(model_resolver: ->(_name) {}).send(
+      :through_physical_hops, outer
+    )
+
+    expect(hops.map { |hop| hop.reflection.name }).to eq(%w[posts taggings tag])
+    expect(diagnostic_code).to be_nil
   end
 
   it 'deduplicates an identical through path with has-one label priority' do

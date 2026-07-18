@@ -574,9 +574,6 @@ module RailsMmd
       unless inverse_referenced_key_columns == referenced_key_columns
         return omitted(context, candidate.owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
       end
-      unless columns_present?(candidate.owner, referenced_key_columns)
-        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_KEY_COLUMN_MISSING').last
-      end
 
       candidate.referenced_key_columns = referenced_key_columns
       nil

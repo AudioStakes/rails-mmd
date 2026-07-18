@@ -1,0 +1,22 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - P205Account
+      - P205Article
+      - P205AssetLink
+      - P205Book
+      - P205Byline
+      - P205Collection
+      - P205Cover
+      - P205Entry
+      - P205Member
+      - P205Profile
+      - P205Publication
+      - P205Writer
+    exclude_models: []
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

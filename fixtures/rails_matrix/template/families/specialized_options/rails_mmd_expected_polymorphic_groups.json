@@ -1,0 +1,27 @@
+[
+  {
+    "group_id": "relationships/p205_asset_links/polymorphic/resource/resource_code/resource_kind",
+    "holder_safe_token": "P205_ASSET_LINK",
+    "root_label": "resource",
+    "candidate_target_safe_tokens": [
+      "P205_BOOK",
+      "P205_COVER"
+    ],
+    "foreign_key_attributes": [
+      "resource_code",
+      "resource_kind"
+    ]
+  },
+  {
+    "group_id": "relationships/p205_entries/polymorphic/entryable/record_code/record_kind",
+    "holder_safe_token": "P205_ENTRY",
+    "root_label": "entryable",
+    "candidate_target_safe_tokens": [
+      "P205_ARTICLE"
+    ],
+    "foreign_key_attributes": [
+      "record_code",
+      "record_kind"
+    ]
+  }
+]

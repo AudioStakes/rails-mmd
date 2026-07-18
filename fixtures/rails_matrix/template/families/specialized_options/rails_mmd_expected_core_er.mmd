@@ -1,0 +1,63 @@
+erDiagram
+  direction LR
+  P205_ASSET_LINK }o..|| P205_COLLECTION : p205_collection
+  P205_ASSET_LINK }o..o| P205_BOOK : resource
+  P205_ASSET_LINK }o..o| P205_COVER : resource
+  P205_BYLINE }o..|| P205_PUBLICATION : p205_publication
+  P205_BYLINE }o..|| P205_WRITER : credited_writer
+  P205_COLLECTION }o..o{ P205_BOOK : p205_books
+  P205_ENTRY |o..o| P205_ARTICLE : entryable
+  P205_MEMBER }o..|| P205_ACCOUNT : p205_account
+  P205_MEMBER }o..|| P205_ACCOUNT : tuple_account
+  P205_PROFILE |o..|| P205_ACCOUNT : p205_account
+  P205_PROFILE |o..|| P205_ACCOUNT : tuple_account
+  P205_PUBLICATION }o..o{ P205_WRITER : contributors
+  P205_ACCOUNT {
+    integer id PK
+  }
+  P205_ARTICLE {
+    integer id PK
+  }
+  P205_ASSET_LINK {
+    integer id PK
+    integer p205_collection_id FK
+    string resource_code FK
+    string resource_kind FK
+  }
+  P205_BOOK {
+    integer id PK
+  }
+  P205_BYLINE {
+    integer id PK
+    integer p205_publication_id FK
+    integer p205_writer_id FK
+  }
+  P205_COLLECTION {
+    integer id PK
+  }
+  P205_COVER {
+    integer id PK
+  }
+  P205_ENTRY {
+    integer id PK
+    string record_code FK
+    string record_kind FK
+  }
+  P205_MEMBER {
+    integer id PK
+    string owner_code FK
+    string owner_local_code FK
+    string owner_region_code FK
+  }
+  P205_PROFILE {
+    integer id PK
+    string owner_code FK
+    string owner_local_code FK
+    string owner_region_code FK
+  }
+  P205_PUBLICATION {
+    integer id PK
+  }
+  P205_WRITER {
+    integer id PK
+  }

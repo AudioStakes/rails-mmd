@@ -104,3 +104,21 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
   uniqueness of an identity field when duplicate IDs have different payloads.
   Keep IR/render-plan `attribute_id` uniqueness in `SchemaValidator` and cover
   same-ID/different-content fixtures.
+
+## P2 Engineering Records
+
+- Before P2 work, read the applicable `docs/p2/<priority>-*/research.md`,
+  `design.md`, and `implementation.md`. Keep feature-specific evidence there;
+  promote only durable cross-feature rules into this file.
+- Resolve direct and polymorphic physical keys through
+  `AssociationBindingResolver`. Keep Active Record reader arity, tuple
+  normalization, inverse type-column selection, and reader-failure containment
+  out of `SchemaProbe` and `RelationshipBuilder` call sites.
+- For typed through associations, resolve the concrete target from the owning
+  through reflection. Never call `klass` on a polymorphic source reflection.
+  Use the same resolved target for semantic target selection and physical-hop
+  validation so Rails join-chain representation differences cannot change the
+  public edge.
+- Treat `source:` syntax as input to Rails reflection resolution, not public
+  identity. Through IDs use the resolved semantic path and selected target; do
+  not append `source` or `source_type` option values.
