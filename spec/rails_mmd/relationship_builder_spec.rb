@@ -25,7 +25,9 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     expect(result).to be_success
     expect(result.diagnostics).to eq([])
-    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(['relationships/users/account'])
+    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(
+      ['relationships/users/account_id/accounts/id']
+    )
     relationship = result.domains.first.relationships.first
     expect(relationship.owner_entity_id).to eq('entities/users')
     expect(relationship.target_entity_id).to eq('entities/accounts')
@@ -123,14 +125,16 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     expect(result.diagnostics).to eq([])
     expect(relationships.fetch('profiles')).to have_attributes(
-      owner_entity_id: 'entities/authors', target_entity_id: 'entities/profiles',
+      relationship_id: 'relationships/profiles/author_id/authors/id',
+      owner_entity_id: 'entities/profiles', target_entity_id: 'entities/authors',
       foreign_key_holder_entity_id: 'entities/profiles', foreign_key_column: 'author_id',
-      owner_cardinality: '0..1', target_cardinality: '0..many'
+      owner_cardinality: '0..many', target_cardinality: '0..1'
     )
     expect(relationships.fetch('account')).to have_attributes(
-      owner_entity_id: 'entities/authors', target_entity_id: 'entities/accounts',
+      relationship_id: 'relationships/accounts/author_id/authors/id',
+      owner_entity_id: 'entities/accounts', target_entity_id: 'entities/authors',
       foreign_key_holder_entity_id: 'entities/accounts', foreign_key_column: 'author_id',
-      owner_cardinality: '1..1', target_cardinality: '0..1'
+      owner_cardinality: '0..1', target_cardinality: '1..1'
     )
   end
 
@@ -208,7 +212,27 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     result = build(domain, 'Post' => post, 'Author' => author)
 
     expect(result.diagnostics).to eq([])
-    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(['relationships/posts/author'])
+    expect(result.domains.first.relationships.map(&:relationship_id)).to eq(
+      ['relationships/posts/author_id/authors/id']
+    )
+  end
+
+  it 'uses macro priority and lexical declaration ID for canonical label ties' do
+    author_model = renderable_model('Author', 'authors')
+    post = owner_model(
+      belongs_to('writer', klass: author_model, class_name: 'Author', foreign_key: 'author_id'),
+      belongs_to('author', klass: author_model, foreign_key: 'author_id')
+    )
+    domain = domain_result(
+      'core',
+      [entity('Post', 'posts', columns: [column('id', false), column('author_id', true)]), entity('Author', 'authors')]
+    )
+
+    relationship = build(domain, 'Post' => post).domains.first.relationships.fetch(0)
+
+    expect(relationship).to have_attributes(
+      relationship_id: 'relationships/posts/author_id/authors/id', association_name: 'author'
+    )
   end
 
   it 'omits ineligible belongs_to reflections with schema-valid diagnostics' do

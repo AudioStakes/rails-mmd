@@ -1,34 +1,42 @@
 [
   {
-    "relationship_id": "relationships/authors/drafts",
-    "owner_safe_token": "AUTHOR",
-    "target_safe_token": "DRAFT",
+    "relationship_id": "relationships/drafts/author_id/authors/id",
+    "owner_safe_token": "DRAFT",
+    "target_safe_token": "AUTHOR",
     "label": "drafts",
-    "owner_cardinality": "0..1",
-    "target_cardinality": "0..many"
-  },
-  {
-    "relationship_id": "relationships/authors/profile",
-    "owner_safe_token": "AUTHOR",
-    "target_safe_token": "PROFILE",
-    "label": "profile",
-    "owner_cardinality": "1..1",
+    "owner_cardinality": "0..many",
     "target_cardinality": "0..1"
   },
   {
-    "relationship_id": "relationships/employees/reports",
+    "relationship_id": "relationships/employees/manager_id/employees/id",
     "owner_safe_token": "EMPLOYEE",
     "target_safe_token": "EMPLOYEE",
-    "label": "reports",
-    "owner_cardinality": "0..1",
-    "target_cardinality": "0..many"
+    "label": "manager",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
   },
   {
-    "relationship_id": "relationships/posts/author",
+    "relationship_id": "relationships/notes/author_id/authors/id",
+    "owner_safe_token": "NOTE",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/posts/author_id/authors/id",
     "owner_safe_token": "POST",
     "target_safe_token": "AUTHOR",
     "label": "author",
     "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/profiles/author_id/authors/id",
+    "owner_safe_token": "PROFILE",
+    "target_safe_token": "AUTHOR",
+    "label": "author",
+    "owner_cardinality": "0..1",
     "target_cardinality": "1..1"
   }
 ]

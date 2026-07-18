@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# Inverse-free direct self join.
+# Explicit-inverse direct self join.
 class Employee < ApplicationRecord
-  has_many :reports, class_name: 'Employee', foreign_key: 'manager_id'
+  belongs_to :manager, class_name: 'Employee', optional: true, inverse_of: :reports
+  has_many :reports, class_name: 'Employee', foreign_key: 'manager_id', inverse_of: :manager
 end

@@ -342,9 +342,15 @@ P1-03 extends Rails 7.2/8.1 eligibility to direct, unscoped,
 non-polymorphic-owner `has_many` and `has_one`. Their scalar target FK must exist,
 their `active_record_primary_key` must equal the declaring owner's actual
 primary key, and both entities must be selected in the same domain. Through and
-`as:` variants remain omitted. If an existing `belongs_to` has the same
-FK-holder/column and referenced entity/primary-key tuple, that existing edge
-wins without an additional edge or warning.
+`as:` variants remain omitted. Same-physical-tuple declarations are grouped by
+the P1-04 rule below without an additional warning.
+
+P1-04 canonicalizes every supported direct physical tuple regardless of
+explicit, automatic, absent, or disabled inverse metadata. Canonical orientation
+is FK holder to referenced entity. The public ID is
+`relationships/<holder_table>/<fk_column>/<referenced_table>/<primary_key>`;
+label priority is `belongs_to`, `has_one`, `has_many`, then lexical declaration
+ID. Thus inverse declarations and enumeration order do not change the edge.
 
 Omitted relationship diagnostics:
 
@@ -753,6 +759,11 @@ Direct `has_many` / `has_one` cardinality evidence (P1-03):
   `has_one`.
 - `has_one` represents the Active Record singular bound even when a unique DB
   index does not enforce it.
+
+P1-04 normalizes those bounds to canonical FK orientation: the holder endpoint
+is `0..1` when any group candidate is `has_one` or the FK has a total plain
+unique index, otherwise `0..many`; the referenced endpoint is `1..1` only with
+DB-FK and non-null evidence, otherwise `0..1`.
 
 ClassDiagram relationship syntax:
 
