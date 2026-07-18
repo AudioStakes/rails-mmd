@@ -163,9 +163,11 @@ The recommended P2-04 contract is:
   base64url without padding and an explicit tuple prefix. Through IDs stay
   key-agnostic. The design phase must pin the prefix and update fixture tooling
   to decode tuple segments instead of treating a tuple segment as one column.
-- Determine requiredness conservatively: the holder end is required only when
-  every participating foreign-key column is non-null. If any member is
-  nullable or unknown, publish the nullable cardinality.
+- Determine tuple nullability conservatively: all participating foreign-key
+  columns must be non-null before the relationship can be required. Preserve
+  the P0 cardinality gate as well: a matching database FK is still required to
+  strengthen a direct endpoint to `1..1`. Any nullable/unknown member or absent
+  database evidence publishes the optional cardinality.
 - Determine singularity from an exact total unique index covering the full
   holder tuple, plus the polymorphic type column when applicable. Partial
   indexes remain non-authoritative. Index column comparison follows the
@@ -325,8 +327,9 @@ Required positive cases:
   `active_record_primary_key` arrays for `has_one` and `has_many`;
 - a composite association containing an `id` member follows the reflection's
   inferred scalar-or-tuple result rather than the model declaration alone;
-- complete non-null foreign-key tuples produce required cardinality, while any
-  nullable member produces optional cardinality;
+- complete database-FK evidence plus an all-non-null foreign-key tuple produces
+  required direct cardinality; a nullable/unknown member or absent database
+  evidence produces optional cardinality;
 - an exact total unique composite index proves singularity independent of index
   column order, while extra/missing columns and partial indexes do not;
 - complete database composite-FK metadata is matched positionally when the
