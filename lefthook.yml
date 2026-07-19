@@ -4,8 +4,7 @@ output:
 pre-commit:
   parallel: false
   commands:
-    ruby-staged-safety:
-      priority: 1
+    verification-routing:
       glob:
         - "*.rb"
         - "*.rake"
@@ -17,86 +16,14 @@ pre-commit:
         - "spec/**/*.rb"
         - "features/*.rb"
         - "features/**/*.rb"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_mixed_changes!(ARGV)' -- {staged_files}
-
-    ruby-rubocop-autocorrect:
-      priority: 2
-      glob:
-        - "*.rb"
-        - "*.rake"
-        - "Rakefile"
-        - "exe/rails-mmd"
-        - "bin/**/*"
-        - "lib/**/*.rb"
-        - "spec/*.rb"
-        - "spec/**/*.rb"
-        - "features/*.rb"
-        - "features/**/*.rb"
-      run: bundle exec rubocop --autocorrect-all --force-exclusion -- {staged_files}
-
-    ruby-post-repair-diff:
-      priority: 3
-      glob:
-        - "*.rb"
-        - "*.rake"
-        - "Rakefile"
-        - "exe/rails-mmd"
-        - "bin/**/*"
-        - "lib/**/*.rb"
-        - "spec/*.rb"
-        - "spec/**/*.rb"
-        - "features/*.rb"
-        - "features/**/*.rb"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.ensure_no_post_repair_diff!'
-
-    ruby-rubocop:
-      priority: 4
-      glob:
-        - "*.rb"
-        - "*.rake"
-        - "Rakefile"
-        - "exe/rails-mmd"
-        - "bin/**/*"
-        - "lib/**/*.rb"
-        - "spec/*.rb"
-        - "spec/**/*.rb"
-        - "features/*.rb"
-        - "features/**/*.rb"
-      run: bundle exec rubocop --force-exclusion -- {staged_files}
-
-    ruby-specs:
-      priority: 5
-      glob:
-        - "spec/*.rb"
-        - "spec/**/*"
         - ".rspec"
         - ".simplecov"
         - ".undercover.yml"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.run_pre_commit_specs!(ARGV)' -- {staged_files}
-
-    dependency-setup:
-      priority: 6
-      glob:
         - "Gemfile"
         - "Gemfile.lock"
         - "*.gemspec"
-      run: bundle check && bundle exec rake bundle:audit
-
-    ruby-version-smoke:
-      priority: 7
-      glob:
         - ".ruby-version"
-      run: ruby -v && bundle exec exe/rails-mmd --version
-
-    rubocop-config:
-      priority: 8
-      glob:
         - ".rubocop.yml"
-      run: bundle exec rake rubocop
-
-    contract-routing:
-      priority: 9
-      glob:
         - "schemas/*.json"
         - "schemas/**/*.json"
         - "fixtures/*.json"
@@ -107,13 +34,7 @@ pre-commit:
         - "README.md"
         - "docs/*.md"
         - "docs/**/*.md"
-      run: bundle exec rspec spec/contracts
-
-    p0-contract-doc:
-      priority: 11
-      glob:
-        - "docs/p0-contract.md"
-      run: printf '%s\n' 'docs/p0-contract.md changed; no P0 contract verifier exists yet.'
+      run: bundle exec ruby -Ilib -rrails_mmd/verification_routing -e 'RailsMmd::VerificationRouting.new.run!(ARGV)' -- {staged_files}
 
 pre-push:
   commands:

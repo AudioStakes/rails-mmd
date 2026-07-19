@@ -10,7 +10,10 @@ ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook install
 
 ## Pre-Commit
 
-The `pre-commit` hook is repair-first and sequential.
+The `pre-commit` hook passes all staged paths to the deep
+`RailsMmd::VerificationRouting` module. Lefthook is only the adapter; path
+classification, deduplication, and repair-first ordering live behind the
+module's single `run!` interface.
 
 For Ruby-like staged files, it runs:
 
@@ -30,7 +33,7 @@ Dependency/setup files have their own route. `Gemfile`, `Gemfile.lock`, and
 and CLI version smoke checks.
 
 RuboCop, RSpec, SimpleCov, and Undercover config files run the relevant
-read-only fallback tasks. Schema, fixture, and setup documentation globs run
+read-only fallback tasks. Schema, fixture, and setup documentation paths run
 `spec/contracts` so JSON schemas, schema fixtures, Mermaid golden fixtures, and
 setup drift guards stay executable without running unrelated checks.
 
