@@ -34,6 +34,164 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(entity.indexes.map(&:unique)).to eq([true])
   end
 
+  it 'keeps the selected physical base entity and normalizes direct and multi-level STI subtypes' do
+    vehicle = sti_model('Vehicle', table_name: 'vehicles', sti_name: 'Vehicle')
+    car = sti_model('Car', table_name: 'vehicles', base_class: vehicle, superclass_model: vehicle)
+    sports_car = sti_model('SportsCar', table_name: 'vehicles', base_class: vehicle, superclass_model: car)
+    models = {
+      'Vehicle' => vehicle,
+      'Car' => car,
+      'SportsCar' => sports_car
+    }
+    domain = domain_result('core', [inventory_record('Vehicle', table_name: 'vehicles')])
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [domain],
+      inventory_records: [
+        inventory_record('Vehicle', table_name: 'vehicles'),
+        inventory_record(
+          'Car',
+          base_class: 'Vehicle',
+          table_name: 'vehicles',
+          renderable: false,
+          reason: 'sti_subclass'
+        ),
+        inventory_record('SportsCar', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                      reason: 'sti_subclass')
+      ]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(['Vehicle'])
+    expect(result.domains.first.sti_subtypes).to match([
+                                                         have_attributes(
+                                                           entity_id: 'entities/vehicles/sti/Car',
+                                                           base_entity_id: 'entities/vehicles',
+                                                           parent_entity_id: 'entities/vehicles',
+                                                           ruby_constant: 'Car',
+                                                           table_name: 'vehicles',
+                                                           inheritance_column: 'type',
+                                                           sti_name: 'Car',
+                                                           depth: 1
+                                                         ),
+                                                         have_attributes(
+                                                           entity_id: 'entities/vehicles/sti/SportsCar',
+                                                           base_entity_id: 'entities/vehicles',
+                                                           parent_entity_id: 'entities/vehicles/sti/Car',
+                                                           ruby_constant: 'SportsCar',
+                                                           table_name: 'vehicles',
+                                                           inheritance_column: 'type',
+                                                           sti_name: 'SportsCar',
+                                                           depth: 2
+                                                         )
+                                                       ])
+  end
+
+  it 'normalizes custom inheritance columns and keeps namespaced demodulized STI names distinct' do
+    vehicle = sti_model('Vehicle', table_name: 'vehicles', inheritance_column: 'kind', sti_name: 'Vehicle')
+    dealer_car = sti_model(
+      'Dealer::Car',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      inheritance_column: 'kind',
+      sti_name: 'Car'
+    )
+    admin_car = sti_model(
+      'Admin::Car',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      inheritance_column: 'kind',
+      sti_name: 'Car'
+    )
+    models = {
+      'Vehicle' => vehicle,
+      'Dealer::Car' => dealer_car,
+      'Admin::Car' => admin_car
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [domain_result('core', [inventory_record('Vehicle', table_name: 'vehicles')])],
+      inventory_records: [
+        inventory_record('Dealer::Car', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                        reason: 'sti_subclass'),
+        inventory_record('Admin::Car', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                       reason: 'sti_subclass'),
+        inventory_record('Vehicle', table_name: 'vehicles')
+      ]
+    )
+
+    expect(result).to be_success
+    expect(result.domains.first.sti_subtypes.map(&:entity_id)).to eq(
+      %w[entities/vehicles/sti/Admin::Car entities/vehicles/sti/Dealer::Car]
+    )
+    expect(result.domains.first.sti_subtypes.map(&:inheritance_column)).to eq(%w[kind kind])
+    expect(result.domains.first.sti_subtypes.map(&:sti_name)).to eq(%w[Car Car])
+  end
+
+  it 'treats an abstract boundary and false-positive or unreadable candidates as outside the selected STI family' do
+    vehicle = sti_model('Vehicle', table_name: 'vehicles', sti_name: 'Vehicle')
+    powered = sti_model(
+      'Vehicle::Powered',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      abstract_class: true
+    )
+    electric = sti_model('Vehicle::Electric', table_name: 'vehicles', superclass_model: powered)
+    disabled = sti_model(
+      'Vehicle::Disabled',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      descends_from_active_record: true
+    )
+    no_column = sti_model(
+      'Vehicle::NoColumn',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      inheritance_column: nil
+    )
+    broken = sti_model(
+      'Vehicle::Broken',
+      table_name: 'vehicles',
+      base_class: vehicle,
+      superclass_model: vehicle,
+      sti_name: -> { raise 'sti_name unavailable' }
+    )
+    models = {
+      'Vehicle' => vehicle,
+      'Vehicle::Powered' => powered,
+      'Vehicle::Electric' => electric,
+      'Vehicle::Disabled' => disabled,
+      'Vehicle::NoColumn' => no_column,
+      'Vehicle::Broken' => broken
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [domain_result('core', [inventory_record('Vehicle', table_name: 'vehicles')])],
+      inventory_records: [
+        inventory_record('Vehicle', table_name: 'vehicles'),
+        inventory_record('Vehicle::Powered', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                             reason: 'abstract_class'),
+        inventory_record('Vehicle::Electric', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                              reason: 'sti_subclass'),
+        inventory_record('Vehicle::Disabled', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                              reason: 'sti_subclass'),
+        inventory_record('Vehicle::NoColumn', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                              reason: 'sti_subclass'),
+        inventory_record('Vehicle::Broken', base_class: 'Vehicle', table_name: 'vehicles', renderable: false,
+                                            reason: 'sti_subclass')
+      ]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.sti_subtypes).to eq([])
+  end
+
   it 'caches hidden HABTM join-table metadata for selected public reflections' do
     reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
     connection = Object.new
@@ -504,6 +662,32 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
   end
 
+  # rubocop:disable Metrics/MethodLength
+  def inventory_record(ruby_constant, **overrides)
+    defaults = {
+      abstract_class: false,
+      base_class: ruby_constant,
+      table_name: "#{ruby_constant.downcase}s",
+      connection_context_id: '{"name":"primary","role":"writing","shard":"default"}',
+      renderable: true,
+      renderability_reason: nil
+    }
+    attributes = defaults.merge(overrides)
+    attributes[:renderability_reason] = attributes.delete(:reason) if attributes.key?(:reason)
+    attributes[:abstract_class] = attributes[:renderability_reason] == 'abstract_class'
+
+    RailsMmd::ModelInventory::Record.new(
+      ruby_constant: ruby_constant,
+      abstract_class: attributes.fetch(:abstract_class),
+      base_class: attributes.fetch(:base_class),
+      table_name: attributes.fetch(:table_name),
+      connection_context_id: attributes.fetch(:connection_context_id),
+      renderable: attributes.fetch(:renderable),
+      renderability_reason: attributes.fetch(:renderability_reason)
+    )
+  end
+  # rubocop:enable Metrics/MethodLength
+
   def model(table_exists:, columns: [], primary_key: 'id', foreign_keys: [], indexes: [])
     model_class = base_model(table_exists, columns, primary_key)
     define_optional_schema_method(model_class, :foreign_keys, foreign_keys)
@@ -585,6 +769,32 @@ RSpec.describe RailsMmd::SchemaProbe do
       )
     end
   end
+
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+  def sti_model(ruby_constant, **options)
+    inheritance_column = options.fetch(:inheritance_column, 'type')
+    columns = options.fetch(:columns) do
+      [column('id', :integer, false), column(inheritance_column, :string, true)]
+    end
+
+    model(table_exists: true, columns: columns).tap do |model_class|
+      model_class.define_singleton_method(:name) { ruby_constant }
+      model_class.define_singleton_method(:table_name) { options.fetch(:table_name) }
+      model_class.define_singleton_method(:base_class) { options.fetch(:base_class, model_class) }
+      model_class.define_singleton_method(:superclass) { options.fetch(:superclass_model, Object) }
+      model_class.define_singleton_method(:inheritance_column) { model_class.callable_value(inheritance_column) }
+      model_class.define_singleton_method(:descends_from_active_record?) do
+        model_class.callable_value(options.fetch(:descends_from_active_record, false))
+      end
+      model_class.define_singleton_method(:abstract_class?) do
+        model_class.callable_value(options.fetch(:abstract_class, false))
+      end
+      model_class.define_singleton_method(:sti_name) do
+        model_class.callable_value(options.fetch(:sti_name, ruby_constant.split('::').last))
+      end
+    end
+  end
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   def schema_valid_diagnostic?(diagnostic)
     envelope = {

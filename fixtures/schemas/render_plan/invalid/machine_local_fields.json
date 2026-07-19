@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_kind": "er",
   "domain_id": "core",
   "direction": "LR",
@@ -10,6 +10,7 @@
   "random_seed": 42,
   "raw_exception_backtrace": ["lib/rails_mmd.rb:1"],
   "entities": [],
+  "inheritances": [],
   "relationships": [],
   "comments": [],
   "diagnostic_ids": [],

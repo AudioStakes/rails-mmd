@@ -52,6 +52,18 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Preserve the repair-first loop: run/autocorrect first, inspect the diff, stage
   explicit repairs, then let read-only checks run.
 
+## Git hook test isolation
+
+- Nested Git-repo specs must wrap temporary repository helpers so `GIT_DIR`,
+  `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, and
+  `GIT_ALTERNATE_OBJECT_DIRECTORIES` are saved, cleared, and restored around the
+  temporary repository lifecycle.
+- Add deterministic assertions that inner temporary repository commits do not alter
+  the outer repository HEAD or tracked files.
+- If a push transport exports repository-discovery variables into a revision
+  that lacks this regression test, run the `pre-push` hook directly and set
+  `LEFTHOOK=0` only for the transport whose checks have just passed.
+
 ## P1 Engineering Records
 
 - Before P1 work, read [`docs/p1/README.md`](docs/p1/README.md) and the applicable

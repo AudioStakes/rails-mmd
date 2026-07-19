@@ -1,0 +1,20 @@
+{
+  "schema_version": 3,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [],
+  "inheritances": [
+    {
+      "inheritance_id": "inheritances/entities/admin_cars/sti/Admin::Car",
+      "parent_entity_id": "entities/admin_cars",
+      "child_entity_id": "entities/admin_cars/sti/Admin::Car",
+      "parent_safe_token": "ADMIN_CAR_H111111111111",
+      "child_safe_token": "ADMIN_CAR_H222222222222"
+    }
+  ],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

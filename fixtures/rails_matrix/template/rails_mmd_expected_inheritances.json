@@ -1,0 +1,44 @@
+[
+  {
+    "inheritance_id": "inheritances/entities/animals/sti/Admin::Dog",
+    "parent_entity_id": "entities/animals",
+    "child_entity_id": "entities/animals/sti/Admin::Dog",
+    "parent_safe_token": "ANIMAL",
+    "child_safe_token": "ADMIN_DOG"
+  },
+  {
+    "inheritance_id": "inheritances/entities/animals/sti/Storefront::Dog",
+    "parent_entity_id": "entities/animals",
+    "child_entity_id": "entities/animals/sti/Storefront::Dog",
+    "parent_safe_token": "ANIMAL",
+    "child_safe_token": "STOREFRONT_DOG"
+  },
+  {
+    "inheritance_id": "inheritances/entities/electric_vehicles/sti/ElectricCar",
+    "parent_entity_id": "entities/electric_vehicles",
+    "child_entity_id": "entities/electric_vehicles/sti/ElectricCar",
+    "parent_safe_token": "ELECTRIC_VEHICLE",
+    "child_safe_token": "ELECTRIC_CAR"
+  },
+  {
+    "inheritance_id": "inheritances/entities/messages/sti/EmailMessage",
+    "parent_entity_id": "entities/messages",
+    "child_entity_id": "entities/messages/sti/EmailMessage",
+    "parent_safe_token": "MESSAGE",
+    "child_safe_token": "EMAIL_MESSAGE"
+  },
+  {
+    "inheritance_id": "inheritances/entities/vehicles/sti/Car",
+    "parent_entity_id": "entities/vehicles",
+    "child_entity_id": "entities/vehicles/sti/Car",
+    "parent_safe_token": "VEHICLE",
+    "child_safe_token": "CAR"
+  },
+  {
+    "inheritance_id": "inheritances/entities/vehicles/sti/SportsCar",
+    "parent_entity_id": "entities/vehicles/sti/Car",
+    "child_entity_id": "entities/vehicles/sti/SportsCar",
+    "parent_safe_token": "CAR",
+    "child_safe_token": "SPORTS_CAR"
+  }
+]

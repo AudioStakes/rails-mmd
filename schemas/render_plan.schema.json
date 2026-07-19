@@ -9,19 +9,24 @@
     "domain_id",
     "direction",
     "entities",
+    "inheritances",
     "relationships",
     "comments",
     "diagnostic_ids",
     "digest_sha256"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "artifact_kind": { "enum": ["er", "class"] },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "direction": { "enum": ["TB", "BT", "LR", "RL"] },
     "entities": {
       "type": "array",
       "items": { "$ref": "#/$defs/entity" }
+    },
+    "inheritances": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/inheritance" }
     },
     "relationships": {
       "type": "array",
@@ -47,6 +52,10 @@
       ]
     },
     "safe_token": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "ruby_constant": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*$"
+    },
     "sanitized_comment": {
       "type": "string",
       "allOf": [
@@ -63,16 +72,44 @@
     "entity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["entity_id", "safe_token", "label", "attributes"],
+      "required": ["entity_id", "entity_kind", "safe_token", "label", "attributes"],
       "properties": {
         "entity_id": { "type": "string", "minLength": 1 },
+        "entity_kind": { "enum": ["physical", "sti_subtype"] },
         "safe_token": { "$ref": "#/$defs/safe_token" },
         "label": { "$ref": "#/$defs/sanitized_comment" },
         "attributes": {
           "type": "array",
           "items": { "$ref": "#/$defs/attribute" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "entity_kind": { "const": "sti_subtype" }
+            },
+            "required": ["entity_kind"]
+          },
+          "then": {
+            "properties": {
+              "attributes": { "maxItems": 0 },
+              "label": { "$ref": "#/$defs/ruby_constant" }
+            }
+          }
+        }
+      ]
+    },
+    "physical_entity": {
+      "allOf": [
+        { "$ref": "#/$defs/entity" },
+        {
+          "type": "object",
+          "properties": {
+            "entity_kind": { "const": "physical" }
+          }
+        }
+      ]
     },
     "attribute": {
       "type": "object",
@@ -130,6 +167,24 @@
         "scoped": { "const": true }
       }
     },
+    "inheritance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inheritance_id",
+        "parent_entity_id",
+        "child_entity_id",
+        "parent_safe_token",
+        "child_safe_token"
+      ],
+      "properties": {
+        "inheritance_id": { "type": "string", "minLength": 1 },
+        "parent_entity_id": { "type": "string", "minLength": 1 },
+        "child_entity_id": { "type": "string", "minLength": 1 },
+        "parent_safe_token": { "$ref": "#/$defs/safe_token" },
+        "child_safe_token": { "$ref": "#/$defs/safe_token" }
+      }
+    },
     "comment": {
       "type": "object",
       "additionalProperties": false,
@@ -141,5 +196,27 @@
       }
     },
     "cardinality": { "enum": ["0..1", "1..1", "0..many", "1..many"] }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "artifact_kind": { "const": "er" }
+        },
+        "required": ["artifact_kind"]
+      },
+      "then": {
+        "properties": {
+          "entities": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/physical_entity" }
+          },
+          "inheritances": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
 }

@@ -5,12 +5,17 @@ domains:
       - Author
       - Account
       - AccountMembership
+      - Animal
+      - Appliance
       - Comment
+      - Device
       - Draft
+      - ElectricVehicle
       - Employee
       - Image
       - Label
       - Labeling
+      - Message
       - Membership
       - Note
       - Partnership
@@ -18,6 +23,7 @@ domains:
       - Profile
       - Team
       - Tag
+      - Vehicle
     exclude_models: []
 output:
   directory: tmp/rails_mmd

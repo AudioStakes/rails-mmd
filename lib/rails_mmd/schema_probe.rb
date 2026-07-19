@@ -7,7 +7,7 @@ module RailsMmd
   # Reads selected-domain-only schema metadata for resolved renderable records.
   # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
   class SchemaProbe
-    DomainResult = Struct.new(:domain_id, :entities, :join_tables, :diagnostics, keyword_init: true)
+    DomainResult = Struct.new(:domain_id, :entities, :sti_subtypes, :join_tables, :diagnostics, keyword_init: true)
     Entity = Struct.new(
       :ruby_constant,
       :table_name,
@@ -16,6 +16,17 @@ module RailsMmd
       :primary_key,
       :foreign_keys,
       :indexes,
+      keyword_init: true
+    )
+    StiSubtype = Struct.new(
+      :entity_id,
+      :base_entity_id,
+      :parent_entity_id,
+      :ruby_constant,
+      :table_name,
+      :inheritance_column,
+      :sti_name,
+      :depth,
       keyword_init: true
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
@@ -45,8 +56,8 @@ module RailsMmd
       @redactor = redactor
     end
 
-    def probe(domains:)
-      domain_results = domains.map { |domain| probe_domain(domain) }
+    def probe(domains:, inventory_records: [])
+      domain_results = domains.map { |domain| probe_domain(domain, inventory_records) }
       all_diagnostics = domain_results.flat_map(&:diagnostics)
 
       Result.new(domains: domain_results, diagnostics: all_diagnostics, exit_code: exit_code(all_diagnostics))
@@ -56,12 +67,13 @@ module RailsMmd
 
     attr_reader :diagnostics, :model_resolver, :redactor
 
-    def probe_domain(domain)
+    def probe_domain(domain, inventory_records)
       connection_diagnostic = multi_db_diagnostic(domain)
       return domain_result(domain, [], [connection_diagnostic]) if connection_diagnostic
 
       entities = []
       entity_models = []
+      selected_entities = []
       output_diagnostics = []
       domain.records.each do |record|
         model = model_for(record)
@@ -69,18 +81,188 @@ module RailsMmd
         if entity
           entities << entity
           entity_models << model
+          selected_entities << { entity: entity, model: model, record: record }
         end
         output_diagnostics.concat(record_diagnostics)
       end
 
-      domain_result(domain, entities, output_diagnostics, probe_join_tables(entity_models))
+      domain_result(
+        domain,
+        entities,
+        output_diagnostics,
+        probe_join_tables(entity_models),
+        probe_sti_subtypes(selected_entities, inventory_records)
+      )
     end
 
-    def domain_result(domain, entities, output_diagnostics, join_tables = [])
+    def domain_result(domain, entities, output_diagnostics, join_tables = [], sti_subtypes = [])
       DomainResult.new(
         domain_id: domain.domain_id, entities: entities,
-        join_tables: join_tables, diagnostics: output_diagnostics
+        sti_subtypes: sti_subtypes, join_tables: join_tables, diagnostics: output_diagnostics
       )
+    end
+
+    def probe_sti_subtypes(selected_entities, inventory_records)
+      selected_entities.flat_map do |selected|
+        sti_subtypes_for(selected.fetch(:record), selected.fetch(:model), selected.fetch(:entity), inventory_records)
+      end
+    end
+
+    def sti_subtypes_for(base_record, base_model, base_entity, inventory_records)
+      base_metadata = sti_base_metadata(base_record, base_model, base_entity)
+      return [] unless base_metadata
+
+      candidates = sti_candidates(base_record, base_model, base_metadata, inventory_records)
+      accepted_by_model = candidates.to_h { |candidate| [candidate.fetch(:model), candidate] }
+      subtypes = candidates.filter_map do |candidate|
+        sti_subtype(candidate, accepted_by_model, base_model, base_metadata.fetch(:entity_id))
+      end
+
+      subtypes.sort_by { |subtype| [subtype.depth, subtype.entity_id] }
+    end
+
+    def sti_base_metadata(base_record, base_model, base_entity)
+      table_name = safe_string_value(base_model, :table_name) || base_record.table_name
+      inheritance_column = safe_string_value(base_model, :inheritance_column)
+      return unless present_string?(table_name) && present_string?(inheritance_column)
+
+      {
+        entity_id: entity_id_for(base_entity.table_name),
+        table_name: table_name,
+        inheritance_column: inheritance_column
+      }
+    end
+
+    def sti_candidates(base_record, base_model, base_metadata, inventory_records)
+      inventory_records.sort_by(&:ruby_constant).filter_map do |candidate_record|
+        build_sti_candidate(
+          base_record: base_record,
+          base_model: base_model,
+          base_metadata: base_metadata,
+          candidate_record: candidate_record
+        )
+      end
+    end
+
+    def build_sti_candidate(base_record:, base_model:, base_metadata:, candidate_record:)
+      return unless candidate_record_matches_base?(base_record, candidate_record)
+
+      candidate_model = model_for(candidate_record)
+      return unless candidate_model_matches_base?(candidate_model, candidate_record.ruby_constant, base_model)
+
+      candidate_metadata = sti_candidate_metadata(candidate_model, base_metadata)
+      return unless candidate_metadata
+
+      {
+        model: candidate_model,
+        entity_id: sti_entity_id(base_metadata.fetch(:entity_id), candidate_record.ruby_constant),
+        ruby_constant: candidate_record.ruby_constant,
+        table_name: candidate_metadata.fetch(:table_name),
+        inheritance_column: candidate_metadata.fetch(:inheritance_column),
+        sti_name: candidate_metadata.fetch(:sti_name)
+      }
+    end
+
+    def candidate_record_matches_base?(base_record, candidate_record)
+      candidate_record.ruby_constant != base_record.ruby_constant &&
+        candidate_record.connection_context_id == base_record.connection_context_id
+    end
+
+    def candidate_model_matches_base?(candidate_model, ruby_constant, base_model)
+      named_model?(candidate_model, ruby_constant) &&
+        safe_value_equals?(candidate_model, :base_class, base_model)
+    end
+
+    def sti_candidate_metadata(candidate_model, base_metadata)
+      metadata = sti_candidate_scalar_metadata(candidate_model)
+      return unless metadata
+      return unless metadata.fetch(:table_name) == base_metadata.fetch(:table_name)
+      return unless metadata.fetch(:inheritance_column) == base_metadata.fetch(:inheritance_column)
+
+      metadata
+    end
+
+    def sti_candidate_scalar_metadata(candidate_model)
+      table_name = safe_string_value(candidate_model, :table_name)
+      inheritance_column = safe_string_value(candidate_model, :inheritance_column)
+      sti_name = safe_string_value(candidate_model, :sti_name)
+      return unless present_string?(table_name) && present_string?(inheritance_column) && present_string?(sti_name)
+      return unless safe_boolean_value(candidate_model, :descends_from_active_record?) == false
+      return unless safe_boolean_value(candidate_model, :abstract_class?) == false
+
+      { table_name: table_name, inheritance_column: inheritance_column, sti_name: sti_name }
+    end
+
+    def sti_subtype(candidate, accepted_by_model, base_model, base_entity_id)
+      parent = sti_parent(candidate.fetch(:model), accepted_by_model, base_model, base_entity_id)
+      return unless parent
+
+      StiSubtype.new(
+        entity_id: candidate.fetch(:entity_id),
+        base_entity_id: base_entity_id,
+        parent_entity_id: parent.fetch(:parent_entity_id),
+        ruby_constant: candidate.fetch(:ruby_constant),
+        table_name: candidate.fetch(:table_name),
+        inheritance_column: candidate.fetch(:inheritance_column),
+        sti_name: candidate.fetch(:sti_name),
+        depth: parent.fetch(:depth)
+      )
+    end
+
+    def sti_parent(candidate_model, accepted_by_model, base_model, base_entity_id)
+      current = candidate_model
+      visible_depth = 1
+      parent_entity_id = nil
+      visited = {}
+
+      loop do
+        current = safe_value_from(current, :superclass)
+        return unless current
+
+        object_id = current.object_id
+        return if visited.key?(object_id)
+
+        visited[object_id] = true
+        if current.equal?(base_model)
+          return { parent_entity_id: parent_entity_id || base_entity_id, depth: visible_depth }
+        end
+
+        accepted_parent = accepted_by_model[current]
+        next unless accepted_parent
+
+        parent_entity_id ||= accepted_parent.fetch(:entity_id)
+        visible_depth += 1
+      end
+    end
+
+    def entity_id_for(table_name)
+      "entities/#{table_name}"
+    end
+
+    def sti_entity_id(base_entity_id, ruby_constant)
+      "#{base_entity_id}/sti/#{ruby_constant}"
+    end
+
+    def named_model?(model, expected_name)
+      safe_string_value(model, :name) == expected_name
+    end
+
+    def safe_value_equals?(object, method_name, expected)
+      safe_value_from(object, method_name).equal?(expected)
+    end
+
+    def safe_string_value(object, method_name)
+      value = safe_value_from(object, method_name)
+      value if present_string?(value)
+    end
+
+    def safe_boolean_value(object, method_name)
+      value = safe_value_from(object, method_name)
+      value if [true, false].include?(value)
+    end
+
+    def present_string?(value)
+      value.is_a?(String) && !value.empty?
     end
 
     def multi_db_diagnostic(domain)

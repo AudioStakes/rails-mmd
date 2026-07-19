@@ -1,11 +1,12 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_kind": "er",
   "domain_id": "core",
   "direction": "LR",
   "entities": [
     {
       "entity_id": "entities/users",
+      "entity_kind": "physical",
       "safe_token": "USER",
       "label": "User",
       "attributes": [
@@ -15,6 +16,7 @@
     },
     {
       "entity_id": "entities/accounts",
+      "entity_kind": "physical",
       "safe_token": "ACCOUNT",
       "label": "Account",
       "attributes": [
@@ -22,6 +24,7 @@
       ]
     }
   ],
+  "inheritances": [],
   "relationships": [
     {
       "relationship_id": "relationships/users/account",

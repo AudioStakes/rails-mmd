@@ -1,12 +1,13 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_kind": "class",
   "domain_id": "core",
   "direction": "BT",
   "entities": [
-    { "entity_id": "entities/orders", "safe_token": "ORDER", "label": "Order", "attributes": [] },
-    { "entity_id": "entities/accounts", "safe_token": "ACCOUNT", "label": "Account", "attributes": [] }
+    { "entity_id": "entities/orders", "entity_kind": "physical", "safe_token": "ORDER", "label": "Order", "attributes": [] },
+    { "entity_id": "entities/accounts", "entity_kind": "physical", "safe_token": "ACCOUNT", "label": "Account", "attributes": [] }
   ],
+  "inheritances": [],
   "relationships": [
     {
       "relationship_id": "relationships/orders/account",

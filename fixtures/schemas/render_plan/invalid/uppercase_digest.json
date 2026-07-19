@@ -1,9 +1,10 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "artifact_kind": "er",
   "domain_id": "core",
   "direction": "LR",
   "entities": [],
+  "inheritances": [],
   "relationships": [],
   "comments": [],
   "diagnostic_ids": [],

@@ -63,14 +63,18 @@ Rails Active Record support and implementation priorities are tracked in
 
 ## Artifact Schema Versions
 
-P2 relationship metadata moves generated IR and render-plan artifacts from
-schema version 1 to schema version 2. Consumers must validate those artifacts
-with the v2 schemas shipped by the same `rails-mmd` release. Configuration and
+P2 scoped-relationship metadata moved generated IR and render-plan artifacts
+from schema version 1 to schema version 2. P2 STI support now moves both
+artifacts from version 2 to version 3: IR entities can carry closed STI metadata,
+while renderer entities carry a kind discriminator and class plans expose
+explicit inheritance edges. Consumers must validate generated artifacts with
+the schemas shipped by the same `rails-mmd` release. Configuration and
 diagnostics artifacts remain at schema version 1.
 
-There is no dual-version output mode. Strict consumers of the former closed v1
-relationship objects must update before consuming v2 IR or render plans. Mermaid
-text output and artifact filenames are unchanged.
+There is no dual-version output mode. Strict v2 consumers must update for the
+new required render-plan members and closed entity variants before consuming v3
+IR or render plans. Association relationship objects retain their v2 shape.
+Mermaid artifact filenames are unchanged.
 
 ## Serena Setup
 

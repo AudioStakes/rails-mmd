@@ -30,6 +30,27 @@ RSpec.describe RailsMmd::Generate do
     expect(publisher.received.fetch(:artifacts).fetch('core').keys).to eq(%w[er class])
   end
 
+  # rubocop:disable RSpec/ExampleLength
+  it 'passes full inventory records to schema probe before relationship building' do
+    inventory_records = [Struct.new(:ruby_constant).new('Vehicle')]
+    schema_probe_handoff = Struct.new(:domains, :diagnostics, :received) do
+      def probe(**kwargs)
+        self.received = kwargs
+        self
+      end
+    end.new([domain_result], [], nil)
+    dependencies[:model_inventory] = Struct.new(:records).new(inventory_records)
+    dependencies[:schema_probe] = schema_probe_handoff
+
+    result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
+
+    expect(result.exit_code).to eq(0)
+    expect(schema_probe_handoff.received.fetch(:inventory_records)).to eq(inventory_records)
+    expect(schema_probe_handoff.received.fetch(:domains).map(&:domain_id)).to eq(['core'])
+    expect(publisher.received.fetch(:artifacts).fetch('core').keys).to eq(%w[er class])
+  end
+  # rubocop:enable RSpec/ExampleLength
+
   it 'keeps warning diagnostics successful when fail-on-warning is disabled' do
     result = generate.run(cli_options: RailsMmd::Config::CliOptions.new)
 

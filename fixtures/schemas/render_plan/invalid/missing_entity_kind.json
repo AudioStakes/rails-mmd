@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "artifact_kind": "class",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/users",
+      "safe_token": "USER",
+      "label": "User",
+      "attributes": []
+    }
+  ],
+  "inheritances": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}
