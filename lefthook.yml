@@ -94,19 +94,18 @@ pre-commit:
         - ".rubocop.yml"
       run: bundle exec rake rubocop
 
-    schema-fixture-routing:
+    contract-routing:
       priority: 9
       glob:
+        - "schemas/*.json"
         - "schemas/**/*.json"
+        - "fixtures/*.json"
         - "fixtures/**/*.json"
+        - "fixtures/*.mmd"
         - "fixtures/**/*.mmd"
-      run: bundle exec rspec spec/contracts
-
-    setup-drift-routing:
-      priority: 10
-      glob:
         - "AGENTS.md"
         - "README.md"
+        - "docs/*.md"
         - "docs/**/*.md"
       run: bundle exec rspec spec/contracts
 

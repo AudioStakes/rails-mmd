@@ -122,12 +122,16 @@ RSpec.describe RailsMmd::HookChecks do
     pre_commit_commands.fetch('rubocop-config')
   end
 
-  def schema_fixture_command
-    pre_commit_commands.fetch('schema-fixture-routing')
+  def contract_command
+    pre_commit_commands.fetch('contract-routing')
   end
 
-  def setup_drift_command
-    pre_commit_commands.fetch('setup-drift-routing')
+  def expected_contract_globs
+    %w[
+      schemas/*.json schemas/**/*.json
+      fixtures/*.json fixtures/**/*.json fixtures/*.mmd fixtures/**/*.mmd
+      AGENTS.md README.md docs/*.md docs/**/*.md
+    ]
   end
 
   it 'fails before repair when a staged file also has unstaged changes' do
@@ -224,27 +228,17 @@ RSpec.describe RailsMmd::HookChecks do
   end
 
   it 'routes schema and fixture changes to contract specs' do
-    expect(schema_fixture_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
+    expect(contract_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
   end
 
-  it 'triggers contract specs for schema and fixture paths' do
-    expect(schema_fixture_command.fetch('glob')).to contain_exactly(
-      'schemas/**/*.json',
-      'fixtures/**/*.json',
-      'fixtures/**/*.mmd'
-    )
+  it 'triggers one contract route for schema, fixture, and setup documentation paths' do
+    expect(contract_command.fetch('glob')).to match_array(expected_contract_globs)
   end
 
-  it 'routes setup documentation changes to contract specs' do
-    expect(setup_drift_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
-  end
+  it 'defines the contract suite command only once' do
+    contract_runs = pre_commit_commands.values.count { |command| command.fetch('run').include?('rspec spec/contracts') }
 
-  it 'triggers contract specs for setup documentation paths' do
-    expect(setup_drift_command.fetch('glob')).to contain_exactly(
-      'AGENTS.md',
-      'README.md',
-      'docs/**/*.md'
-    )
+    expect(contract_runs).to eq(1)
   end
 
   it 'separates RuboCop options from staged file arguments' do
