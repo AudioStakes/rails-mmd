@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-require 'fileutils'
 require 'json'
-require 'tmpdir'
 require 'rails_mmd/diagnostics'
 require 'rails_mmd/output_directory'
 require 'rails_mmd/schema_validator'
@@ -24,12 +22,8 @@ module RailsMmd
       OUTPUT_DIRECTORY_INVALID
     ].freeze
     ARTIFACT_KINDS = %w[er class].freeze
-    MANAGED_PATH_PATTERN =
-      /\A(?:global\.diagnostics|[a-z][a-z0-9_]*\.(?:diagnostics|er|class)(?:\.render_plan)?)\.(?:json|mmd)\z/
-
     def initialize(project_root:, schema_validator: SchemaValidator.new, diagnostics_factory: Diagnostics.new)
-      @project_root = Pathname(project_root).expand_path
-      @output_directory = OutputDirectory.new(project_root: @project_root)
+      @output_directory = OutputDirectory.new(project_root: project_root)
       @schema_validator = schema_validator
       @diagnostics_factory = diagnostics_factory
     end
@@ -52,22 +46,17 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics_factory, :output_directory, :project_root, :schema_validator
+    attr_reader :diagnostics_factory, :output_directory, :schema_validator
 
     def publish_inside_output(result, selected_domain_ids, diagnostics, artifacts)
-      prepare_output_directory(result.path)
-      diagnostics = scoped_diagnostics(diagnostics, selected_domain_ids)
-      artifacts = scoped_artifacts(artifacts, selected_domain_ids)
-      diagnostic_documents = validate_payloads!(diagnostics, artifacts)
-      blocked_domains = blocked_domains(selected_domain_ids, diagnostics)
-      plan = publish_plan(selected_domain_ids, diagnostic_documents, artifacts, blocked_domains)
-      write_plan(result.path, plan, selected_domain_ids)
-      Result.new(success: true, diagnostics: diagnostics, written_paths: plan.keys.sort, stderr: nil)
-    end
-
-    def prepare_output_directory(path)
-      path.mkpath
-      ensure_inside_project_root!(path)
+      written_paths = output_directory.publish!(result, selected_domain_ids: selected_domain_ids) do
+        diagnostics = scoped_diagnostics(diagnostics, selected_domain_ids)
+        artifacts = scoped_artifacts(artifacts, selected_domain_ids)
+        diagnostic_documents = validate_payloads!(diagnostics, artifacts)
+        blocked_domains = blocked_domains(selected_domain_ids, diagnostics)
+        publish_plan(selected_domain_ids, diagnostic_documents, artifacts, blocked_domains)
+      end
+      Result.new(success: true, diagnostics: diagnostics, written_paths: written_paths, stderr: nil)
     end
 
     def validate_payloads!(diagnostics, artifacts)
@@ -139,93 +128,6 @@ module RailsMmd
 
     def blocking?(diagnostic)
       %w[fatal error].include?(diagnostic.fetch('severity'))
-    end
-
-    def write_plan(output_path, plan, selected_domain_ids)
-      ensure_inside_project_root!(output_path)
-      ensure_safe_replacement_set!(output_path, plan, selected_domain_ids)
-      Dir.mktmpdir('.rails-mmd-', output_path.to_s) do |tmp|
-        tmp_path = Pathname(tmp)
-        plan.each { |relative_path, content| tmp_path.join(relative_path).write(content) }
-        ensure_inside_project_root!(output_path)
-        ensure_safe_replacement_set!(output_path, plan, selected_domain_ids)
-        replace_plan_files(output_path, tmp_path, plan, selected_domain_ids)
-      end
-    end
-
-    def replace_plan_files(output_path, tmp_path, plan, selected_domain_ids)
-      Dir.mktmpdir('.rails-mmd-backup-', output_path.to_s) do |backup|
-        backup_path = Pathname(backup)
-        backup_existing_files(output_path, backup_path, selected_domain_ids)
-        move_plan_files(output_path, tmp_path, plan)
-      rescue StandardError
-        rollback_replacement(output_path, backup_path, plan)
-        raise
-      end
-    end
-
-    def backup_existing_files(output_path, backup_path, selected_domain_ids)
-      scoped_managed_paths(output_path, selected_domain_ids).each do |path|
-        ensure_safe_target!(output_path, path.basename.to_s)
-        FileUtils.mv(path.to_s, backup_path.join(path.basename).to_s)
-      end
-    end
-
-    def move_plan_files(output_path, tmp_path, plan)
-      plan.each_key { |relative_path| replace_file(output_path, tmp_path, relative_path) }
-    end
-
-    def rollback_replacement(output_path, backup_path, plan)
-      plan.each_key do |relative_path|
-        target = output_path.join(relative_path)
-        target.delete if target.file? && !target.symlink?
-      end
-      backup_path.children.each do |path|
-        ensure_safe_target!(output_path, path.basename.to_s)
-        FileUtils.mv(path.to_s, output_path.join(path.basename).to_s)
-      end
-    end
-
-    def ensure_safe_replacement_set!(output_path, plan, selected_domain_ids)
-      scoped_managed_paths(output_path, selected_domain_ids).each do |path|
-        ensure_safe_target!(output_path, path.basename.to_s)
-      end
-      plan.each_key { |relative_path| ensure_safe_target!(output_path, relative_path) }
-    end
-
-    def scoped_managed_paths(output_path, selected_domain_ids)
-      output_path.children.select do |path|
-        managed_path?(path) && scoped_managed_path?(path.basename.to_s, selected_domain_ids)
-      end
-    end
-
-    def managed_path?(path)
-      path.basename.to_s.match?(MANAGED_PATH_PATTERN)
-    end
-
-    def scoped_managed_path?(name, selected_domain_ids)
-      return true if name == 'global.diagnostics.json'
-
-      selected_domain_ids.any? { |domain_id| name.start_with?("#{domain_id}.") }
-    end
-
-    def replace_file(output_path, tmp_path, relative_path)
-      ensure_inside_project_root!(output_path)
-      ensure_safe_target!(output_path, relative_path)
-      FileUtils.mv(tmp_path.join(relative_path).to_s, output_path.join(relative_path).to_s)
-    end
-
-    def ensure_safe_target!(output_path, relative_path)
-      target = output_path.join(relative_path)
-      raise ArgumentError, 'output target is symlink' if target.symlink?
-      raise ArgumentError, 'output target is not a regular file' if target.exist? && !target.file?
-
-      ensure_inside_project_root!(target.parent)
-    end
-
-    def ensure_inside_project_root!(path)
-      relative = path.realpath.relative_path_from(project_root.realpath).to_s
-      raise ArgumentError, 'output path escapes project root' if relative.start_with?('..')
     end
 
     def json_document(payload)

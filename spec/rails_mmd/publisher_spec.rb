@@ -156,6 +156,27 @@ RSpec.describe RailsMmd::Publisher do
     expect(output.join('core.er.render_plan.json').read).to eq('old plan')
   end
 
+  it 'returns sanitized OUTPUT_WRITE_FAILED diagnostics when backup fails mid-publish' do
+    output = project_root.join('out')
+    output.mkpath
+    output.join('core.er.mmd').write('old mermaid')
+    output.join('core.er.render_plan.json').write('old plan')
+    fail_second_backup_move
+
+    result = publisher.publish(
+      output_dir: 'out',
+      selected_domain_ids: ['core'],
+      diagnostics: [],
+      artifacts: { 'core' => { 'er' => er_artifact_without_diagnostics } }
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first.fetch('code')).to eq('OUTPUT_WRITE_FAILED')
+    expect(output.join('core.er.mmd').read).to eq('old mermaid')
+    expect(output.join('core.er.render_plan.json').read).to eq('old plan')
+    expect(JSON.generate(result.diagnostics)).not_to include(project_root.to_s)
+  end
+
   it 'sorts diagnostics by severity, code, subject, and diagnostic id before writing' do
     publisher.publish(
       output_dir: 'out',
@@ -262,6 +283,18 @@ RSpec.describe RailsMmd::Publisher do
       if !failed && target.end_with?('/out/core.er.render_plan.json')
         failed = true
         raise Errno::EACCES, source
+      end
+
+      method.call(source, target)
+    end
+  end
+
+  def fail_second_backup_move
+    backup_moves = 0
+    allow(FileUtils).to receive(:mv).and_wrap_original do |method, source, target|
+      if target.include?('/.rails-mmd-backup-')
+        backup_moves += 1
+        raise Errno::EACCES, source if backup_moves == 2
       end
 
       method.call(source, target)
