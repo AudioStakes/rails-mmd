@@ -88,7 +88,7 @@ RSpec.describe RailsMmd::GenerationPipeline do
 
   def config(format: 'both')
     output = RailsMmd::Config::Output.new(directory: 'out', format: format, attributes: 'keys', direction: 'LR')
-    domain = RailsMmd::Config::Domain.new(id: 'core', include_models: [], exclude_models: [])
+    domain = RailsMmd::Config::Domain.new(domain_id: 'core', include_models: [], exclude_models: [])
     RailsMmd::Config::Resolved.new(domains: { 'core' => domain }, output: output, selected_domain_ids: ['core'])
   end
 

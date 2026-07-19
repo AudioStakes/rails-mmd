@@ -34,9 +34,6 @@ module RailsMmd
       Result.new(diagnostics: diagnostics, artifacts: artifacts)
     end
 
-    # Backward-compatible name for the original generation seam.
-    def build(config:) = generate(config: config)
-
     private
 
     attr_reader :active_record_base, :constant_resolver, :diagnostic_factory, :mermaid_serializer, :redactor,

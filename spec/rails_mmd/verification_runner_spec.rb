@@ -141,12 +141,12 @@ RSpec.describe RailsMmd::VerificationRunner do
   it 'keeps Lefthook as a single adapter to the routing interface' do
     commands = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands')
 
-    expect(commands.keys).to eq(['verification-routing'])
-    expect(commands.fetch('verification-routing').fetch('run')).to include('VerificationRunner.new.run!(ARGV)')
+    expect(commands.keys).to eq(['verification-runner'])
+    expect(commands.fetch('verification-runner').fetch('run')).to include('VerificationRunner.new.run!(ARGV)')
   end
 
   it 'limits the Lefthook adapter to the union of verification paths' do
-    adapter = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands').fetch('verification-routing')
+    adapter = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands').fetch('verification-runner')
 
     expect(adapter.fetch('glob')).to match_array(activation_globs)
   end

@@ -21,10 +21,5 @@ module RailsMmd
         ]
       end
     end
-
-    # Backward-compatible method names for the recorded P1 seam.
-    def by_key(records, key) = sort_by_key(records, key)
-
-    def diagnostics(records) = sort_diagnostics(records)
   end
 end

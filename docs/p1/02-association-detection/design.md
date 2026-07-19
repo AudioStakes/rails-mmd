@@ -27,7 +27,7 @@ Status: design complete; reviewed with no remaining findings
 - Preserve warning severity, exit code 0 by default, `relationship_build` phase,
   and relationship scope. `--fail-on-warning` retains its existing exit policy.
 - Keep builder iteration order internal. Published diagnostics use the existing
-  `Ordering.diagnostics` contract; tests compare the stable published order or
+  `Ordering.sort_diagnostics` contract; tests compare the stable published order or
   key projections, not Rails reflection order.
 
 ### Real-Rails acceptance

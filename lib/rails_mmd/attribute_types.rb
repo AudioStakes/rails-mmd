@@ -25,8 +25,5 @@ module RailsMmd
 
       'unknown'
     end
-
-    # Backward-compatible constant name.
-    SUPPORTED = SUPPORTED_TYPES
   end
 end

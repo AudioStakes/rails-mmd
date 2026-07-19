@@ -110,9 +110,7 @@ module RailsMmd
     end
 
     def generate_artifacts(config)
-      return pipeline.generate(config: config) if pipeline.respond_to?(:generate)
-
-      pipeline.build(config: config)
+      pipeline.generate(config: config)
     end
   end
 end

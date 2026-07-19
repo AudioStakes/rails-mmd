@@ -13,8 +13,6 @@ module RailsMmd
         reason.nil?
       end
     end
-    Result = Resolution
-
     DRIVE_OR_UNC_PATTERN = /\A(?:[A-Za-z]:|\\\\)/
     SAFE_RELATIVE_PATH_PATTERN = %r{\A[A-Za-z0-9._/-]+\z}
     MANAGED_PATH_PATTERN = /

@@ -333,7 +333,8 @@ RSpec.describe 'runtime primitives' do
 
   describe RailsMmd::Ordering do
     it 'sorts records deterministically by named keys and diagnostic tuple' do
-      expect(described_class.by_key([{ 'id' => 'b' }, { 'id' => 'a' }], 'id')).to eq([{ 'id' => 'a' }, { 'id' => 'b' }])
+      expect(described_class.sort_by_key([{ 'id' => 'b' }, { 'id' => 'a' }], 'id'))
+        .to eq([{ 'id' => 'a' }, { 'id' => 'b' }])
 
       diagnostics = [
         { 'severity' => 'fatal', 'phase' => 'tokenization', 'code' => 'SAFE_TOKEN_COLLISION', 'subject_id' => 'c',
@@ -343,7 +344,7 @@ RSpec.describe 'runtime primitives' do
         { 'severity' => 'error', 'phase' => 'config', 'code' => 'CONFIG_NOT_FOUND', 'subject_id' => 'a',
           'diagnostic_id' => '1' }
       ]
-      expect(described_class.diagnostics(diagnostics).map { |diagnostic| diagnostic.fetch('severity') })
+      expect(described_class.sort_diagnostics(diagnostics).map { |diagnostic| diagnostic.fetch('severity') })
         .to eq(%w[fatal error warning])
 
       phase_conflict = [
@@ -352,7 +353,7 @@ RSpec.describe 'runtime primitives' do
         { 'severity' => 'error', 'phase' => 'z', 'code' => 'CONFIG_NOT_FOUND', 'subject_id' => 'b',
           'diagnostic_id' => '1' }
       ]
-      expect(described_class.diagnostics(phase_conflict).map { |diagnostic| diagnostic.fetch('code') })
+      expect(described_class.sort_diagnostics(phase_conflict).map { |diagnostic| diagnostic.fetch('code') })
         .to eq(%w[CONFIG_NOT_FOUND OUTPUT_WRITE_FAILED])
     end
   end

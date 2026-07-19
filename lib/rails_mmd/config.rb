@@ -22,14 +22,7 @@ module RailsMmd
     EXIT_CONTRACT_ERROR = 2
 
     CliOptions = Struct.new(:config_path, :output_dir, :domain, :format, keyword_init: true)
-    Domain = Struct.new(:domain_id, :include_models, :exclude_models, keyword_init: true) do
-      def initialize(include_models:, exclude_models:, domain_id: nil, id: nil)
-        super(domain_id: domain_id || id, include_models: include_models, exclude_models: exclude_models)
-      end
-
-      alias_method :id, :domain_id
-      alias_method :id=, :domain_id=
-    end
+    Domain = Struct.new(:domain_id, :include_models, :exclude_models, keyword_init: true)
     Output = Struct.new(:directory, :path, :format, :attributes, :direction, :sources, keyword_init: true)
     Resolved = Struct.new(:config_path, :domains, :output, :selected_domain_ids, keyword_init: true)
     Result = Struct.new(:config, :diagnostics, :exit_code, keyword_init: true) do

@@ -40,20 +40,6 @@ RSpec.describe RailsMmd::GenerateCommand do
     end
   end
 
-  class LegacyPipeline
-    attr_reader :configs
-
-    def initialize(result)
-      @result = result
-      @configs = []
-    end
-
-    def build(config:)
-      configs << config
-      @result
-    end
-  end
-
   it 'exposes only the Rails loader and deep pipeline as replaceable seams' do
     expect(described_class.instance_method(:initialize).parameters).to eq(
       [%i[key project_root], %i[key rails_loader], %i[key pipeline]]
@@ -70,17 +56,6 @@ RSpec.describe RailsMmd::GenerateCommand do
       expect(result).to be_success
       expect(root.join('out/core.er.mmd')).to exist
       expect(root.join('out/core.er.render_plan.json')).to exist
-    end
-  end
-
-  it 'supports the former pipeline build seam during the compatibility window' do
-    in_project do |root|
-      pipeline = LegacyPipeline.new(pipeline_result)
-      result = described_class.new(project_root: root, rails_loader: successful_loader, pipeline: pipeline)
-                              .run(cli_options: cli_options)
-
-      expect(result).to be_success
-      expect(pipeline.configs.length).to eq(1)
     end
   end
 

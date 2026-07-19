@@ -23,8 +23,5 @@ module RailsMmd
 
       blocking.map { |diagnostic| EXIT_CODE_BY_DIAGNOSTIC_CODE.fetch(diagnostic.fetch('code'), 2) }.max
     end
-
-    # Backward-compatible constant name.
-    CODE_BY_DIAGNOSTIC = EXIT_CODE_BY_DIAGNOSTIC_CODE
   end
 end
