@@ -43,11 +43,7 @@ module RailsMmd
       keyword_init: true
     )
     private_constant :Candidate
-    Result = Struct.new(:domains, :diagnostics, keyword_init: true) do
-      def success?
-        true
-      end
-    end
+    Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
     STRUCTURED_COLUMN_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/

@@ -151,6 +151,17 @@ RSpec.describe RailsMmd::Generate do
     end
   end
 
+  it 'maps pipeline contract errors at the command boundary' do
+    in_project do |root|
+      result = generate(root, pipeline_result(diagnostics: [diagnostic('DOMAIN_EMPTY')]))
+               .run(cli_options: cli_options)
+
+      expect(result.exit_code).to eq(2)
+      expect(result.diagnostics.map { |item| item.fetch('code') }).to eq(['DOMAIN_EMPTY'])
+      expect(root.join('out/core.diagnostics.json')).to exist
+    end
+  end
+
   def generate(root, result)
     described_class.new(project_root: root, rails_loader: successful_loader, pipeline: FakePipeline.new(result))
   end

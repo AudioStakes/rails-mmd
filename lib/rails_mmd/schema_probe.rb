@@ -31,13 +31,7 @@ module RailsMmd
         super(message)
       end
     end
-    Result = Struct.new(:domains, :diagnostics, :exit_code, keyword_init: true) do
-      def success?
-        diagnostics.none? { |diagnostic| diagnostic.fetch('severity') != 'warning' }
-      end
-    end
-
-    EXIT_CONTRACT_ERROR = 2
+    Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
     def initialize(model_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
       @model_resolver = model_resolver
@@ -49,7 +43,7 @@ module RailsMmd
       domain_results = domains.map { |domain| probe_domain(domain) }
       all_diagnostics = domain_results.flat_map(&:diagnostics)
 
-      Result.new(domains: domain_results, diagnostics: all_diagnostics, exit_code: exit_code(all_diagnostics))
+      Result.new(domains: domain_results, diagnostics: all_diagnostics)
     end
 
     private
@@ -108,10 +102,6 @@ module RailsMmd
       return invalid_record(domain_id, record, :primary_key) unless scalar_primary_key?(primary_key)
 
       build_entity(domain_id, record, model, columns, primary_key)
-    end
-
-    def exit_code(all_diagnostics)
-      all_diagnostics.any? { |diagnostic| diagnostic.fetch('severity') != 'warning' } ? EXIT_CONTRACT_ERROR : 0
     end
 
     def model_for(record)

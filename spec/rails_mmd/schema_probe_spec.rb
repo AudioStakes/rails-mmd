@@ -23,8 +23,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(name) { resolver.fetch(name) }).probe(domains: [domain])
 
-    expect(result).to be_success
-    expect(result.exit_code).to eq(0)
     expect(result.diagnostics).to eq([])
     expect(result.domains.first.entities.map(&:ruby_constant)).to eq(['User'])
     entity = result.domains.first.entities.first
@@ -89,7 +87,7 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', models.keys.map { |name| record(name) })]
     )
 
-    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
     expect(result.domains.first.join_tables).to eq([])
   end
 
@@ -127,8 +125,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(name) { calls << name }).probe(domains: [domain])
 
-    expect(result).not_to be_success
-    expect(result.exit_code).to eq(2)
     expect(result.diagnostics.first).to include('code' => 'MULTI_DB_UNSUPPORTED')
     expect(result.diagnostics.first.dig('metadata', 'connection_context_ids')).to eq(
       [second.connection_context_id, first.connection_context_id].sort
@@ -159,7 +155,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [first, second])]
     )
 
-    expect(result).not_to be_success
     expect(result.diagnostics.first).to include('code' => 'MULTI_DB_UNSUPPORTED')
     expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').length).to eq(2)
     expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').join(' '))
@@ -177,7 +172,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(_name) { raise 'must not probe' }).probe(domains: [domain])
 
-    expect(result).not_to be_success
     expect(result.diagnostics.first).to include('code' => 'MULTI_DB_UNSUPPORTED')
     expect(result.diagnostics.first.dig('metadata', 'connection_context_ids').join(' '))
       .not_to include('/Users/dev', '/tmp')
@@ -191,8 +185,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(name) { resolver.fetch(name) }).probe(domains: [domain])
 
-    expect(result).not_to be_success
-    expect(result.exit_code).to eq(2)
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[MODEL_TABLE_MISSING MODEL_PRIMARY_KEY_UNSUPPORTED]
     )
@@ -214,7 +206,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [record('TableError'), record('ColumnError'), record('PrimaryKeyError')])]
     )
 
-    expect(result).not_to be_success
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[MODEL_TABLE_MISSING MODEL_TABLE_MISSING MODEL_PRIMARY_KEY_UNSUPPORTED]
     )
@@ -227,7 +218,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain]
     )
 
-    expect(result).not_to be_success
     expect(result.diagnostics.first).to include('code' => 'MODEL_TABLE_MISSING')
     expect(result.diagnostics.first.fetch('message')).not_to include('/Users/dev')
     expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
@@ -239,7 +229,6 @@ RSpec.describe RailsMmd::SchemaProbe do
         model_resolver: ->(_name) { raise error_class, '/Users/dev/app failed' }
       ).probe(domains: [domain_result('core', [record('User')])])
 
-      expect(result).not_to be_success
       expect(result.diagnostics.first).to include('code' => 'MODEL_TABLE_MISSING')
       expect(result.diagnostics.first.fetch('message')).not_to include('/Users/dev')
     end
@@ -257,8 +246,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(_name) { user }).probe(domains: [domain])
 
-    expect(result).to be_success
-    expect(result.exit_code).to eq(0)
     expect(result.domains.first.entities.first.foreign_keys).to eq([])
     expect(result.domains.first.entities.first.indexes).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
@@ -283,7 +270,6 @@ RSpec.describe RailsMmd::SchemaProbe do
         domains: [domain_result('core', [record('User')])]
       )
 
-      expect(result).to be_success
       expect(result.diagnostics.first).to include('code' => 'DB_METADATA_DEGRADED')
       expect(result.diagnostics.first.dig('metadata', 'reason')).not_to include('/Users/dev')
     end
@@ -302,7 +288,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [record('User')])]
     )
 
-    expect(result).to be_success
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[DB_METADATA_DEGRADED DB_METADATA_DEGRADED]
     )
@@ -318,7 +303,6 @@ RSpec.describe RailsMmd::SchemaProbe do
 
     result = described_class.new(model_resolver: ->(_name) { user }).probe(domains: [domain])
 
-    expect(result).to be_success
     expect(result.domains.first.entities.first.foreign_keys).to eq([])
     expect(result.domains.first.entities.first.indexes).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') })
@@ -343,7 +327,6 @@ RSpec.describe RailsMmd::SchemaProbe do
     )
 
     entity = result.domains.first.entities.first
-    expect(result).to be_success
     expect(entity.foreign_keys.map(&:column)).to eq(['account_id'])
     expect(entity.indexes.map(&:columns)).to eq([%w[email]])
   end
@@ -361,7 +344,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [record('User')])]
     )
 
-    expect(result).to be_success
     expect(result.domains.first.entities.first.foreign_keys).to eq([])
     expect(result.domains.first.entities.first.indexes).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
@@ -388,7 +370,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [record('User')])]
     )
 
-    expect(result).to be_success
     expect(result.diagnostics).to eq([])
     expect(result.domains.first.entities.first.indexes.map(&:where)).to eq([nil, 'deleted_at IS NULL', nil])
     expect(result.domains.first.entities.first.indexes.map(&:using)).to eq(['btree', nil, nil])
@@ -411,7 +392,6 @@ RSpec.describe RailsMmd::SchemaProbe do
       domains: [domain_result('core', [record('User')])]
     )
 
-    expect(result).to be_success
     expect(result.domains.first.entities.first.indexes).to eq([])
     expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'metadata_kind') }).to eq(
       ['unique_index']

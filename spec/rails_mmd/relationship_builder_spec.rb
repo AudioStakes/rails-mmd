@@ -23,7 +23,6 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     result = build(domain, 'User' => user_model, 'Account' => account_model)
 
-    expect(result).to be_success
     expect(result.diagnostics).to eq([])
     expect(result.domains.first.relationships.map(&:relationship_id)).to eq(
       ['relationships/users/account_id/accounts/id']
