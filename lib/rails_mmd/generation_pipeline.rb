@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/domain_resolver'
+require 'rails_mmd/diagnostics'
 require 'rails_mmd/ir_builder'
 require 'rails_mmd/mermaid_serializer'
 require 'rails_mmd/model_inventory'
 require 'rails_mmd/relationship_builder'
 require 'rails_mmd/render_plan_builder'
+require 'rails_mmd/redactor'
 require 'rails_mmd/schema_probe'
 
 module RailsMmd
@@ -13,11 +15,13 @@ module RailsMmd
   class GenerationPipeline
     Result = Struct.new(:diagnostics, :artifacts, keyword_init: true)
 
-    def initialize(active_record_base: nil, render_plan_builder: RenderPlanBuilder.new,
-                   mermaid_serializer: MermaidSerializer.new)
+    def initialize(active_record_base: nil, redactor: Redactor.new, render_plan_builder: nil,
+                   mermaid_serializer: nil)
       @active_record_base = active_record_base
-      @render_plan_builder = render_plan_builder
-      @mermaid_serializer = mermaid_serializer
+      @redactor = redactor
+      @diagnostics = Diagnostics.new(redactor: redactor)
+      @render_plan_builder = render_plan_builder || RenderPlanBuilder.new(redactor: redactor)
+      @mermaid_serializer = mermaid_serializer || MermaidSerializer.new(diagnostics: @diagnostics)
     end
 
     def build(config:)
@@ -29,7 +33,7 @@ module RailsMmd
 
     private
 
-    attr_reader :active_record_base, :mermaid_serializer, :render_plan_builder
+    attr_reader :active_record_base, :diagnostics, :mermaid_serializer, :redactor, :render_plan_builder
 
     def internal_payloads(config)
       resolved = resolve_domains(config)
@@ -40,16 +44,17 @@ module RailsMmd
     end
 
     def resolve_domains(config)
-      inventory = ModelInventory.new(active_record_base: resolved_active_record_base)
-      DomainResolver.new.resolve(config: config, inventory_records: inventory.records)
+      inventory = ModelInventory.new(active_record_base: resolved_active_record_base, redactor: redactor)
+      DomainResolver.new(diagnostics: diagnostics).resolve(config: config, inventory_records: inventory.records)
     end
 
     def probe_domains(resolved)
-      SchemaProbe.new(model_resolver: model_resolver).probe(domains: resolved.domains)
+      SchemaProbe.new(model_resolver: model_resolver, diagnostics: diagnostics, redactor: redactor)
+                 .probe(domains: resolved.domains)
     end
 
     def build_relationships(probed)
-      RelationshipBuilder.new(model_resolver: model_resolver).build(domains: probed.domains)
+      RelationshipBuilder.new(model_resolver: model_resolver, diagnostics: diagnostics).build(domains: probed.domains)
     end
 
     def build_ir(config, probed, relationships)

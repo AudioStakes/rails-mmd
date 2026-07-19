@@ -31,6 +31,21 @@ RSpec.describe 'runtime primitives' do
       expect(redactor.sanitize_object('api_key' => 'super-secret-value')).to eq('[REDACTED_KEY]' => '[REDACTED]')
       expect(redactor.sanitize_object(42)).to eq(42)
     end
+
+    it 'owns Mermaid free-text and structured-identifier sanitization' do
+      redactor = described_class.new(project_root: Dir.pwd, env: {})
+
+      expect(
+        described_class.sanitize_mermaid_free_text(
+          "api\n_key=secret /tmp/pri\nvate/token=hidden", sanitizer: redactor
+        )
+      ).to eq('[REDACTED] [REDACTED_PATH]')
+      expect(
+        described_class.sanitize_mermaid_free_text('database_url=postgres://u:p@db', sanitizer: redactor)
+      ).to eq('[REDACTED]')
+      expect(described_class.sanitize_mermaid_structured('Admin::User', grammar: :ruby_constant)).to eq('Admin::User')
+      expect(described_class.sanitize_mermaid_structured('Admin User', grammar: :ruby_constant)).to eq('X')
+    end
   end
 
   describe RailsMmd::SchemaValidator do

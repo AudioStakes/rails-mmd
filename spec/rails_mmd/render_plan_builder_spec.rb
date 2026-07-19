@@ -111,6 +111,20 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end
 
+  it 'preserves the sanitize-only injected redactor seam' do
+    redactor = Class.new do
+      def sanitize(value) = value.gsub('sensitive-value', '[CUSTOM_REDACTION]')
+    end.new
+    result = described_class.new(redactor: redactor).build(
+      ir: ir_payload,
+      artifact_kind: 'er',
+      direction: 'LR',
+      comments: [{ 'comment_id' => 'comments/custom', 'text' => 'note sensitive-value' }]
+    )
+
+    expect(result.payload.fetch('comments').first.fetch('text')).to eq('note [CUSTOM_REDACTION]')
+  end
+
   it 'normalizes Mermaid-facing comments to sanitized single-line text before schema validation' do
     result = described_class.new.build(
       ir: ir_payload,

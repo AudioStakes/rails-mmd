@@ -23,31 +23,7 @@ module RailsMmd
       '0..many' => '0..*',
       '1..many' => '1..*'
     }.freeze
-    FREE_TEXT_SECRET_KEY = /
-      (?:
-        password|passwd|secret|credential|token|pid|
-        api\s*[_-]?\s*key|
-        database\s*[_-]?\s*url|
-        (?:access|auth|refresh)\s*[_-]?\s*token|
-        generated\s*[_-]?\s*at|
-        process\s*[_-]?\s*id|
-        random\s*[_-]?\s*seed|
-        raw\s*[_-]?\s*exception\s*[_-]?\s*backtrace
-      )
-    /ix
-    FREE_TEXT_FORBIDDEN_ASSIGNMENT = /[A-Za-z0-9_-]*#{FREE_TEXT_SECRET_KEY}[A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/ix
-    REDACTED_KEY_ASSIGNMENT = /[A-Za-z0-9_-]*\[REDACTED_KEY\][A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/
-    URL_PATTERN = %r{\b[a-z][a-z0-9+.-]*://[^\s]+}i
-    URL_PLACEHOLDER_PREFIX = "\uE000RAILSMMDURL"
-    REDACTED_URL = '[REDACTED_URL]'
-    MERMAID_CONTROL_TEXT = /[\r\n\t[:cntrl:]]+/
-    CONTROL_SPLIT_ABSOLUTE_PATH =
-      /(?<![A-Za-z0-9_])\/[^[:cntrl:]\s)\]}>;,:!?]+(?:[\r\n\t[:cntrl:]][^[:cntrl:]\s)\]}>;,:!?]*)*/
-    RUBY_CONSTANT_PATTERN = /\A[A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*\z/
-    RUBY_CONSTANT_LABEL_PATTERN = /\A[A-Z][A-Za-z0-9_]*\z/
-    SNAKE_IDENTIFIER_PATTERN = /\A[a-z][a-z0-9_]*\z/
     ASSOCIATION_LABEL_SUFFIX = /[?!=]\z/
-    STRUCTURED_FALLBACK_LABEL = 'X'
 
     def initialize(safe_tokens: SafeTokens.new, redactor: Redactor.new)
       @safe_tokens = safe_tokens
@@ -197,45 +173,11 @@ module RailsMmd
     end
 
     def free_text_mermaid_text(value)
-      urls = []
-      text = protect_urls(value.to_s.delete("\u0000"), urls)
-      text = text.gsub(CONTROL_SPLIT_ABSOLUTE_PATH, '[REDACTED_PATH]')
-      text = text.gsub(MERMAID_CONTROL_TEXT, ' ')
-      text = text.gsub(FREE_TEXT_FORBIDDEN_ASSIGNMENT, '[REDACTED]')
-      text = redactor.sanitize(text).gsub(REDACTED_KEY_ASSIGNMENT, '[REDACTED]')
-      restore_urls(text, urls).gsub(/\s+/, ' ').strip
+      Redactor.sanitize_mermaid_free_text(value, sanitizer: redactor)
     end
 
     def structured_mermaid_text(value, grammar)
-      text = single_line_text(value)
-      return STRUCTURED_FALLBACK_LABEL unless structured_pattern(grammar).match?(text)
-
-      text
-    end
-
-    def single_line_text(value)
-      value.to_s.delete("\u0000").gsub(MERMAID_CONTROL_TEXT, ' ').gsub(/\s+/, ' ').strip
-    end
-
-    def structured_pattern(grammar)
-      {
-        ruby_constant: RUBY_CONSTANT_PATTERN,
-        ruby_constant_label: RUBY_CONSTANT_LABEL_PATTERN,
-        snake_identifier: SNAKE_IDENTIFIER_PATTERN
-      }.fetch(grammar)
-    end
-
-    def protect_urls(text, urls)
-      text.gsub(URL_PATTERN) do |_url|
-        urls << REDACTED_URL
-        "#{URL_PLACEHOLDER_PREFIX}#{urls.length - 1}"
-      end
-    end
-
-    def restore_urls(text, urls)
-      urls.each_with_index.reduce(text) do |output, (url, index)|
-        output.gsub("#{URL_PLACEHOLDER_PREFIX}#{index}", url)
-      end
+      Redactor.sanitize_mermaid_structured(value, grammar: grammar)
     end
 
     def diagnostic_ids(ir, available_diagnostic_ids)
