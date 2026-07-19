@@ -64,12 +64,15 @@ pre-commit:
         - "features/**/*.rb"
       run: bundle exec rubocop --force-exclusion -- {staged_files}
 
-    ruby-targeted-specs:
+    ruby-specs:
       priority: 5
       glob:
         - "spec/*.rb"
         - "spec/**/*"
-      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.run_targeted_specs!(ARGV)' -- {staged_files}
+        - ".rspec"
+        - ".simplecov"
+        - ".undercover.yml"
+      run: bundle exec ruby -Ilib -rrails_mmd/hook_checks -e 'RailsMmd::HookChecks.run_pre_commit_specs!(ARGV)' -- {staged_files}
 
     dependency-setup:
       priority: 6
@@ -85,14 +88,11 @@ pre-commit:
         - ".ruby-version"
       run: ruby -v && bundle exec exe/rails-mmd --version
 
-    rubocop-rspec-coverage-config:
+    rubocop-config:
       priority: 8
       glob:
         - ".rubocop.yml"
-        - ".rspec"
-        - ".simplecov"
-        - ".undercover.yml"
-      run: bundle exec rake rubocop && bundle exec rake coverage
+      run: bundle exec rake rubocop
 
     schema-fixture-routing:
       priority: 9

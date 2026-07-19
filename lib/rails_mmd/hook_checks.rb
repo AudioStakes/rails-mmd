@@ -5,6 +5,8 @@ require 'open3'
 module RailsMmd
   # Small Git-state checks used by Lefthook pre-commit commands.
   module HookChecks
+    FULL_SPEC_SUITE_CONFIG_PATHS = %w[.rspec .simplecov .undercover.yml].freeze
+
     module_function
 
     def ensure_no_mixed_changes!(paths)
@@ -28,8 +30,11 @@ module RailsMmd
       exit 1
     end
 
-    def run_targeted_specs!(paths)
-      specs = normalize_paths(paths).grep(%r{\Aspec/.+_spec\.rb\z})
+    def run_pre_commit_specs!(paths)
+      paths = normalize_paths(paths)
+      return Kernel.exec 'bundle', 'exec', 'rake', 'coverage' if paths.intersect?(FULL_SPEC_SUITE_CONFIG_PATHS)
+
+      specs = paths.grep(%r{\Aspec/.+_spec\.rb\z})
       return puts('targeted specs: no direct spec files matched') if specs.empty?
 
       Kernel.exec 'bundle', 'exec', 'rspec', *specs
