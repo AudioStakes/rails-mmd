@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "scope": "domain",
+  "domain_id": "collision",
+  "diagnostics": [
+    {
+      "diagnostic_id": "diag_90950ae4c5c356af",
+      "code": "MULTI_DB_UNSUPPORTED",
+      "severity": "error",
+      "phase": "schema_probe",
+      "scope": "domain",
+      "subject_id": "collision",
+      "message": "Domain collision has colliding entity identities across connection contexts",
+      "metadata": {
+        "domain_id": "collision",
+        "connection_context_ids": [
+          "{\"adapter\":\"sqlite3\",\"database\":\"tmp/matrix_archive.sqlite3\",\"host\":null,\"name\":\"archive\",\"port\":null,\"role\":\"writing\",\"shard\":\"default\",\"username\":null}",
+          "{\"adapter\":\"sqlite3\",\"database\":\"tmp/matrix_primary.sqlite3\",\"host\":null,\"name\":\"primary\",\"port\":null,\"role\":\"writing\",\"shard\":\"default\",\"username\":null}"
+        ]
+      },
+      "artifact_refs": [],
+      "remediation": null
+    }
+  ],
+  "digest_sha256": "82c5239905c3cf028b4a3185dc16eb8cf283419982eaabde8aec358ea163387e"
+}

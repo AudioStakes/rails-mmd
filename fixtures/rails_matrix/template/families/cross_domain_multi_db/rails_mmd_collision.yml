@@ -1,0 +1,12 @@
+version: 1
+domains:
+  collision:
+    include_models:
+      - P206::PrimaryCollision
+      - P206::ArchiveCollision
+    exclude_models: []
+output:
+  directory: tmp/rails_mmd_collision
+  format: both
+  attributes: keys
+  direction: LR

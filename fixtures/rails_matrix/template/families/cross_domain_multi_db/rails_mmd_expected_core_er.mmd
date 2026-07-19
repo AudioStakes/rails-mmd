@@ -1,0 +1,79 @@
+erDiagram
+  direction LR
+  P206_ARCHIVE_AUTHOR }o..o{ P206_ARCHIVE_TAG : archive_tags
+  P206_ATTACHMENT }o..o| P206_LOCAL_DOCUMENT : attachable
+  P206_ENTRY }o..o| P206_LOCAL_ARTICLE : entryable
+  P206_MEMBERSHIP }o..|| P206_ACCOUNT : account
+  P206_ORDER }o..|| P206_ACCOUNT : account
+  P206_PRIMARY_AUTHOR }o..o{ P206_PRIMARY_TAG : primary_tags
+  P206_SHARED_TARGET }o..o| P206_ACCOUNT : shared_targets
+  P206_ACCOUNT {
+    integer id PK
+  }
+  P206_ARCHIVE_ARTICLE {
+    integer id PK
+  }
+  P206_ARCHIVE_ASSET {
+    integer id PK
+  }
+  P206_ARCHIVE_AUTHOR {
+    integer id PK
+  }
+  P206_ARCHIVE_DOCUMENT {
+    integer id PK
+  }
+  P206_ARCHIVE_NOTE {
+    integer id PK
+  }
+  P206_ARCHIVE_ONLY_ARTICLE {
+    integer id PK
+  }
+  P206_ARCHIVE_ONLY_ATTACHMENT {
+    integer id PK
+  }
+  P206_ARCHIVE_ONLY_ENTRY {
+    integer id PK
+  }
+  P206_ARCHIVE_PROFILE {
+    integer id PK
+  }
+  P206_ARCHIVE_TAG {
+    integer id PK
+  }
+  P206_ATTACHMENT {
+    integer id PK
+    integer attachable_id FK
+    string attachable_type FK
+  }
+  P206_AUDIT {
+    integer id PK
+  }
+  P206_ENTRY {
+    integer id PK
+    integer entryable_id FK
+    string entryable_type FK
+  }
+  P206_LOCAL_ARTICLE {
+    integer id PK
+  }
+  P206_LOCAL_DOCUMENT {
+    integer id PK
+  }
+  P206_MEMBERSHIP {
+    integer id PK
+    integer account_id FK
+  }
+  P206_ORDER {
+    integer id PK
+    integer account_id FK
+  }
+  P206_PRIMARY_AUTHOR {
+    integer id PK
+  }
+  P206_PRIMARY_TAG {
+    integer id PK
+  }
+  P206_SHARED_TARGET {
+    integer id PK
+    integer account_id FK
+  }

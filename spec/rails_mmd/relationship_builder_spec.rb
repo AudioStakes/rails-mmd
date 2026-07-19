@@ -580,6 +580,21 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'contains an unsupported rootless polymorphic inverse name' do
+    inverse = association(
+      'BadName', :has_many, klass: renderable_model('Comment', 'comments'), as: :commentable,
+                            foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result('core', [entity('Post', 'posts'), entity('Comment', 'comments')])
+
+    result = build(domain, 'Post' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_NAME_UNSUPPORTED_OMITTED']
+    )
+  end
+
   it 'keeps the generic rootless inverse fallback when its target reader fails' do
     inverse = association(
       'comments', :has_many, klass: -> { raise 'target unavailable' }, as: :commentable,

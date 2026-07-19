@@ -449,6 +449,7 @@ RSpec.describe RailsMmd::SchemaProbe do
         Expanded
         Excluded
         Selected
+        SelectedOtherConnection
         SelectedBroken
         Broken
         Missing
@@ -463,12 +464,14 @@ RSpec.describe RailsMmd::SchemaProbe do
       ]
     )
     selected = model(table_exists: true, columns: [column('id', :integer, false)])
+    selected_other_connection = model(table_exists: true, columns: [column('id', :integer, false)])
     selected_broken = model(table_exists: false)
     expanded = model(table_exists: true, columns: [column('id', :integer, false)])
     broken = model(table_exists: false)
     models = {
       'Entry' => entry,
       'Selected' => selected,
+      'SelectedOtherConnection' => selected_other_connection,
       'SelectedBroken' => selected_broken,
       'Expanded' => expanded,
       'Broken' => broken
@@ -481,6 +484,10 @@ RSpec.describe RailsMmd::SchemaProbe do
           [
             inventory_record('Entry', table_name: 'entries'),
             inventory_record('Selected', table_name: 'selecteds'),
+            inventory_record(
+              'SelectedOtherConnection', table_name: 'selected_other_connections',
+                                         connection_context_id: '{"name":"archive"}'
+            ),
             inventory_record('SelectedBroken', table_name: 'selected_brokens')
           ],
           excluded_ruby_constants: ['Excluded']
@@ -489,6 +496,10 @@ RSpec.describe RailsMmd::SchemaProbe do
       inventory_records: [
         inventory_record('Entry', table_name: 'entries'),
         inventory_record('Selected', table_name: 'selecteds'),
+        inventory_record(
+          'SelectedOtherConnection', table_name: 'selected_other_connections',
+                                     connection_context_id: '{"name":"archive"}'
+        ),
         inventory_record('SelectedBroken', table_name: 'selected_brokens'),
         inventory_record('Expanded', table_name: 'expandeds'),
         inventory_record('Broken', table_name: 'brokens'),
@@ -517,7 +528,9 @@ RSpec.describe RailsMmd::SchemaProbe do
         'metadata' => include('ruby_constant' => 'Broken')
       )
     )
-    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(%w[Entry Selected Expanded])
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(
+      %w[Entry Selected SelectedOtherConnection Expanded]
+    )
     expect(result.domains.first.entities.find { |entity| entity.ruby_constant == 'Expanded' }.selection_origin).to eq(
       :delegated_type_expanded
     )
@@ -573,6 +586,12 @@ RSpec.describe RailsMmd::SchemaProbe do
                                         entity_id: nil,
                                         status: :not_renderable,
                                         diagnostic_code: 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'SelectedOtherConnection',
+                                        entity_id: nil,
+                                        status: :other_connection,
+                                        diagnostic_code: 'CONNECTION_RELATIONSHIP_OMITTED'
                                       ),
                                       have_attributes(
                                         ruby_constant: 'StiLeaf',

@@ -1,6 +1,6 @@
 # P2-06 cross-domain / multi-DB implementation
 
-Status: implementation in progress
+Status: implementation complete
 
 ## TDD record
 
@@ -59,8 +59,17 @@ Status: implementation in progress
 
 ### Slice 6: real matrix and public contract
 
-- RED: pending.
-- GREEN: pending.
+- RED: the integration contract initially reported no P2-06 runtime oracle or
+  pair probe. The first real fixture then exposed two harness defects: loading a
+  family schema replaced the shared STI tables, and the primary-side schema did
+  not preserve the exact foreign-key evidence required by the oracle. The fake
+  runner also rejected missing probe/runtime/collision outputs.
+- GREEN: a family-local additive schema setup, exact runtime/probe/artifact
+  oracles, and a diagnostics-only collision invocation now pass the focused
+  matrix runner suite (47 examples, seed 2606). The mandatory real matrix passes
+  every family, including `cross_domain_multi_db`, on all three declared pairs:
+  Ruby 4.0.6 / Rails 7.2.3.1, Ruby 3.3.12 / Rails 8.1.3, and Ruby 4.0.6 /
+  Rails 8.1.3 (`PASS 3/3 Rails matrix pairs`).
 
 ### Review repair: single-context diagnostic non-regression
 
@@ -93,6 +102,34 @@ All actionable findings were repaired with the focused TDD cycle above.
 - Architecture: `指摘なし`.
 - Rails / Active Record: `指摘なし`.
 
+### Integrated matrix round 3
+
+- Architecture required a closed success publication set, a missing
+  outside-domain table to prove schema non-access, and missing collision tables
+  to prove the fatal gate runs before probing.
+- Rails independently identified the outside-domain schema-access seam.
+- QA required fake-runner negative coverage for the entities, cross-domain
+  runtime, and exact collision-diagnostics oracles.
+
+The repair introduced an exact seven-file success publication set, removed the
+outside-domain and collision tables while retaining their model declarations,
+and added four negative verifier examples. RED was 8 examples / 2 failures
+(seed 2607); after the validator and a schema-valid empty diagnostics fixture,
+the same 8 examples passed.
+
+### Integrated matrix round 4
+
+- Architecture: `指摘なし`.
+- Rails / Active Record: `指摘なし`.
+- QA: `指摘なし`.
+
 ## Verification
 
-Pending.
+- Full RSpec: 421 examples, 0 failures.
+- Focused core/contracts: 177 examples, 0 failures (seed 2606).
+- Focused P2-06 matrix negative cases: 8 examples, 0 failures (seed 2607).
+- Real Rails matrix: every fixture family passes all three declared pairs,
+  ending in `PASS 3/3 Rails matrix pairs`.
+- RuboCop: 153 files, 0 offenses.
+- Bundler Audit: advisory database updated, no vulnerabilities found.
+- Undercover: no coverage missing in the latest changes.

@@ -1,0 +1,35 @@
+{
+  "direct": {
+    "belongs_to": { "macro": "belongs_to", "target": "P206::Account", "same_context": false },
+    "has_many": { "macro": "has_many", "target": "P206::Audit", "same_context": false },
+    "has_one": { "macro": "has_one", "target": "P206::ArchiveProfile", "same_context": false }
+  },
+  "through": {
+    "macro": "has_many",
+    "through_target": "P206::Membership",
+    "source_target": "P206::ArchiveNote",
+    "source_same_context": false
+  },
+  "polymorphic": {
+    "mixed_root": true,
+    "all_rejected_root": true,
+    "local_inverse_same_context": true,
+    "archive_inverse_same_context": false
+  },
+  "delegated_type": {
+    "mixed_root": true,
+    "mixed_types": ["P206::LocalArticle", "P206::ArchiveArticle"],
+    "all_rejected_root": true,
+    "all_rejected_types": ["P206::ArchiveOnlyArticle"],
+    "local_inverse_same_context": true,
+    "archive_inverse_same_context": false
+  },
+  "habtm": {
+    "primary_join_table": "p206_shared_links",
+    "archive_join_table": "p206_shared_links",
+    "same_hidden_name": true,
+    "primary_same_context": true,
+    "archive_same_context": true,
+    "cross_same_context": false
+  }
+}

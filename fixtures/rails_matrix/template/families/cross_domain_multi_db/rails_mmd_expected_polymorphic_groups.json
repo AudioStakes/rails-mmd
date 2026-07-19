@@ -1,0 +1,26 @@
+[
+  {
+    "group_id": "relationships/p206_attachments/polymorphic/attachable/attachable_id/attachable_type",
+    "holder_safe_token": "P206_ATTACHMENT",
+    "root_label": "attachable",
+    "candidate_target_safe_tokens": [
+      "P206_LOCAL_DOCUMENT"
+    ],
+    "foreign_key_attributes": [
+      "attachable_id",
+      "attachable_type"
+    ]
+  },
+  {
+    "group_id": "relationships/p206_entries/polymorphic/entryable/entryable_id/entryable_type",
+    "holder_safe_token": "P206_ENTRY",
+    "root_label": "entryable",
+    "candidate_target_safe_tokens": [
+      "P206_LOCAL_ARTICLE"
+    ],
+    "foreign_key_attributes": [
+      "entryable_id",
+      "entryable_type"
+    ]
+  }
+]

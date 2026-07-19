@@ -1,0 +1,58 @@
+[
+  {
+    "relationship_id": "relationships/p206_archive_authors/habtm/p206_shared_links/author_id/p206_archive_tags/tag_id",
+    "owner_safe_token": "P206_ARCHIVE_AUTHOR",
+    "target_safe_token": "P206_ARCHIVE_TAG",
+    "label": "archive_tags",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/p206_attachments/polymorphic/attachable/attachable_id/attachable_type/p206_local_documents",
+    "owner_safe_token": "P206_ATTACHMENT",
+    "target_safe_token": "P206_LOCAL_DOCUMENT",
+    "label": "attachable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p206_entries/polymorphic/entryable/entryable_id/entryable_type/p206_local_articles",
+    "owner_safe_token": "P206_ENTRY",
+    "target_safe_token": "P206_LOCAL_ARTICLE",
+    "label": "entryable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p206_memberships/account_id/p206_accounts/id",
+    "owner_safe_token": "P206_MEMBERSHIP",
+    "target_safe_token": "P206_ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p206_orders/account_id/p206_accounts/id",
+    "owner_safe_token": "P206_ORDER",
+    "target_safe_token": "P206_ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p206_primary_authors/habtm/p206_shared_links/author_id/p206_primary_tags/tag_id",
+    "owner_safe_token": "P206_PRIMARY_AUTHOR",
+    "target_safe_token": "P206_PRIMARY_TAG",
+    "label": "primary_tags",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/p206_shared_targets/account_id/p206_accounts/id",
+    "owner_safe_token": "P206_SHARED_TARGET",
+    "target_safe_token": "P206_ACCOUNT",
+    "label": "shared_targets",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  }
+]
