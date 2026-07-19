@@ -6,13 +6,7 @@ module RailsMmd
   # Resolves configured domains exactly against schema-free inventory records.
   class DomainResolver
     DomainResult = Struct.new(:domain_id, :records, :diagnostics, keyword_init: true)
-    Result = Struct.new(:domains, :diagnostics, :exit_code, keyword_init: true) do
-      def success?
-        diagnostics.empty?
-      end
-    end
-
-    EXIT_CONTRACT_ERROR = 2
+    Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
     def initialize(diagnostics: Diagnostics.new)
       @diagnostics = diagnostics
@@ -25,8 +19,7 @@ module RailsMmd
       end
       all_diagnostics = domain_results.flat_map(&:diagnostics)
 
-      Result.new(domains: domain_results, diagnostics: all_diagnostics,
-                 exit_code: all_diagnostics.empty? ? 0 : EXIT_CONTRACT_ERROR)
+      Result.new(domains: domain_results, diagnostics: all_diagnostics)
     end
 
     private

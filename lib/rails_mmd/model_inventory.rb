@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/canonical_json'
+require 'rails_mmd/constant_resolver'
 require 'rails_mmd/redactor'
 
 module RailsMmd
@@ -19,10 +20,10 @@ module RailsMmd
     )
     CONNECTION_CONTEXT_KEYS = %w[name role shard adapter database host port username].freeze
 
-    def initialize(active_record_base:, constant_resolver: method(:default_constant_resolver),
+    def initialize(active_record_base:, constant_resolver: ConstantResolver.new,
                    redactor: Redactor.new)
       @active_record_base = active_record_base
-      @constant_resolver = constant_resolver
+      @constant_resolver = ConstantResolver.wrap(constant_resolver)
       @redactor = redactor
     end
 
@@ -42,11 +43,7 @@ module RailsMmd
       name = model.name
       return false unless name.is_a?(String) && !name.empty?
 
-      constant_resolver.call(name).equal?(model)
-    rescue Exception => e # rubocop:disable Lint/RescueException
-      raise if e.is_a?(Interrupt) || e.is_a?(SystemExit)
-
-      false
+      constant_resolver.resolve(name).equal?(model)
     end
 
     def build_record(model)
@@ -142,10 +139,6 @@ module RailsMmd
 
       value = object.public_send(method_name)
       sanitize_context_value(value)
-    end
-
-    def default_constant_resolver(name)
-      name.split('::').reduce(Object) { |namespace, const_name| namespace.const_get(const_name, false) }
     end
   end
   # rubocop:enable Metrics/ClassLength, Metrics/MethodLength

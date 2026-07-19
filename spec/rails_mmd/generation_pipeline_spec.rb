@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rails_mmd/config'
 require 'rails_mmd/generation_pipeline'
 
 # rubocop:disable Lint/ConstantDefinitionInBlock, Naming/MethodParameterName, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
@@ -27,10 +28,24 @@ RSpec.describe RailsMmd::GenerationPipeline do
     end
   end
 
+  class PrefixingRedactor < RailsMmd::Redactor
+    def sanitize(value)
+      "shared:#{super}"
+    end
+  end
+
   it 'runs the real in-process stages through one interface' do
     result = described_class.new(active_record_base: empty_active_record_base).build(config: config)
 
     expect_pipeline_result(result)
+  end
+
+  it 'uses one redaction policy across the in-process stages' do
+    redactor = PrefixingRedactor.new(project_root: Dir.pwd, env: {})
+    result = described_class.new(active_record_base: empty_active_record_base, redactor: redactor)
+                            .build(config: config)
+
+    expect(result.diagnostics.fetch(0).fetch('message')).to start_with('shared:')
   end
 
   it 'accumulates render-plan diagnostics through the pipeline interface' do

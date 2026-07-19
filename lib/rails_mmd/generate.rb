@@ -5,6 +5,7 @@ require 'rails_mmd/exit_policy'
 require 'rails_mmd/generation_pipeline'
 require 'rails_mmd/publisher'
 require 'rails_mmd/rails_loader'
+require 'rails_mmd/redactor'
 
 module RailsMmd
   # Coordinates the P0 generate pipeline behind the Thor command.
@@ -23,7 +24,7 @@ module RailsMmd
     end
 
     def run(cli_options:, fail_on_warning: false)
-      config_result = Config.new(project_root: project_root).load(cli_options: cli_options)
+      config_result = Config.new(project_root: project_root, redactor: redactor).load(cli_options: cli_options)
       return pre_output_result(config_result.diagnostics, config_result.exit_code) unless config_result.success?
 
       run_pipeline(config_result.config, fail_on_warning)
@@ -89,19 +90,23 @@ module RailsMmd
     end
 
     def rails_loader
-      @rails_loader ||= RailsLoader.new(project_root: project_root)
+      @rails_loader ||= RailsLoader.new(project_root: project_root, diagnostics: diagnostics_factory)
     end
 
     def publisher
-      @publisher ||= Publisher.new(project_root: project_root)
+      @publisher ||= Publisher.new(project_root: project_root, diagnostics_factory: diagnostics_factory)
     end
 
     def diagnostics_factory
-      @diagnostics_factory ||= Diagnostics.new
+      @diagnostics_factory ||= Diagnostics.new(redactor: redactor)
+    end
+
+    def redactor
+      @redactor ||= Redactor.new(project_root: project_root)
     end
 
     def pipeline
-      @pipeline ||= GenerationPipeline.new
+      @pipeline ||= GenerationPipeline.new(redactor: redactor)
     end
   end
 end

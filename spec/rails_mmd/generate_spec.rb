@@ -108,7 +108,7 @@ RSpec.describe RailsMmd::Generate do
 
   it 'maps unexpected seam failures to an internal error result' do
     in_project do |root|
-      loader = FakeLoader.new(failure: RuntimeError.new('boom'))
+      loader = FakeLoader.new(failure: RuntimeError.new("#{root}/private/boom"))
 
       result = described_class.new(
         project_root: root, rails_loader: loader, pipeline: FakePipeline.new(pipeline_result)
@@ -116,6 +116,27 @@ RSpec.describe RailsMmd::Generate do
 
       expect(result.exit_code).to eq(99)
       expect(result.diagnostics.first.fetch('code')).to eq('INTERNAL_ERROR')
+      expect(result.diagnostics.first.dig('metadata', 'exception_summary')).to eq('private/boom')
+    end
+  end
+
+  it 'captures environment-backed redaction when a run starts' do
+    in_project do |root|
+      key = 'RAILS_MMD_LATE_SECRET'
+      previous = ENV.fetch(key, nil)
+      secret = 'late-secret-value'
+      generator = described_class.new(
+        project_root: root,
+        rails_loader: FakeLoader.new(failure: RuntimeError.new(secret)),
+        pipeline: FakePipeline.new(pipeline_result)
+      )
+
+      ENV[key] = secret
+      result = generator.run(cli_options: cli_options)
+
+      expect(result.diagnostics.first.dig('metadata', 'exception_summary')).to eq('[REDACTED]')
+    ensure
+      previous.nil? ? ENV.delete(key) : ENV[key] = previous
     end
   end
 
@@ -127,6 +148,17 @@ RSpec.describe RailsMmd::Generate do
       expect(result.exit_code).to eq(3)
       expect(root.join('out/core.diagnostics.json')).to exist
       expect(root.join('out/core.er.mmd')).not_to exist
+    end
+  end
+
+  it 'maps pipeline contract errors at the command boundary' do
+    in_project do |root|
+      result = generate(root, pipeline_result(diagnostics: [diagnostic('DOMAIN_EMPTY')]))
+               .run(cli_options: cli_options)
+
+      expect(result.exit_code).to eq(2)
+      expect(result.diagnostics.map { |item| item.fetch('code') }).to eq(['DOMAIN_EMPTY'])
+      expect(root.join('out/core.diagnostics.json')).to exist
     end
   end
 

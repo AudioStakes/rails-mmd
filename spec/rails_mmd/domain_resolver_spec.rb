@@ -19,10 +19,9 @@ RSpec.describe RailsMmd::DomainResolver do
 
     result = described_class.new.resolve(config: config, inventory_records: [user, account, invoice])
 
-    expect(result).to be_success
-    expect(result.exit_code).to eq(0)
     expect(result.domains.map(&:domain_id)).to eq(%w[core billing])
     expect(result.domains.map { |domain| domain.records.map(&:ruby_constant) }).to eq([['User'], ['Billing::Invoice']])
+    expect(result.diagnostics).to eq([])
   end
 
   it 'respects a future selected domain from config loading' do
@@ -36,9 +35,9 @@ RSpec.describe RailsMmd::DomainResolver do
 
     result = described_class.new.resolve(config: config, inventory_records: [record('User'), record('Admin::User')])
 
-    expect(result).to be_success
     expect(result.domains.map(&:domain_id)).to eq(['admin'])
     expect(result.domains.first.records.map(&:ruby_constant)).to eq(['Admin::User'])
+    expect(result.diagnostics).to eq([])
   end
 
   it 'preserves first include order while applying set semantics for duplicates and excludes' do
@@ -54,8 +53,8 @@ RSpec.describe RailsMmd::DomainResolver do
       inventory_records: [record('Account'), record('Invoice'), record('User')]
     )
 
-    expect(result).to be_success
     expect(result.domains.first.records.map(&:ruby_constant)).to eq(%w[Invoice User])
+    expect(result.diagnostics).to eq([])
   end
 
   it 'emits schema-valid diagnostics for missing, non-renderable, and empty domains' do
@@ -68,8 +67,6 @@ RSpec.describe RailsMmd::DomainResolver do
 
     result = described_class.new.resolve(config: config, inventory_records: [abstract, sti, record('User')])
 
-    expect(result).not_to be_success
-    expect(result.exit_code).to eq(2)
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[
         DOMAIN_MODEL_NOT_FOUND
