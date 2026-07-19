@@ -75,7 +75,7 @@ module RailsMmd
 
     def payload_for(ir:, artifact_kind:, direction:, attributes:, comments:, token_sets:, available_diagnostic_ids:)
       payload = {
-        'schema_version' => 1,
+        'schema_version' => 2,
         'artifact_kind' => artifact_kind,
         'domain_id' => ir.fetch('domain_id'),
         'direction' => direction,
@@ -158,7 +158,7 @@ module RailsMmd
     def relationship_payload(relationship, token_sets)
       er_left, = ER_MARKERS.fetch(relationship.fetch('owner_cardinality'))
       _, er_right = ER_MARKERS.fetch(relationship.fetch('target_cardinality'))
-      {
+      payload = {
         'relationship_id' => relationship.fetch('relationship_id'),
         'safe_token' => token_sets.fetch('relationship').fetch(relationship.fetch('relationship_id')),
         'owner_safe_token' => token_sets.fetch('entity').fetch(relationship.fetch('owner_entity_id')),
@@ -171,6 +171,8 @@ module RailsMmd
         'class_owner_multiplicity' => CLASS_MULTIPLICITIES.fetch(relationship.fetch('owner_cardinality')),
         'class_target_multiplicity' => CLASS_MULTIPLICITIES.fetch(relationship.fetch('target_cardinality'))
       }
+      payload['metadata'] = { 'scoped' => true } if relationship.dig('metadata', 'scoped') == true
+      payload
     end
 
     def comments_payload(comments, token_sets)

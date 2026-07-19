@@ -33,7 +33,7 @@ module RailsMmd
 
     def payload_without_digest(domain, relationship_domain)
       {
-        'schema_version' => 1,
+        'schema_version' => 2,
         'domain_id' => domain.domain_id,
         'entities' => entities_payload(domain, relationship_domain),
         'relationships' => relationships_payload(relationship_domain),
@@ -99,7 +99,7 @@ module RailsMmd
     end
 
     def relationship_payload(relationship)
-      {
+      payload = {
         'relationship_id' => relationship.relationship_id,
         'owner_entity_id' => relationship.owner_entity_id,
         'target_entity_id' => relationship.target_entity_id,
@@ -107,6 +107,8 @@ module RailsMmd
         'owner_cardinality' => relationship.owner_cardinality,
         'target_cardinality' => relationship.target_cardinality
       }
+      payload['metadata'] = { 'scoped' => true } if relationship.metadata&.fetch(:scoped, false)
+      payload
     end
 
     def diagnostic_ids(domain, relationship_domain)

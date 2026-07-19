@@ -61,6 +61,17 @@ read that file instead of relying on chat history or local design attachments.
 Rails Active Record support and implementation priorities are tracked in
 [`docs/active-record-association-support.md`](docs/active-record-association-support.md).
 
+## Artifact Schema Versions
+
+P2 relationship metadata moves generated IR and render-plan artifacts from
+schema version 1 to schema version 2. Consumers must validate those artifacts
+with the v2 schemas shipped by the same `rails-mmd` release. Configuration and
+diagnostics artifacts remain at schema version 1.
+
+There is no dual-version output mode. Strict consumers of the former closed v1
+relationship objects must update before consuming v2 IR or render plans. Mermaid
+text output and artifact filenames are unchanged.
+
 ## Serena Setup
 
 Local setup for Codex and Serena MCP is documented in

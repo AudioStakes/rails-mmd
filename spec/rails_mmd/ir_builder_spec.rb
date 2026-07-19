@@ -24,6 +24,7 @@ RSpec.describe RailsMmd::IrBuilder do
       ],
       diagnostics: [diagnostic('d_relationship_warning')]
     )
+    relationships.relationships.first.metadata = { scoped: true }
 
     payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
 
@@ -40,8 +41,10 @@ RSpec.describe RailsMmd::IrBuilder do
       'relationship_id' => 'relationships/users/account',
       'association_name' => 'account',
       'owner_cardinality' => '0..many',
-      'target_cardinality' => '1..1'
+      'target_cardinality' => '1..1',
+      'metadata' => { 'scoped' => true }
     )
+    expect(payload.fetch('schema_version')).to eq(2)
     expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
     expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
     expect(schema_valid_ir?(payload)).to be(true)
@@ -85,6 +88,7 @@ RSpec.describe RailsMmd::IrBuilder do
     expect(entities.fetch('entities/profiles').fetch('attributes').map { |attribute| attribute.fetch('name') }).to eq(
       %w[id author_id]
     )
+    expect(payload.fetch('relationships').first).not_to have_key('metadata')
   end
 
   it 'marks both polymorphic id and type columns as foreign keys' do

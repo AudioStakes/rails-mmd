@@ -29,7 +29,10 @@
     "target_safe_token": "TAG",
     "label": "tags",
     "owner_cardinality": "0..many",
-    "target_cardinality": "0..many"
+    "target_cardinality": "0..many",
+    "metadata": {
+      "scoped": true
+    }
   },
   {
     "relationship_id": "relationships/authors/through/account_membership/account/accounts",
@@ -61,7 +64,10 @@
     "target_safe_token": "LABEL",
     "label": "labels",
     "owner_cardinality": "0..many",
-    "target_cardinality": "0..many"
+    "target_cardinality": "0..many",
+    "metadata": {
+      "scoped": true
+    }
   },
   {
     "relationship_id": "relationships/comments/polymorphic/commentable/commentable_id/commentable_type/images",
@@ -77,7 +83,10 @@
     "target_safe_token": "POST",
     "label": "commentable",
     "owner_cardinality": "0..many",
-    "target_cardinality": "0..1"
+    "target_cardinality": "0..1",
+    "metadata": {
+      "scoped": true
+    }
   },
   {
     "relationship_id": "relationships/drafts/author_id/authors/id",
@@ -165,7 +174,10 @@
     "target_safe_token": "AUTHOR",
     "label": "author",
     "owner_cardinality": "0..many",
-    "target_cardinality": "1..1"
+    "target_cardinality": "1..1",
+    "metadata": {
+      "scoped": true
+    }
   },
   {
     "relationship_id": "relationships/posts/through/labelings/label/labels",

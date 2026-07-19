@@ -33,6 +33,15 @@ RSpec.describe 'P0 contract schemas' do
     expect(schema(schema_name)).not_to be_valid(fixture(fixture_path))
   end
 
+  def expect_invalid_relationship_metadata(schema_name, fixture_path)
+    [nil, {}, { 'scoped' => false }, { 'scoped' => 'true' },
+     { 'scoped' => true, 'origin' => 'declaration' }].each do |metadata|
+      payload = JSON.parse(JSON.generate(fixture(fixture_path)))
+      payload.fetch('relationships').first['metadata'] = metadata
+      expect(schema(schema_name)).not_to be_valid(payload)
+    end
+  end
+
   describe 'config.schema.json' do
     it 'accepts complete and defaultable config fixtures' do
       config_valid_fixtures.each { |path| expect_valid('config', path) }
@@ -84,6 +93,10 @@ RSpec.describe 'P0 contract schemas' do
     it 'rejects safe tokens and invalid digest boundaries' do
       ir_invalid_fixtures.each { |path| expect_invalid('ir', path) }
     end
+
+    it 'rejects every relationship metadata shape except scoped true' do
+      expect_invalid_relationship_metadata('ir', 'ir/valid/core.json')
+    end
   end
 
   describe 'render_plan.schema.json' do
@@ -95,6 +108,10 @@ RSpec.describe 'P0 contract schemas' do
 
     it 'rejects invalid digest boundaries and machine-local fields' do
       render_plan_invalid_fixtures.each { |path| expect_invalid('render_plan', path) }
+    end
+
+    it 'rejects every relationship metadata shape except scoped true' do
+      expect_invalid_relationship_metadata('render_plan', 'render_plan/valid/er.json')
     end
   end
 
@@ -237,7 +254,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def ir_domain_id_valid?(domain_id)
     data = {
-      'schema_version' => 1,
+      'schema_version' => 2,
       'domain_id' => domain_id,
       'entities' => [],
       'relationships' => [],
@@ -258,7 +275,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def render_plan_base
     {
-      'schema_version' => 1, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
+      'schema_version' => 2, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
       'entities' => [],
       'relationships' => [],
       'comments' => [],

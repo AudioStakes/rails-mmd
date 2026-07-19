@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "domain_id": "core",
   "entities": [
     {
@@ -27,7 +27,8 @@
       "target_entity_id": "entities/accounts",
       "association_name": "account",
       "owner_cardinality": "0..many",
-      "target_cardinality": "1..1"
+      "target_cardinality": "1..1",
+      "metadata": { "scoped": true }
     }
   ],
   "diagnostic_ids": ["d_db_metadata_degraded"],
