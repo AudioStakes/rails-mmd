@@ -32,13 +32,14 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationship.owner_entity_id).to eq('entities/users')
     expect(relationship.target_entity_id).to eq('entities/accounts')
     expect(relationship.association_name).to eq('account')
-    expect(relationship.owner_foreign_key_column).to eq('account_id')
-    expect(relationship.target_primary_key_column).to eq('id')
-    expect(relationship.owner_fk_unique).to be(true)
-    expect(relationship.db_foreign_key).to be(true)
-    expect(relationship.owner_fk_nullable).to be(false)
+    expect(relationship.foreign_key_column).to eq('account_id')
     expect(relationship.owner_cardinality).to eq('0..1')
     expect(relationship.target_cardinality).to eq('1..1')
+    expect(described_class::Relationship.members).to eq(
+      %i[relationship_id owner_entity_id target_entity_id association_name foreign_key_column foreign_type_column
+         owner_cardinality target_cardinality]
+    )
+    expect { described_class::Candidate }.to raise_error(NameError)
   end
 
   it 'handles owner models without associations' do
@@ -120,9 +121,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       have_attributes(
         relationship_id: 'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
         owner_entity_id: 'entities/authors', target_entity_id: 'entities/tags',
-        association_name: 'tags', relationship_kind: :habtm,
-        owner_cardinality: '0..many', target_cardinality: '0..many',
-        foreign_key_holder_entity_id: nil, foreign_key_column: nil
+        association_name: 'tags', owner_cardinality: '0..many', target_cardinality: '0..many',
+        foreign_key_column: nil
       )
     )
   end
@@ -282,13 +282,13 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationships.fetch('profiles')).to have_attributes(
       relationship_id: 'relationships/profiles/author_id/authors/id',
       owner_entity_id: 'entities/profiles', target_entity_id: 'entities/authors',
-      foreign_key_holder_entity_id: 'entities/profiles', foreign_key_column: 'author_id',
+      foreign_key_column: 'author_id',
       owner_cardinality: '0..many', target_cardinality: '0..1'
     )
     expect(relationships.fetch('account')).to have_attributes(
       relationship_id: 'relationships/accounts/author_id/authors/id',
       owner_entity_id: 'entities/accounts', target_entity_id: 'entities/authors',
-      foreign_key_holder_entity_id: 'entities/accounts', foreign_key_column: 'author_id',
+      foreign_key_column: 'author_id',
       owner_cardinality: '0..1', target_cardinality: '1..1'
     )
   end
@@ -351,7 +351,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       'Image' => owner_model(image_comment)
     )
     polymorphic = result.domains.first.relationships.select do |relationship|
-      relationship.relationship_kind == :polymorphic
+      relationship.relationship_id.include?('/polymorphic/')
     end
 
     expect(result.diagnostics).to eq([])
@@ -391,7 +391,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       'Post' => owner_model(many, singular_alias)
     )
     polymorphic = result.domains.first.relationships.select do |relationship|
-      relationship.relationship_kind == :polymorphic
+      relationship.relationship_id.include?('/polymorphic/')
     end
 
     expect(result.diagnostics).to eq([])
@@ -573,7 +573,9 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     result = build(domain, 'Author' => author, 'Membership' => membership)
-    through = result.domains.first.relationships.find { |relationship| relationship.relationship_kind == :through }
+    through = result.domains.first.relationships.find do |relationship|
+      relationship.relationship_id.include?('/through/')
+    end
 
     expect(result.diagnostics).to eq([])
     expect(through).to have_attributes(
@@ -599,7 +601,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     relationship = build(domain, 'Author' => owner_model(account_membership, account))
-                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+                   .domains.first.relationships.find { |item| item.relationship_id.include?('/through/') }
 
     expect(relationship).to have_attributes(
       relationship_id: 'relationships/authors/through/account_membership/account/accounts',
@@ -628,11 +630,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     relationship = build(domain, 'Author' => owner_model(posts, tags))
-                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+                   .domains.first.relationships.find { |item| item.relationship_id.include?('/through/') }
 
     expect(relationship).to have_attributes(
       relationship_id: 'relationships/authors/through/posts/taggings/tag/tags',
-      through_path: %w[posts taggings tag], target_entity_id: 'entities/tags'
+      target_entity_id: 'entities/tags'
     )
   end
 
@@ -652,10 +654,10 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     through = build(domain, 'Author' => owner_model(has_many_teams, has_one_team))
-              .domains.first.relationships.select { |candidate| candidate.relationship_kind == :through }
+              .domains.first.relationships.select { |item| item.relationship_id.include?('/through/') }
 
     expect(through).to contain_exactly(
-      have_attributes(association_macro: :has_one, target_cardinality: '0..1')
+      have_attributes(association_name: 'teams', target_cardinality: '0..1')
     )
   end
 
@@ -675,7 +677,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     relationship = build(domain, 'Author' => owner_model(teams, squads))
-                   .domains.first.relationships.find { |candidate| candidate.relationship_kind == :through }
+                   .domains.first.relationships.find { |item| item.relationship_id.include?('/through/') }
 
     expect(relationship.association_name).to eq('squads')
   end

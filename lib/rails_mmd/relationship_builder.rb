@@ -12,6 +12,17 @@ module RailsMmd
       :owner_entity_id,
       :target_entity_id,
       :association_name,
+      :foreign_key_column,
+      :foreign_type_column,
+      :owner_cardinality,
+      :target_cardinality,
+      keyword_init: true
+    )
+    Candidate = Struct.new(
+      :relationship_id,
+      :owner_entity_id,
+      :target_entity_id,
+      :association_name,
       :association_macro,
       :relationship_kind,
       :join_table_name,
@@ -31,6 +42,7 @@ module RailsMmd
       :target_cardinality,
       keyword_init: true
     )
+    private_constant :Candidate
     Result = Struct.new(:domains, :diagnostics, keyword_init: true) do
       def success?
         true
@@ -213,7 +225,7 @@ module RailsMmd
       relationship_id = [
         'relationships', left[1], 'habtm', join_table, left[2], right[1], right[2]
       ].join('/')
-      Relationship.new(
+      Candidate.new(
         relationship_id: relationship_id,
         owner_entity_id: left[0],
         target_entity_id: right[0],
@@ -512,7 +524,7 @@ module RailsMmd
       db_foreign_key = db_foreign_key?(owner, target, owner_fk, target_pk)
       owner_fk_nullable = column_nullable?(owner, owner_fk)
 
-      Relationship.new(
+      Candidate.new(
         relationship_id: "relationships/#{owner.table_name}/#{association_name}",
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -539,7 +551,7 @@ module RailsMmd
       db_foreign_key = db_foreign_key?(target, owner, foreign_key, referenced_primary_key)
       foreign_key_nullable = column_nullable?(target, foreign_key)
 
-      Relationship.new(
+      Candidate.new(
         relationship_id: "relationships/#{owner.table_name}/#{association_name}",
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -569,7 +581,7 @@ module RailsMmd
       ].join('/')
       singular = reflection_macro(inverse_reflection) == :has_one ||
                  unique_owner_keys?(owner, [foreign_type, foreign_key])
-      Relationship.new(
+      Candidate.new(
         relationship_id: relationship_id,
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -598,7 +610,7 @@ module RailsMmd
       relationship_id = [
         'relationships', owner.table_name, 'through', *path_names, target.table_name
       ].join('/')
-      Relationship.new(
+      Candidate.new(
         relationship_id: relationship_id,
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -612,10 +624,23 @@ module RailsMmd
       )
     end
 
-    def deduplicate_relationships(relationships)
-      relationships.group_by(&:physical_key).map do |_key, candidates|
-        canonical_relationship(candidates)
+    def deduplicate_relationships(candidates)
+      candidates.group_by(&:physical_key).map do |_key, duplicates|
+        relationship_from(canonical_relationship(duplicates))
       end
+    end
+
+    def relationship_from(candidate)
+      Relationship.new(
+        relationship_id: candidate.relationship_id,
+        owner_entity_id: candidate.owner_entity_id,
+        target_entity_id: candidate.target_entity_id,
+        association_name: candidate.association_name,
+        foreign_key_column: candidate.foreign_key_column,
+        foreign_type_column: candidate.foreign_type_column,
+        owner_cardinality: candidate.owner_cardinality,
+        target_cardinality: candidate.target_cardinality
+      )
     end
 
     def canonical_relationship(candidates)
