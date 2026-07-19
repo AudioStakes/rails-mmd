@@ -9,7 +9,17 @@ RSpec.describe RailsMmd::HookChecks do
     system(*command, out: File::NULL, err: File::NULL) || raise("command failed: #{command.join(' ')}")
   end
 
-  def in_git_repository
+  def in_git_repository(&block)
+    outer_state = outer_repository_state
+
+    ClimateControl.modify(git_repository_env.to_h { |key| [key, nil] }) do
+      in_temporary_git_repository(&block)
+    end
+  ensure
+    expect(outer_repository_state).to eq(outer_state) if outer_state
+  end
+
+  def in_temporary_git_repository
     Dir.mktmpdir do |dir|
       Dir.chdir(dir) do
         system!('git', 'init')
@@ -18,6 +28,16 @@ RSpec.describe RailsMmd::HookChecks do
         yield dir
       end
     end
+  end
+
+  def git_repository_env
+    %w[GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES]
+  end
+
+  def outer_repository_state
+    head = Open3.capture2('git', 'rev-parse', 'HEAD').first
+    tracked = Open3.capture2('git', 'status', '--porcelain', '--untracked-files=no').first
+    [head, tracked]
   end
 
   def commit_example_file
@@ -94,12 +114,24 @@ RSpec.describe RailsMmd::HookChecks do
     pre_commit_commands.fetch(name).fetch('run')
   end
 
-  def schema_fixture_command
-    pre_commit_commands.fetch('schema-fixture-routing')
+  def ruby_specs_command
+    pre_commit_commands.fetch('ruby-specs')
   end
 
-  def setup_drift_command
-    pre_commit_commands.fetch('setup-drift-routing')
+  def rubocop_config_command
+    pre_commit_commands.fetch('rubocop-config')
+  end
+
+  def contract_command
+    pre_commit_commands.fetch('contract-routing')
+  end
+
+  def expected_contract_globs
+    %w[
+      schemas/*.json schemas/**/*.json
+      fixtures/*.json fixtures/**/*.json fixtures/*.mmd fixtures/**/*.mmd
+      AGENTS.md README.md docs/*.md docs/**/*.md
+    ]
   end
 
   it 'fails before repair when a staged file also has unstaged changes' do
@@ -140,14 +172,54 @@ RSpec.describe RailsMmd::HookChecks do
   it 'runs direct spec files when staged specs are present' do
     allow(Kernel).to receive(:exec)
 
-    described_class.run_targeted_specs!(%w[spec/example_spec.rb lib/example.rb])
+    described_class.run_pre_commit_specs!(%w[spec/example_spec.rb lib/example.rb])
 
     expect(Kernel).to have_received(:exec).with('bundle', 'exec', 'rspec', 'spec/example_spec.rb')
   end
 
   it 'reports when no direct spec files are present' do
-    expect { described_class.run_targeted_specs!(%w[lib/example.rb]) }
+    expect { described_class.run_pre_commit_specs!(%w[spec/spec_helper.rb]) }
       .to output("targeted specs: no direct spec files matched\n").to_stdout
+  end
+
+  %w[.rspec .simplecov .undercover.yml].each do |config_path|
+    it "runs the full coverage suite once when #{config_path} is staged" do
+      allow(Kernel).to receive(:exec)
+
+      described_class.run_pre_commit_specs!([config_path])
+
+      expect(Kernel).to have_received(:exec).once.with('bundle', 'exec', 'rake', 'coverage')
+    end
+  end
+
+  it 'prefers the full coverage suite when a direct spec and config overlap' do
+    allow(Kernel).to receive(:exec)
+
+    described_class.run_pre_commit_specs!(%w[spec/example_spec.rb .rspec])
+
+    expect(Kernel).to have_received(:exec).once.with('bundle', 'exec', 'rake', 'coverage')
+  end
+
+  it 'routes direct specs and full-suite config through one pre-commit command' do
+    expected_globs = %w[spec/*.rb spec/**/* .rspec .simplecov .undercover.yml]
+
+    expect(ruby_specs_command.fetch('glob')).to match_array(expected_globs)
+  end
+
+  it 'uses the mutually exclusive pre-commit spec router' do
+    expect(ruby_specs_command.fetch('run')).to include('run_pre_commit_specs!')
+  end
+
+  it 'removes the overlapping RSpec and coverage configuration command' do
+    expect(command_names).not_to include('rubocop-rspec-coverage-config')
+  end
+
+  it 'routes RuboCop configuration without rerunning the coverage suite' do
+    expect(rubocop_config_command.fetch('run')).to eq('bundle exec rake rubocop')
+  end
+
+  it 'limits RuboCop configuration routing to the RuboCop config' do
+    expect(rubocop_config_command.fetch('glob')).to eq(['.rubocop.yml'])
   end
 
   it 'reports pending schema and fixture checks for matching paths' do
@@ -156,27 +228,17 @@ RSpec.describe RailsMmd::HookChecks do
   end
 
   it 'routes schema and fixture changes to contract specs' do
-    expect(schema_fixture_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
+    expect(contract_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
   end
 
-  it 'triggers contract specs for schema and fixture paths' do
-    expect(schema_fixture_command.fetch('glob')).to contain_exactly(
-      'schemas/**/*.json',
-      'fixtures/**/*.json',
-      'fixtures/**/*.mmd'
-    )
+  it 'triggers one contract route for schema, fixture, and setup documentation paths' do
+    expect(contract_command.fetch('glob')).to match_array(expected_contract_globs)
   end
 
-  it 'routes setup documentation changes to contract specs' do
-    expect(setup_drift_command.fetch('run')).to eq('bundle exec rspec spec/contracts')
-  end
+  it 'defines the contract suite command only once' do
+    contract_runs = pre_commit_commands.values.count { |command| command.fetch('run').include?('rspec spec/contracts') }
 
-  it 'triggers contract specs for setup documentation paths' do
-    expect(setup_drift_command.fetch('glob')).to contain_exactly(
-      'AGENTS.md',
-      'README.md',
-      'docs/**/*.md'
-    )
+    expect(contract_runs).to eq(1)
   end
 
   it 'separates RuboCop options from staged file arguments' do

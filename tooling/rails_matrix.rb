@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'bundler'
+require 'digest'
 require 'fileutils'
 require 'json'
 require 'open3'
@@ -38,6 +39,49 @@ module RailsMatrix
     private
 
     attr_reader :data
+  end
+
+  # Resolves a stable Bundler install path from the matrix Ruby and lockfile.
+  class BundleCache
+    ROOT_ENV = 'RAILS_MMD_MATRIX_CACHE_ROOT'
+
+    def initialize(root:)
+      @root = Pathname(root)
+    end
+
+    def path_for(pair)
+      cache_root.join(
+        'gems',
+        pair.ruby_version,
+        "#{pair.rails_series}-#{lock_digest(pair)}"
+      )
+    end
+
+    private
+
+    attr_reader :root
+
+    def cache_root
+      override = ENV.fetch(ROOT_ENV, nil)
+      return root.join('.bundle/rails-matrix') unless override
+
+      raise VerificationError, "#{ROOT_ENV} must not be empty" if override.empty?
+
+      Pathname(override).expand_path(root)
+    end
+
+    def lock_digest(pair)
+      content = lock_path(pair).binread
+      raise VerificationError, "#{pair.name} bundle lockfile is empty" if content.empty?
+
+      Digest::SHA256.hexdigest(content)
+    rescue SystemCallError => e
+      raise VerificationError, "#{pair.name} cannot read bundle lockfile: #{e.message}"
+    end
+
+    def lock_path(pair)
+      root.join('fixtures/rails_matrix/bundles', pair.rails_series, 'Gemfile.lock')
+    end
   end
 
   # Builds the exact-oracle view of target-specific polymorphic edges.
@@ -194,6 +238,7 @@ module RailsMatrix
       @root = root
       @manifest = Manifest.new(root.join('fixtures/rails_matrix/matrix.yml'))
       @artifact_validator = ArtifactValidator.new
+      @bundle_cache = BundleCache.new(root:)
     end
 
     def run
@@ -205,7 +250,7 @@ module RailsMatrix
 
     private
 
-    attr_reader :artifact_validator, :manifest, :root
+    attr_reader :artifact_validator, :bundle_cache, :manifest, :root
 
     def verify_prerequisites(pairs)
       pairs.map(&:ruby_version).uniq.each do |version|
@@ -293,7 +338,7 @@ module RailsMatrix
         'ASDF_RUBY_VERSION' => pair.ruby_version,
         'BUNDLE_FROZEN' => 'true',
         'BUNDLE_GEMFILE' => app_root.join('Gemfile').to_s,
-        'BUNDLE_PATH' => root.join('.bundle/rails-matrix/gems', pair.ruby_version).to_s,
+        'BUNDLE_PATH' => bundle_cache.path_for(pair).to_s,
         'PATH' => caller_path,
         'RAILS_ENV' => 'development'
       }
