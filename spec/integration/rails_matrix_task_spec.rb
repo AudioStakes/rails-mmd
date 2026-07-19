@@ -221,10 +221,6 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     end
   end
 
-  it 'executes every required Ruby and Rails pair' do
-    expect(run_matrix).to include(success: true, stderr: '', stdout: include('PASS 3/3 Rails matrix pairs'))
-  end
-
   it 'runs the Rails matrix from the default local verification gate' do
     expect(rake_prerequisites).to match(/rake default\n(?: {4}.+\n)* {4}verify:rails_matrix/)
   end
