@@ -5,24 +5,13 @@ require 'rails_mmd/diagnostics'
 
 module RailsMmd
   # Mermaid-safe token generation and scoped collision resolution.
+  # @api private
   class SafeTokens
     TOKEN_KINDS = %w[entity attribute relationship diagnostic comment].freeze
     ARTIFACT_KINDS = %w[er class].freeze
 
     def initialize(diagnostics: Diagnostics.new)
       @diagnostics = diagnostics
-    end
-
-    def base_token(source)
-      token = source.to_s.unicode_normalize(:nfkd)
-      token = token.gsub('::', '_')
-      token = token.gsub(/([a-z\d])([A-Z])/, '\\1_\\2')
-      token = token.gsub(/([A-Z]+)([A-Z][a-z])/, '\\1_\\2')
-      token = token.gsub(/[^A-Za-z0-9]+/, '_')
-      token = token.delete('^A-Za-z0-9_')
-      token = token.squeeze('_').gsub(/\A_+|_+\z/, '').upcase
-      token = 'X' if token.empty?
-      token.match?(/\A\d/) ? "X_#{token}" : token
     end
 
     def assign(subjects, scope:)
@@ -37,6 +26,18 @@ module RailsMmd
     private
 
     attr_reader :diagnostics
+
+    def base_token(source)
+      token = source.to_s.unicode_normalize(:nfkd)
+      token = token.gsub('::', '_')
+      token = token.gsub(/([a-z\d])([A-Z])/, '\\1_\\2')
+      token = token.gsub(/([A-Z]+)([A-Z][a-z])/, '\\1_\\2')
+      token = token.gsub(/[^A-Za-z0-9]+/, '_')
+      token = token.delete('^A-Za-z0-9_')
+      token = token.squeeze('_').gsub(/\A_+|_+\z/, '').upcase
+      token = 'X' if token.empty?
+      token.match?(/\A\d/) ? "X_#{token}" : token
+    end
 
     def validate_scope!(scope)
       raise ArgumentError, 'invalid artifact_kind' unless ARTIFACT_KINDS.include?(scope.fetch(:artifact_kind))

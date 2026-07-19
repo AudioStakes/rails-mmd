@@ -245,14 +245,33 @@ RSpec.describe 'runtime primitives' do
 
   describe RailsMmd::SafeTokens do
     it 'implements the P0 safe-token examples' do
-      tokens = described_class.new
+      subjects = {
+        'Admin::User' => 'ADMIN_USER',
+        'HTTPResponseCode' => 'HTTP_RESPONSE_CODE',
+        '注文Line' => 'LINE',
+        'order_item' => 'ORDER_ITEM',
+        '123Order' => 'X_123_ORDER',
+        '!!!' => 'X'
+      }.map do |source, _token|
+        { source: source, identity: "subject:#{source}" }
+      end
 
-      expect(tokens.base_token('Admin::User')).to eq('ADMIN_USER')
-      expect(tokens.base_token('HTTPResponseCode')).to eq('HTTP_RESPONSE_CODE')
-      expect(tokens.base_token('注文Line')).to eq('LINE')
-      expect(tokens.base_token('order_item')).to eq('ORDER_ITEM')
-      expect(tokens.base_token('123Order')).to eq('X_123_ORDER')
-      expect(tokens.base_token('!!!')).to eq('X')
+      result = described_class.new.assign(
+        subjects,
+        scope: { artifact_kind: 'er', domain_id: 'core', token_kind: 'entity' }
+      )
+
+      expect(result).to eq(
+        tokens: {
+          'subject:Admin::User' => 'ADMIN_USER',
+          'subject:HTTPResponseCode' => 'HTTP_RESPONSE_CODE',
+          'subject:注文Line' => 'LINE',
+          'subject:order_item' => 'ORDER_ITEM',
+          'subject:123Order' => 'X_123_ORDER',
+          'subject:!!!' => 'X'
+        },
+        diagnostics: []
+      )
     end
 
     it 'suffixes scoped collisions and emits a resolved warning diagnostic' do
@@ -279,10 +298,9 @@ RSpec.describe 'runtime primitives' do
     end
 
     it 'emits a fatal diagnostic when suffix expansion cannot resolve a collision' do
-      tokens = described_class.new
-      allow(tokens).to receive(:collision_digest).and_return('A' * 64)
+      allow(RailsMmd::CanonicalJson).to receive(:digest_sha256).and_return('A' * 64)
 
-      result = tokens.assign(
+      result = described_class.new.assign(
         [
           { source: 'User', identity: 'model:User' },
           { source: 'User', identity: 'model:UserDuplicate' }
