@@ -101,7 +101,7 @@ classDiagram
   AUTHOR "0..*" --> "0..*" TEAM : teams
   AUTHOR "0..*" --> "0..*" TEAM : collaborators
   AUTHOR "0..*" --> "0..*" LABEL : labels
-  COMMENT "0..1" --> "0..1" IMAGE : commentable
+  COMMENT "0..*" --> "0..1" IMAGE : commentable
   COMMENT "0..*" --> "0..1" POST : commentable
   DRAFT "0..*" --> "0..1" AUTHOR : drafts
   EMPLOYEE "0..*" --> "0..1" EMPLOYEE : manager

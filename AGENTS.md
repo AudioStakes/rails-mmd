@@ -91,3 +91,16 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Matrix fixture-family selectors are harness-only environment. Remove
   `RAILS_MMD_MATRIX_FIXTURE_FAMILY` and `RAILS_MMD_MATRIX_PAIR` from child Rails
   processes so runtime behavior and redaction cannot depend on test selectors.
+- For composite association fixtures shared by Rails 7.2 and 8.1, use array
+  `foreign_key:` declarations and model-level `query_constraints`; association
+  `query_constraints:` is deprecated in 7.2 and rejected in 8.1.
+- Never call `association_primary_key` on an unresolved polymorphic
+  `belongs_to`; supply the concrete target class before reading its key tuple.
+- Composite HABTM is not operational on the pinned Rails matrix: reflection
+  stringifies one tuple side and owner SQL falls back to a scalar conventional
+  id. Preserve the checked-in P2-04 runtime probe and emit the documented
+  omission instead of guessing an edge.
+- JSON Schema `uniqueItems` compares whole array items; it does not enforce
+  uniqueness of an identity field when duplicate IDs have different payloads.
+  Keep IR/render-plan `attribute_id` uniqueness in `SchemaValidator` and cover
+  same-ID/different-content fixtures.

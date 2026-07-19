@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/diagnostics'
+require 'rails_mmd/key_tuple'
 require 'rails_mmd/redactor'
 
 module RailsMmd
@@ -22,7 +23,7 @@ module RailsMmd
       :table_name,
       :connection_context_id,
       :columns,
-      :primary_key,
+      :primary_key_columns,
       :foreign_keys,
       :indexes,
       :selection_origin,
@@ -43,7 +44,7 @@ module RailsMmd
       :owner_entity_id,
       :owner_ruby_constant,
       :association_name,
-      :foreign_key,
+      :foreign_key_columns,
       :foreign_type,
       :scoped,
       :root_diagnostic_code,
@@ -58,8 +59,8 @@ module RailsMmd
       keyword_init: true
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
-    JoinTable = Struct.new(:table_name, :columns, :primary_key, keyword_init: true)
-    ForeignKey = Struct.new(:from_table, :column, :to_table, :primary_key, keyword_init: true)
+    JoinTable = Struct.new(:table_name, :columns, :primary_key_columns, keyword_init: true)
+    ForeignKey = Struct.new(:from_table, :columns, :to_table, :primary_key_columns, keyword_init: true)
     Index = Struct.new(:columns, :unique, :where, :using, :expression, keyword_init: true)
     # Carries valid metadata records when only some optional adapter rows degrade.
     class PartialMetadataDegraded < StandardError
@@ -218,17 +219,18 @@ module RailsMmd
       delegated_types = call_delegated_types_method(delegated_types_method)
       return if delegated_types.nil?
 
-      foreign_key = scalar_key(safe_reflection_value(reflection, :foreign_key))
+      foreign_key_columns = KeyTuple.normalize(safe_reflection_value(reflection, :foreign_key))
       foreign_type = scalar_key(safe_reflection_value(reflection, :foreign_type))
       family = DelegatedTypeFamily.new(
         owner_entity_id: entity_id_for(owner_entity.table_name),
         owner_ruby_constant: owner_entity.ruby_constant,
         association_name: association_name,
-        foreign_key: foreign_key,
+        foreign_key_columns: foreign_key_columns,
         foreign_type: foreign_type,
         scoped: scoped?(reflection),
-        root_diagnostic_code: delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key,
-                                                             foreign_type),
+        root_diagnostic_code: delegated_root_diagnostic_code(
+          reflection, owner_entity, association_name, foreign_key_columns, foreign_type
+        ),
         targets: []
       )
       return family if family.root_diagnostic_code
@@ -372,15 +374,17 @@ module RailsMmd
       nil
     end
 
-    def delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key, foreign_type)
+    def delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key_columns, foreign_type)
       sanitized_name = sanitize_association_name(association_name)
       return 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED' unless sanitized_name
-      return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless foreign_key && foreign_type
-      unless default_polymorphic_keys?(sanitized_name, foreign_key, foreign_type)
+      return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless foreign_key_columns && foreign_type
+      unless default_polymorphic_keys?(sanitized_name, foreign_key_columns, foreign_type)
         return 'ASSOCIATION_POLYMORPHIC_OMITTED'
       end
       return 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED' if primary_key_specialized?(reflection)
-      return 'ASSOCIATION_KEY_COLUMN_MISSING' unless owner_has_key_columns?(owner_entity, foreign_key, foreign_type)
+      unless owner_has_key_columns?(owner_entity, foreign_key_columns, foreign_type)
+        return 'ASSOCIATION_KEY_COLUMN_MISSING'
+      end
 
       nil
     end
@@ -430,8 +434,9 @@ module RailsMmd
       name.delete_suffix('?').delete_suffix('!').delete_suffix('=')
     end
 
-    def default_polymorphic_keys?(association_name, foreign_key, foreign_type)
-      foreign_key == "#{association_name}_id" && foreign_type == "#{association_name}_type"
+    def default_polymorphic_keys?(association_name, foreign_key_columns, foreign_type)
+      identifier_matches = foreign_key_columns.length > 1 || foreign_key_columns == ["#{association_name}_id"]
+      identifier_matches && foreign_type == "#{association_name}_type"
     end
 
     def primary_key_specialized?(reflection)
@@ -439,9 +444,9 @@ module RailsMmd
       reflection_options.is_a?(Hash) && reflection_options.key?(:primary_key)
     end
 
-    def owner_has_key_columns?(owner_entity, foreign_key, foreign_type)
+    def owner_has_key_columns?(owner_entity, foreign_key_columns, foreign_type)
       column_names = owner_entity.columns.map(&:name)
-      column_names.include?(foreign_key) && column_names.include?(foreign_type)
+      foreign_key_columns.all? { |column| column_names.include?(column) } && column_names.include?(foreign_type)
     end
 
     def probe_sti_subtypes(selected_entities, inventory_records)
@@ -627,11 +632,13 @@ module RailsMmd
       return invalid_record(domain_id, record, :table) unless table_exists?(model)
 
       columns = read_columns(model)
-      primary_key = read_primary_key(model)
+      primary_key_columns = KeyTuple.normalize(read_primary_key(model))
       return invalid_record(domain_id, record, :table) if columns.nil?
-      return invalid_record(domain_id, record, :primary_key) unless scalar_primary_key?(primary_key)
+      unless primary_key_columns&.all? { |name| columns.any? { |column| column.name == name } }
+        return invalid_record(domain_id, record, :primary_key)
+      end
 
-      build_entity(domain_id, record, model, columns, primary_key, selection_origin)
+      build_entity(domain_id, record, model, columns, primary_key_columns, selection_origin)
     end
 
     def exit_code(all_diagnostics)
@@ -653,7 +660,7 @@ module RailsMmd
       [nil, [diagnostic]]
     end
 
-    def build_entity(domain_id, record, model, columns, primary_key, selection_origin)
+    def build_entity(domain_id, record, model, columns, primary_key_columns, selection_origin)
       foreign_keys, foreign_key_diagnostic = degradable_metadata(domain_id, record, 'foreign_key') do
         read_foreign_keys(model, record.table_name)
       end
@@ -667,7 +674,7 @@ module RailsMmd
           table_name: record.table_name,
           connection_context_id: record.connection_context_id,
           columns: columns,
-          primary_key: primary_key,
+          primary_key_columns: primary_key_columns,
           foreign_keys: foreign_keys,
           indexes: indexes,
           selection_origin: selection_origin
@@ -731,10 +738,14 @@ module RailsMmd
       connection = join_table_connection(model, table_name)
       return unless connection
 
+      raw_primary_key = connection.primary_key(table_name)
+      primary_key_columns = KeyTuple.normalize(raw_primary_key) unless raw_primary_key.nil?
+      return if !raw_primary_key.nil? && primary_key_columns.nil?
+
       JoinTable.new(
         table_name: table_name,
         columns: Array(connection.columns(table_name)).map { |column| column_record(column) },
-        primary_key: connection.primary_key(table_name)
+        primary_key_columns: primary_key_columns
       )
     rescue LoadError, SyntaxError, StandardError
       nil
@@ -758,10 +769,6 @@ module RailsMmd
       model.respond_to?(:primary_key) ? model.primary_key : nil
     rescue LoadError, SyntaxError, StandardError
       nil
-    end
-
-    def scalar_primary_key?(primary_key)
-      primary_key.is_a?(String) && !primary_key.empty?
     end
 
     def degradable_metadata(domain_id, record, metadata_kind)
@@ -806,15 +813,16 @@ module RailsMmd
     end
 
     def foreign_key_record(foreign_key)
+      columns = KeyTuple.normalize(value_from(foreign_key, :column))
+      primary_key_columns = KeyTuple.normalize(value_from(foreign_key, :primary_key))
       record = ForeignKey.new(
         from_table: value_from(foreign_key, :from_table),
-        column: value_from(foreign_key, :column),
+        columns: columns,
         to_table: value_from(foreign_key, :to_table),
-        primary_key: value_from(foreign_key, :primary_key)
+        primary_key_columns: primary_key_columns
       )
-      return record if [record.from_table, record.column, record.to_table, record.primary_key].all? do |value|
-        value.is_a?(String) && !value.empty?
-      end
+      table_names_valid = [record.from_table, record.to_table].all? { |value| present_string?(value) }
+      return record if table_names_valid && KeyTuple.valid_pair?(record.columns, record.primary_key_columns)
 
       raise ArgumentError, 'foreign_key metadata inconsistent'
     end

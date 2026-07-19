@@ -1,0 +1,25 @@
+{
+  "schema_version": 4,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/line_items",
+      "ruby_constant": "LineItem",
+      "table_name": "line_items",
+      "attributes": [
+        { "attribute_id": "entities/line_items/attributes/order_id", "name": "order_id", "role": "primary_foreign_key", "type": "bigint" }
+      ]
+    },
+    {
+      "entity_id": "entities/orders",
+      "ruby_constant": "Order",
+      "table_name": "orders",
+      "attributes": [
+        { "attribute_id": "entities/line_items/attributes/order_id", "name": "legacy_order_id", "role": "primary_key", "type": "integer" }
+      ]
+    }
+  ],
+  "relationships": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}

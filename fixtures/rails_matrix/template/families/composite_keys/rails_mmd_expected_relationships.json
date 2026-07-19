@@ -1,0 +1,80 @@
+[
+  {
+    "relationship_id": "relationships/p204_attachments/polymorphic/attachable/tuple/WyJhdHRhY2hhYmxlX3JlZ2lvbl9jb2RlIiwiYXR0YWNoYWJsZV9pZCJd/attachable_type/p204_orders",
+    "owner_safe_token": "P204_ATTACHMENT",
+    "target_safe_token": "P204_ORDER",
+    "label": "attachable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p204_attachments/polymorphic/attachable/tuple/WyJhdHRhY2hhYmxlX3JlZ2lvbl9jb2RlIiwiYXR0YWNoYWJsZV9pZCJd/attachable_type/p204_shops",
+    "owner_safe_token": "P204_ATTACHMENT",
+    "target_safe_token": "P204_SHOP",
+    "label": "attachable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p204_bins/tuple/WyJyZWdpb25fY29kZSIsIndhcmVob3VzZV9pZCJd/p204_warehouses/tuple/WyJyZWdpb25fY29kZSIsImlkIl0",
+    "owner_safe_token": "P204_BIN",
+    "target_safe_token": "P204_WAREHOUSE",
+    "label": "p204_warehouse",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p204_catalog_items/p204_catalog_id/p204_catalogs/id",
+    "owner_safe_token": "P204_CATALOG_ITEM",
+    "target_safe_token": "P204_CATALOG",
+    "label": "p204_catalog",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p204_entries/polymorphic/entryable/tuple/WyJlbnRyeWFibGVfcmVnaW9uX2NvZGUiLCJlbnRyeWFibGVfaWQiXQ/entryable_type/p204_posts",
+    "owner_safe_token": "P204_ENTRY",
+    "target_safe_token": "P204_POST",
+    "label": "entryable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1"
+  },
+  {
+    "relationship_id": "relationships/p204_line_items/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwib3JkZXJfY29kZSJd/p204_orders/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwib3JkZXJfY29kZSJd",
+    "owner_safe_token": "P204_LINE_ITEM",
+    "target_safe_token": "P204_ORDER",
+    "label": "p204_order",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p204_orders/tuple/WyJzaG9wX3JlZ2lvbl9jb2RlIiwic2hvcF9jb2RlIl0/p204_shops/tuple/WyJyZWdpb25fY29kZSIsInNob3BfY29kZSJd",
+    "owner_safe_token": "P204_ORDER",
+    "target_safe_token": "P204_SHOP",
+    "label": "p204_shop",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1",
+    "metadata": {
+      "scoped": true
+    }
+  },
+  {
+    "relationship_id": "relationships/p204_shops/through/p204_orders/p204_line_items/p204_line_items",
+    "owner_safe_token": "P204_SHOP",
+    "target_safe_token": "P204_LINE_ITEM",
+    "label": "p204_line_items",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many",
+    "metadata": {
+      "scoped": true
+    }
+  },
+  {
+    "relationship_id": "relationships/p204_warehouse_profiles/tuple/WyJyZWdpb25fY29kZSIsIndhcmVob3VzZV9pZCJd/p204_warehouses/tuple/WyJyZWdpb25fY29kZSIsImlkIl0",
+    "owner_safe_token": "P204_WAREHOUSE_PROFILE",
+    "target_safe_token": "P204_WAREHOUSE",
+    "label": "p204_warehouse",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "0..1"
+  }
+]

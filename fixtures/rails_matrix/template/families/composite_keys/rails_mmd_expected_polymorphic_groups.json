@@ -1,0 +1,29 @@
+[
+  {
+    "group_id": "relationships/p204_attachments/polymorphic/attachable/tuple/WyJhdHRhY2hhYmxlX3JlZ2lvbl9jb2RlIiwiYXR0YWNoYWJsZV9pZCJd/attachable_type",
+    "holder_safe_token": "P204_ATTACHMENT",
+    "root_label": "attachable",
+    "candidate_target_safe_tokens": [
+      "P204_ORDER",
+      "P204_SHOP"
+    ],
+    "foreign_key_attributes": [
+      "attachable_id",
+      "attachable_region_code",
+      "attachable_type"
+    ]
+  },
+  {
+    "group_id": "relationships/p204_entries/polymorphic/entryable/tuple/WyJlbnRyeWFibGVfcmVnaW9uX2NvZGUiLCJlbnRyeWFibGVfaWQiXQ/entryable_type",
+    "holder_safe_token": "P204_ENTRY",
+    "root_label": "entryable",
+    "candidate_target_safe_tokens": [
+      "P204_POST"
+    ],
+    "foreign_key_attributes": [
+      "entryable_id",
+      "entryable_region_code",
+      "entryable_type"
+    ]
+  }
+]

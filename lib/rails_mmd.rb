@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative 'rails_mmd/version'
+require_relative 'rails_mmd/key_tuple'
+require_relative 'rails_mmd/relationship_id_codec'
 require_relative 'rails_mmd/config'
 require_relative 'rails_mmd/domain_resolver'
 require_relative 'rails_mmd/model_inventory'

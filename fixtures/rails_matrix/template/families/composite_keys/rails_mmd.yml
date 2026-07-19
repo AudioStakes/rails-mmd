@@ -1,0 +1,23 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - P204Attachment
+      - P204Author
+      - P204Bin
+      - P204Book
+      - P204Catalog
+      - P204CatalogItem
+      - P204Entry
+      - P204LineItem
+      - P204Order
+      - P204Post
+      - P204Shop
+      - P204Warehouse
+      - P204WarehouseProfile
+    exclude_models: []
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

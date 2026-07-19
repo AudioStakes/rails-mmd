@@ -32,13 +32,61 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationship.owner_entity_id).to eq('entities/users')
     expect(relationship.target_entity_id).to eq('entities/accounts')
     expect(relationship.association_name).to eq('account')
-    expect(relationship.owner_foreign_key_column).to eq('account_id')
-    expect(relationship.target_primary_key_column).to eq('id')
+    expect(relationship.foreign_key_columns).to eq(['account_id'])
+    expect(relationship.referenced_key_columns).to eq(['id'])
     expect(relationship.owner_fk_unique).to be(true)
     expect(relationship.db_foreign_key).to be(true)
     expect(relationship.owner_fk_nullable).to be(false)
     expect(relationship.owner_cardinality).to eq('0..1')
     expect(relationship.target_cardinality).to eq('1..1')
+  end
+
+  it 'publishes an ordered composite belongs-to tuple with exact tuple evidence' do
+    account_model = renderable_model('Account', 'accounts')
+    membership_model = owner_model(
+      belongs_to(
+        'account',
+        klass: account_model,
+        foreign_key: %w[tenant_id account_id],
+        association_primary_key: %w[tenant_id id]
+      )
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Membership', 'memberships',
+          columns: [column('id', false), column('tenant_id', false), column('account_id', false)],
+          foreign_keys: [foreign_key('memberships', %w[tenant_id account_id], 'accounts', %w[tenant_id id])],
+          indexes: [index(%w[account_id tenant_id], true, using: :btree)]
+        ),
+        entity(
+          'Account', 'accounts',
+          columns: [column('tenant_id', false), column('id', false)],
+          primary_key_columns: %w[tenant_id id]
+        )
+      ]
+    )
+
+    result = build(domain, 'Membership' => membership_model, 'Account' => account_model)
+
+    expect(result.diagnostics).to eq([])
+    relationship = result.domains.first.relationships.fetch(0)
+    expect(relationship).to have_attributes(
+      relationship_id: 'relationships/memberships/tuple/WyJ0ZW5hbnRfaWQiLCJhY2NvdW50X2lkIl0/' \
+                       'accounts/tuple/WyJ0ZW5hbnRfaWQiLCJpZCJd',
+      foreign_key_holder_entity_id: 'entities/memberships',
+      foreign_key_columns: %w[tenant_id account_id],
+      referenced_key_columns: %w[tenant_id id],
+      owner_fk_unique: true,
+      db_foreign_key: true,
+      owner_fk_nullable: false,
+      owner_cardinality: '0..1',
+      target_cardinality: '1..1'
+    )
+    expect(relationship).not_to respond_to(:foreign_key_column)
+    expect(relationship.foreign_key_columns).to be_frozen
+    expect(relationship.referenced_key_columns).to be_frozen
   end
 
   it 'retains scope presence on an eligible scoped belongs_to without executing it' do
@@ -142,7 +190,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         owner_entity_id: 'entities/authors', target_entity_id: 'entities/tags',
         association_name: 'tags', relationship_kind: :habtm,
         owner_cardinality: '0..many', target_cardinality: '0..many',
-        foreign_key_holder_entity_id: nil, foreign_key_column: nil
+        foreign_key_holder_entity_id: nil, foreign_key_columns: nil
       )
     )
   end
@@ -216,7 +264,9 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'classifies every invalid HABTM table-global shape deterministically' do
     tag_model = renderable_model('Tag', 'tags')
     cases = {
-      'primary_key_present' => [join_table('authors_tags', %w[author_id tag_id], primary_key: 'id'), 'tag_id'],
+      'primary_key_present' => [
+        join_table('authors_tags', %w[author_id tag_id], primary_key_columns: ['id']), 'tag_id'
+      ],
       'join_column_missing' => [join_table('authors_tags', ['author_id']), 'tag_id'],
       'extra_columns' => [join_table('authors_tags', %w[author_id tag_id created_at]), 'tag_id'],
       'ambiguous_columns' => [join_table('authors_tags', ['author_id']), 'author_id']
@@ -305,14 +355,59 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationships.fetch('profiles')).to have_attributes(
       relationship_id: 'relationships/profiles/author_id/authors/id',
       owner_entity_id: 'entities/profiles', target_entity_id: 'entities/authors',
-      foreign_key_holder_entity_id: 'entities/profiles', foreign_key_column: 'author_id',
+      foreign_key_holder_entity_id: 'entities/profiles', foreign_key_columns: ['author_id'],
       owner_cardinality: '0..many', target_cardinality: '0..1', metadata: { scoped: true }
     )
     expect(relationships.fetch('account')).to have_attributes(
       relationship_id: 'relationships/accounts/author_id/authors/id',
       owner_entity_id: 'entities/accounts', target_entity_id: 'entities/authors',
-      foreign_key_holder_entity_id: 'entities/accounts', foreign_key_column: 'author_id',
+      foreign_key_holder_entity_id: 'entities/accounts', foreign_key_columns: ['author_id'],
       owner_cardinality: '0..1', target_cardinality: '1..1', metadata: { scoped: true }
+    )
+  end
+
+  it 'publishes direct has-many query-constraint tuples from the target-side holder' do
+    invoice_model = renderable_model('Invoice', 'invoices')
+    account_model = owner_model(
+      association(
+        'invoices', :has_many,
+        klass: invoice_model,
+        foreign_key: %w[account_tenant_id account_id],
+        active_record_primary_key: %w[tenant_id id]
+      )
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Account', 'accounts',
+          columns: [column('tenant_id', false), column('id', false)],
+          primary_key_columns: %w[tenant_id id]
+        ),
+        entity(
+          'Invoice', 'invoices',
+          columns: [column('id', false), column('account_tenant_id', false), column('account_id', false)],
+          foreign_keys: [
+            foreign_key('invoices', %w[account_tenant_id account_id], 'accounts', %w[tenant_id id])
+          ]
+        )
+      ]
+    )
+
+    result = build(domain, 'Account' => account_model)
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships).to contain_exactly(
+      have_attributes(
+        relationship_id: 'relationships/invoices/tuple/' \
+                         'WyJhY2NvdW50X3RlbmFudF9pZCIsImFjY291bnRfaWQiXQ/' \
+                         'accounts/tuple/WyJ0ZW5hbnRfaWQiLCJpZCJd',
+        foreign_key_holder_entity_id: 'entities/invoices',
+        foreign_key_columns: %w[account_tenant_id account_id],
+        referenced_key_columns: %w[tenant_id id],
+        owner_cardinality: '0..many',
+        target_cardinality: '1..1'
+      )
     )
   end
 
@@ -382,16 +477,67 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       have_attributes(
         relationship_id: 'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/posts',
         owner_entity_id: 'entities/comments', target_entity_id: 'entities/posts',
-        association_name: 'commentable', foreign_key_column: 'commentable_id',
+        association_name: 'commentable', foreign_key_columns: ['commentable_id'],
         foreign_type_column: 'commentable_type', owner_cardinality: '0..many', target_cardinality: '0..1',
         metadata: { scoped: true }
       ),
       have_attributes(
         relationship_id: 'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/images',
         owner_entity_id: 'entities/comments', target_entity_id: 'entities/images',
-        association_name: 'commentable', foreign_key_column: 'commentable_id',
-        foreign_type_column: 'commentable_type', owner_cardinality: '0..1', target_cardinality: '0..1',
+        association_name: 'commentable', foreign_key_columns: ['commentable_id'],
+        foreign_type_column: 'commentable_type', owner_cardinality: '0..many', target_cardinality: '0..1',
         metadata: { scoped: true }
+      )
+    )
+  end
+
+  it 'publishes a composite polymorphic identifier against a concrete target tuple' do
+    comment_model = renderable_model('Comment', 'comments')
+    post_model = owner_model(
+      association(
+        'comments', :has_many,
+        klass: comment_model,
+        as: :commentable,
+        foreign_key: %w[tenant_id commentable_id],
+        type: 'commentable_type',
+        active_record_primary_key: %w[tenant_id id]
+      )
+    )
+    root = belongs_to(
+      'commentable',
+      polymorphic: true,
+      foreign_key: %w[tenant_id commentable_id],
+      association_primary_key: %w[tenant_id id]
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Comment', 'comments',
+          columns: [column('id', false), column('tenant_id', false), column('commentable_id', false),
+                    column('commentable_type', false)],
+          indexes: [index(%w[commentable_type commentable_id tenant_id], true)]
+        ),
+        entity(
+          'Post', 'posts',
+          columns: [column('tenant_id', false), column('id', false)],
+          primary_key_columns: %w[tenant_id id]
+        )
+      ]
+    )
+
+    result = build(domain, 'Comment' => owner_model(root), 'Post' => post_model)
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships).to contain_exactly(
+      have_attributes(
+        relationship_id: 'relationships/comments/polymorphic/commentable/tuple/' \
+                         'WyJ0ZW5hbnRfaWQiLCJjb21tZW50YWJsZV9pZCJd/commentable_type/posts',
+        foreign_key_columns: %w[tenant_id commentable_id],
+        foreign_type_column: 'commentable_type',
+        referenced_key_columns: %w[tenant_id id],
+        owner_cardinality: '0..1',
+        target_cardinality: '0..1'
       )
     )
   end
@@ -419,7 +565,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     end
 
     expect(results.flat_map(&:diagnostics)).to eq([])
-    expect(polymorphic).to all(have_attributes(owner_cardinality: '0..1', metadata: { scoped: true }))
+    expect(polymorphic).to all(have_attributes(owner_cardinality: '0..many', metadata: { scoped: true }))
   end
 
   it 'merges scope metadata across duplicate polymorphic roots in either declaration order' do
@@ -491,7 +637,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  it 'diagnoses unsafe and composite polymorphic roots without resolving a target class' do
+  it 'diagnoses unsafe names and missing composite polymorphic holder columns without resolving a target class' do
     domain = domain_result('core', [entity('Comment', 'comments')])
 
     unsafe = build(domain, 'Comment' => owner_model(belongs_to('BadName', polymorphic: true)))
@@ -505,7 +651,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       ['ASSOCIATION_NAME_UNSUPPORTED_OMITTED']
     )
     expect(composite.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
-      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
+      ['ASSOCIATION_KEY_COLUMN_MISSING']
     )
   end
 
@@ -549,7 +695,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       [entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
                                                column('commentable_type', false)]),
        entity('Post', 'posts'), entity('Image', 'images'),
-       entity('Video', 'videos', primary_key: 'uuid'), entity('Audio', 'audios')]
+       entity('Video', 'videos', primary_key_columns: ['uuid']), entity('Audio', 'audios')]
     )
 
     result = build(
@@ -621,7 +767,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
           owner_entity_id: 'entities/entries',
           owner_ruby_constant: 'Entry',
           association_name: 'entryable',
-          foreign_key: 'entryable_id',
+          foreign_key_columns: ['entryable_id'],
           foreign_type: 'entryable_type',
           targets: [
             delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected),
@@ -655,7 +801,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
     expect(relationships.fetch('entities/images')).to have_attributes(
       relationship_id: 'relationships/entries/polymorphic/entryable/entryable_id/entryable_type/images',
-      owner_cardinality: '0..1',
+      owner_cardinality: '0..many',
       target_cardinality: '0..1',
       metadata: { scoped: true }
     )
@@ -687,7 +833,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       delegated_type_families: [
         delegated_type_family(
           owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
-          foreign_key: 'entryable_id', foreign_type: 'entryable_type',
+          foreign_key_columns: ['entryable_id'], foreign_type: 'entryable_type',
           targets: [
             delegated_type_target(ruby_constant: 'Image', entity_id: 'entities/images', status: :selected),
             delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected),
@@ -724,7 +870,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       delegated_type_families: [
         delegated_type_family(
           owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
-          foreign_key: 'entryable_id', foreign_type: 'entryable_type',
+          foreign_key_columns: ['entryable_id'], foreign_type: 'entryable_type',
           root_diagnostic_code: 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED',
           targets: [
             delegated_type_target(
@@ -762,7 +908,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
           owner_entity_id: 'entities/entries',
           owner_ruby_constant: 'Entry',
           association_name: 'entryable',
-          foreign_key: 'entryable_id',
+          foreign_key_columns: ['entryable_id'],
           foreign_type: 'entryable_type',
           targets: [
             delegated_type_target(ruby_constant: 'Message', entity_id: 'entities/messages', status: :expanded)
@@ -799,7 +945,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     unreadable_family = delegated_type_family(
       owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
-      foreign_key: 'entryable_id', foreign_type: 'entryable_type', targets: []
+      foreign_key_columns: ['entryable_id'], foreign_type: 'entryable_type', targets: []
     )
     unreadable_family.define_singleton_method(:targets) { raise 'targets unavailable' }
     family_domain = domain_result('core', [entry], delegated_type_families: [unreadable_family])
@@ -824,7 +970,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
           owner_entity_id: 'entities/entries',
           owner_ruby_constant: 'Entry',
           association_name: 'entryable',
-          foreign_key: 'entryable_id',
+          foreign_key_columns: ['entryable_id'],
           foreign_type: 'entryable_type',
           targets: [
             delegated_type_target(ruby_constant: 'MissingEntryable', status: :unresolved,
@@ -890,6 +1036,431 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'atomically omits a through edge when one physical hop has mismatched key tuples' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    invalid_team_source = belongs_to(
+      'team', klass: team_model, foreign_key: %w[tenant_id team_id], association_primary_key: 'id'
+    )
+    teams = through_association(
+      'teams', :has_many,
+      through_reflection: memberships,
+      source_reflection: invalid_team_source,
+      klass: team_model
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity(
+          'Membership', 'memberships',
+          columns: [column('id', false), column('author_id', false), column('tenant_id', false),
+                    column('team_id', false)]
+        ),
+        entity('Team', 'teams')
+      ]
+    )
+
+    result = build(domain, 'Author' => owner_model(teams))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
+    )
+  end
+
+  it 'omits delegated polymorphic targets when delegated target key columns are absent' do
+    post_model = renderable_model('Post', 'posts')
+    domain = domain_result(
+      'core',
+      [
+        entity('Comment', 'comments', columns: [column('id', false), column('entryable_id', false),
+                                                column('entryable_type', false)]),
+        entity('Post', 'posts', columns: [column('entryable_id', false), column('entryable_type', false)],
+                                primary_key_columns: ['id'])
+      ],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/comments',
+          owner_ruby_constant: 'Comment',
+          association_name: 'entryable',
+          foreign_key_columns: ['entryable_id'],
+          foreign_type: 'entryable_type',
+          targets: [delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected)]
+        )
+      ]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(belongs_to('entryable', polymorphic: true)),
+      'Post' => post_model
+    )
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_KEY_COLUMN_MISSING ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'omits inverse-free delegated targets whose referenced tuple length mismatches the root tuple' do
+    post_model = renderable_model('Post', 'posts')
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Entry', 'entries',
+          columns: [column('id', false), column('entryable_region_code', false), column('entryable_id', false),
+                    column('entryable_type', false)]
+        ),
+        entity('Post', 'posts')
+      ],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+          foreign_key_columns: %w[entryable_region_code entryable_id], foreign_type: 'entryable_type',
+          targets: [delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected)]
+        )
+      ]
+    )
+    root = belongs_to(
+      'entryable', polymorphic: true, foreign_key: %w[entryable_region_code entryable_id],
+                   association_primary_key: 'id'
+    )
+
+    result = build(domain, 'Entry' => owner_model(root), 'Post' => post_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_COMPOSITE_KEY_OMITTED ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'omits inverse-free delegated targets whose complete tuple references a missing target member' do
+    post_model = renderable_model('Post', 'posts')
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Entry', 'entries',
+          columns: [column('id', false), column('entryable_region_code', false), column('entryable_id', false),
+                    column('entryable_type', false)]
+        ),
+        entity('Post', 'posts', primary_key_columns: %w[region_code post_code],
+                                columns: [column('region_code', false)])
+      ],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+          foreign_key_columns: %w[entryable_region_code entryable_id], foreign_type: 'entryable_type',
+          targets: [delegated_type_target(ruby_constant: 'Post', entity_id: 'entities/posts', status: :selected)]
+        )
+      ]
+    )
+    root = belongs_to(
+      'entryable', polymorphic: true, foreign_key: %w[entryable_region_code entryable_id],
+                   association_primary_key: %w[region_code post_code]
+    )
+
+    result = build(domain, 'Entry' => owner_model(root), 'Post' => post_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_KEY_COLUMN_MISSING ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'adds a polymorphic candidate omission when candidate keys and root keys are incompatible' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to(
+      'commentable', polymorphic: true, foreign_key: %w[tenant_id commentable_id],
+                     foreign_type: 'commentable_type'
+    )
+    inverse = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: %w[tenant_id commentable_id], type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Comment', 'comments',
+          columns: [column('id', false), column('tenant_id', false), column('commentable_id', false),
+                    column('commentable_type', false)]
+        ),
+        entity('Post', 'posts',
+               columns: [column('id', false), column('tenant_id', false), column('commentable_id', false)])
+      ]
+    )
+
+    result = build(domain, 'Comment' => owner_model(root), 'Post' => owner_model(inverse))
+
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_COMPOSITE_KEY_OMITTED ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'adds a polymorphic key-column omission when candidate references missing keys' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true, foreign_key: 'commentable_id')
+    inverse = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Comment', 'comments',
+          columns: [column('id', false), column('commentable_id', false), column('commentable_type', false)]
+        ),
+        entity('Post', 'posts', columns: [column('commentable_id', false), column('commentable_type', false)],
+                                primary_key_columns: ['id'])
+      ]
+    )
+
+    result = build(domain, 'Comment' => owner_model(root), 'Post' => owner_model(inverse))
+
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_KEY_COLUMN_MISSING ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'omits delegated polymorphic candidates when root association_primary_key introspection raises' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    root.define_singleton_method(:association_primary_key) { raise 'unreadable association primary key' }
+    inverse = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Comment', 'comments',
+          columns: [column('id', false), column('commentable_id', false), column('commentable_type', false)]
+        ),
+        entity('Post', 'posts', columns: [column('id', false), column('commentable_id', false)],
+                                primary_key_columns: ['id'])
+      ]
+    )
+
+    result = build(domain, 'Comment' => owner_model(root), 'Post' => owner_model(inverse))
+
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[ASSOCIATION_COMPOSITE_KEY_OMITTED ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED]
+    )
+  end
+
+  it 'omits belongs_to edges when reflection key extraction raises while normalizing' do
+    account_model = renderable_model('Account', 'accounts')
+    order = owner_model(belongs_to('account', klass: account_model, foreign_key: lambda {
+      raise StandardError, 'invalid key'
+    }))
+    domain = domain_result(
+      'core',
+      [entity('Order', 'orders', columns: [column('id', false)]),
+       entity('Account', 'accounts', columns: [column('id', false)])]
+    )
+
+    result = build(domain, 'Order' => order, 'Account' => account_model)
+
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_COMPOSITE_KEY_OMITTED']
+    )
+  end
+
+  it 'uses non-belongs_to omission logic for direct through hops' do
+    target = entity('Membership', 'memberships', columns: [column('tenant_id', false), column('author_id', false)])
+    owner = entity('Author', 'authors', primary_key_columns: ['id'], columns: [column('id', false)])
+    reflection = association('memberships', :has_many, foreign_key: %w[tenant_id author_id])
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code,
+      owner,
+      target,
+      renderable_model('Membership', 'memberships'),
+      reflection
+    )
+
+    expect(code).to eq('ASSOCIATION_COMPOSITE_KEY_OMITTED')
+  end
+
+  it 'accepts a complete composite belongs_to through hop' do
+    owner = entity(
+      'Order', 'orders',
+      columns: [column('id', false), column('account_tenant_id', false), column('account_id', false)]
+    )
+    target = entity(
+      'Account', 'accounts', primary_key_columns: %w[tenant_id id],
+                             columns: [column('tenant_id', false), column('id', false)]
+    )
+    reflection = belongs_to(
+      'account', foreign_key: %w[account_tenant_id account_id], association_primary_key: %w[tenant_id id]
+    )
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Account', 'accounts'), reflection
+    )
+
+    expect(code).to be_nil
+  end
+
+  it 'omits an explicit composite primary key on a belongs_to through hop' do
+    owner = entity('Order', 'orders')
+    target = entity('Account', 'accounts', primary_key_columns: %w[tenant_id id])
+    reflection = belongs_to(
+      'account', foreign_key: %w[account_tenant_id account_id], association_primary_key: %w[tenant_id id],
+                 primary_key: %w[tenant_id id]
+    )
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Account', 'accounts'), reflection
+    )
+
+    expect(code).to eq('ASSOCIATION_NON_PRIMARY_KEY_OMITTED')
+  end
+
+  it 'omits an explicit scalar primary key on a belongs_to through hop' do
+    owner = entity('Order', 'orders', columns: [column('id', false), column('account_uuid', false)])
+    target = entity('Account', 'accounts', columns: [column('id', false), column('uuid', false)])
+    reflection = belongs_to(
+      'account', foreign_key: 'account_uuid', association_primary_key: 'uuid', primary_key: 'uuid'
+    )
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Account', 'accounts'), reflection
+    )
+
+    expect(code).to eq('ASSOCIATION_NON_PRIMARY_KEY_OMITTED')
+  end
+
+  it 'accepts a complete composite has_many through hop' do
+    owner = entity(
+      'Account', 'accounts', primary_key_columns: %w[tenant_id id],
+                             columns: [column('tenant_id', false), column('id', false)]
+    )
+    target = entity(
+      'Order', 'orders',
+      columns: [column('id', false), column('account_tenant_id', false), column('account_id', false)]
+    )
+    reflection = association(
+      'orders', :has_many, foreign_key: %w[account_tenant_id account_id],
+                           active_record_primary_key: %w[tenant_id id]
+    )
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Order', 'orders'), reflection
+    )
+
+    expect(code).to be_nil
+  end
+
+  it 'omits a composite has_many through hop with a missing physical key member' do
+    owner = entity(
+      'Account', 'accounts', primary_key_columns: %w[tenant_id id],
+                             columns: [column('tenant_id', false), column('id', false)]
+    )
+    target = entity('Order', 'orders', columns: [column('id', false), column('account_id', false)])
+    reflection = association(
+      'orders', :has_many, foreign_key: %w[account_tenant_id account_id],
+                           active_record_primary_key: %w[tenant_id id]
+    )
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Order', 'orders'), reflection
+    )
+
+    expect(code).to eq('ASSOCIATION_KEY_COLUMN_MISSING')
+  end
+
+  it 'omits a scalar has_many through hop with a missing physical key column' do
+    owner = entity('Account', 'accounts')
+    target = entity('Order', 'orders')
+    reflection = association('orders', :has_many, foreign_key: 'account_id', active_record_primary_key: 'id')
+
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :direct_hop_key_omission_code, owner, target, renderable_model('Order', 'orders'), reflection
+    )
+
+    expect(code).to eq('ASSOCIATION_KEY_COLUMN_MISSING')
+  end
+
+  it 'omits a public through edge when its scalar belongs_to source has an explicit primary key' do
+    membership_model = renderable_model('Membership', 'memberships')
+    account_model = renderable_model('Account', 'accounts')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    account_source = belongs_to(
+      'account', klass: account_model, foreign_key: 'account_uuid', association_primary_key: 'uuid',
+                 primary_key: 'uuid'
+    )
+    accounts = through_association(
+      'accounts', :has_many, through_reflection: memberships, source_reflection: account_source,
+                             klass: account_model
+    )
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('account_uuid', false)]),
+       entity('Account', 'accounts', columns: [column('id', false), column('uuid', false)])]
+    )
+
+    result = build(domain, 'Author' => owner_model(accounts))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_NON_PRIMARY_KEY_OMITTED']
+    )
+  end
+
+  it 'omits a public through edge when a scalar physical hop column is missing' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships,
+                          source_reflection: belongs_to('team', klass: team_model), klass: team_model
+    )
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships', columns: [column('id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
+    )
+
+    result = build(domain, 'Author' => owner_model(teams))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_KEY_COLUMN_MISSING']
+    )
+  end
+
+  it 'returns composite omission when through physical key analysis raises' do
+    memberships = association('memberships', :has_many, klass: renderable_model('Membership', 'memberships'))
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships,
+                          source_reflection: belongs_to('team', klass: renderable_model('Team', 'teams')),
+                          klass: renderable_model('Team', 'teams')
+    )
+    owner = entity('Author', 'authors')
+    unstable_context = Object.new
+    unstable_context.define_singleton_method(:entity_by_constant) do |_target_name|
+      raise 'unreadable domain cache'
+    end
+    code = described_class.new(model_resolver: ->(_name) {}).send(
+      :through_physical_key_omission_code,
+      unstable_context,
+      owner,
+      teams
+    )
+
+    expect(code).to eq('ASSOCIATION_COMPOSITE_KEY_OMITTED')
+  end
+
   it 'retains scope presence from a resolved through source without executing it' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
@@ -928,7 +1499,14 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
     domain = domain_result(
       'core',
-      [entity('Author', 'authors'), entity('AccountMembership', 'account_memberships'), entity('Account', 'accounts')]
+      [
+        entity('Author', 'authors'),
+        entity(
+          'AccountMembership', 'account_memberships',
+          columns: [column('id', false), column('author_id', false), column('account_id', false)]
+        ),
+        entity('Account', 'accounts')
+      ]
     )
 
     relationship = build(domain, 'Author' => owner_model(account_membership, account))
@@ -957,7 +1535,15 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
     domain = domain_result(
       'core',
-      [entity('Author', 'authors'), entity('Post', 'posts'), entity('Tagging', 'taggings'), entity('Tag', 'tags')]
+      [
+        entity('Author', 'authors'),
+        entity('Post', 'posts', columns: [column('id', false), column('author_id', false)]),
+        entity(
+          'Tagging', 'taggings',
+          columns: [column('id', false), column('post_id', false), column('tag_id', false)]
+        ),
+        entity('Tag', 'tags')
+      ]
     )
 
     relationship = build(domain, 'Author' => owner_model(posts, tags))
@@ -972,7 +1558,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'deduplicates an identical through path with has-one label priority' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     team_source = belongs_to('team', klass: team_model)
     has_many_teams = through_association(
       'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model,
@@ -982,7 +1568,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       'teams', :has_one, through_reflection: memberships, source_reflection: team_source, klass: team_model
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     through = [owner_model(has_many_teams, has_one_team), owner_model(has_one_team, has_many_teams)].map do |owner|
@@ -1000,7 +1590,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'uses lexical association name for same-macro through path ties' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     team_source = belongs_to('team', klass: team_model)
     teams = through_association(
       'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
@@ -1009,7 +1599,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       'squads', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     relationship = build(domain, 'Author' => owner_model(teams, squads))
@@ -1021,14 +1615,18 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'keeps scoped through with explicit source on the macro omission path' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     team_source = belongs_to('team', klass: team_model)
     explicit = through_association(
       'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model,
                           source: :team, scope: -> { raise 'scope executed' }
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     result = build(domain, 'Author' => owner_model(explicit))
@@ -1042,7 +1640,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'routes unsupported through variants and ignores aggregate scope indicators' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     team_source = belongs_to('team', klass: team_model)
     owner = owner_model(
       through_association('explicit_teams', :has_many, through_reflection: memberships,
@@ -1058,7 +1656,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       association('missing_source', :has_many, through: true, through_reflection: memberships)
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     result = build(domain, 'Author' => owner)
@@ -1081,18 +1683,24 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     post_model = renderable_model('Post', 'posts')
     tagging_model = renderable_model('Tagging', 'taggings')
     tag_model = renderable_model('Tag', 'tags')
-    posts = association('posts', :has_many, klass: post_model)
+    posts = association('posts', :has_many, klass: post_model, foreign_key: 'author_id')
     owner = owner_model(
       nested_through('explicit_tags', posts, association('taggings', :has_many, source: :tag), tag_model),
       nested_through('typed_tags', posts, association('taggings', :has_many, source_type: 'Tag'), tag_model),
       nested_through('scoped_tags', posts,
                      association('taggings', :has_many, klass: tagging_model,
+                                                        foreign_key: 'post_id',
                                                         scope: -> { raise 'scope executed' }), tag_model),
       nested_through('polymorphic_tags', posts, association('taggings', :has_many, polymorphic: true), tag_model)
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Post', 'posts'), entity('Tagging', 'taggings'),
-               entity('Tag', 'tags')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Post', 'posts',
+              columns: [column('id', false), column('author_id', false), column('tag_id', false)]),
+       entity('Tagging', 'taggings',
+              columns: [column('id', false), column('post_id', false), column('tag_id', false)]),
+       entity('Tag', 'tags')]
     )
 
     result = build(domain, 'Author' => owner)
@@ -1175,14 +1783,18 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'stabilizes an unreadable nested join chain as source unresolved' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     teams = through_association(
       'teams', :has_many, through_reflection: memberships,
                           source_reflection: belongs_to('team', klass: team_model), klass: team_model,
                           chain: -> { raise ArgumentError, 'invalid nested chain' }
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     result = build(domain, 'Author' => owner_model(teams))
@@ -1196,14 +1808,18 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'ignores unreadable aggregate through scope state when no scope proc exists' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
-    memberships = association('memberships', :has_many, klass: membership_model)
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
     teams = through_association(
       'teams', :has_many, through_reflection: memberships,
                           source_reflection: belongs_to('team', klass: team_model), klass: team_model,
                           has_scope: -> { raise NoMethodError, 'missing source scope state' }
     )
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Membership', 'memberships'), entity('Team', 'teams')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Membership', 'memberships',
+              columns: [column('id', false), column('author_id', false), column('team_id', false)]),
+       entity('Team', 'teams')]
     )
 
     result = build(domain, 'Author' => owner_model(teams))
@@ -1217,7 +1833,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   it 'stabilizes unreadable nested source lineage as source unresolved' do
     post_model = renderable_model('Post', 'posts')
     label_model = renderable_model('Label', 'labels')
-    posts = association('posts', :has_many, klass: post_model)
+    posts = association('posts', :has_many, klass: post_model, foreign_key: 'author_id')
     missing_inner_source = association(
       'labels', :has_many, through: true,
                            source_reflection: -> { raise ArgumentError, 'invalid inner source' }, klass: label_model
@@ -1244,9 +1860,9 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     post_model = renderable_model('Post', 'posts')
     labeling_model = renderable_model('Labeling', 'labelings')
     label_model = renderable_model('Label', 'labels')
-    posts = association('posts', :has_many, klass: post_model)
+    posts = association('posts', :has_many, klass: post_model, foreign_key: 'author_id')
     label_source = belongs_to('label', klass: label_model)
-    scoped_hop = scope_only_reflection('labelings', labeling_model)
+    scoped_hop = scope_only_reflection('labelings', labeling_model, foreign_key: 'post_id')
     unsafe_hop = association('BadName', :has_many, klass: labeling_model)
     outer = lambda do |name, hop|
       through_association(
@@ -1256,8 +1872,13 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     end
     owner = owner_model(outer.call('scoped_labels', scoped_hop), outer.call('unsafe_labels', unsafe_hop))
     domain = domain_result(
-      'core', [entity('Author', 'authors'), entity('Post', 'posts'),
-               entity('Labeling', 'labelings'), entity('Label', 'labels')]
+      'core',
+      [entity('Author', 'authors'),
+       entity('Post', 'posts',
+              columns: [column('id', false), column('author_id', false), column('label_id', false)]),
+       entity('Labeling', 'labelings',
+              columns: [column('id', false), column('post_id', false), column('label_id', false)]),
+       entity('Label', 'labels')]
     )
 
     result = build(domain, 'Author' => owner)
@@ -1291,7 +1912,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       association('legacy_profiles', :has_many,
                   klass: renderable_model('LegacyProfile', 'legacy_profiles', renderable: false)),
       association('uuid_profiles', :has_many, klass: profile, foreign_key: 'author_id',
-                                              active_record_primary_key: 'uuid'),
+                                              active_record_primary_key: 'uuid', primary_key: 'uuid'),
       association('missing_key_profiles', :has_many, klass: profile, foreign_key: 'missing_author_id')
     )
     domain = domain_result(
@@ -1362,7 +1983,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       belongs_to('external_account', klass: renderable_model('ExternalAccount', 'external_accounts')),
       belongs_to('composite_owner', class_name: 'Account', foreign_key: %w[first_id second_id]),
       belongs_to('missing_key', class_name: 'Account', foreign_key: 'missing_account_id'),
-      belongs_to('uuid_account', class_name: 'Account', association_primary_key: 'uuid'),
+      belongs_to('uuid_account', class_name: 'Account', association_primary_key: 'uuid', primary_key: 'uuid'),
       belongs_to('BadName')
     )
     domain = domain_result(
@@ -1480,7 +2101,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     :owner_entity_id,
     :owner_ruby_constant,
     :association_name,
-    :foreign_key,
+    :foreign_key_columns,
     :foreign_type,
     :scoped,
     :root_diagnostic_code,
@@ -1505,20 +2126,20 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     end
   end
 
-  def entity(ruby_constant, table_name, columns: [column('id', false)], primary_key: 'id', foreign_keys: [],
+  def entity(ruby_constant, table_name, columns: [column('id', false)], primary_key_columns: ['id'], foreign_keys: [],
              indexes: [], selection_origin: nil)
-    attributes = entity_attributes(ruby_constant:, table_name:, columns:, primary_key:, foreign_keys:, indexes:)
+    attributes = entity_attributes(ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:)
 
     decorate_entity_selection_origin(RailsMmd::SchemaProbe::Entity.new(**attributes), selection_origin)
   end
 
-  def entity_attributes(ruby_constant:, table_name:, columns:, primary_key:, foreign_keys:, indexes:)
+  def entity_attributes(ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:)
     {
       ruby_constant: ruby_constant,
       table_name: table_name,
       connection_context_id: '{"name":"primary"}',
       columns: columns,
-      primary_key: primary_key,
+      primary_key_columns: primary_key_columns,
       foreign_keys: foreign_keys,
       indexes: indexes
     }
@@ -1544,12 +2165,12 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: nullable)
   end
 
-  def foreign_key(from_table, column_name, to_table, primary_key)
+  def foreign_key(from_table, columns, to_table, primary_key_columns)
     RailsMmd::SchemaProbe::ForeignKey.new(
       from_table: from_table,
-      column: column_name,
+      columns: Array(columns),
       to_table: to_table,
-      primary_key: primary_key
+      primary_key_columns: Array(primary_key_columns)
     )
   end
 
@@ -1563,13 +2184,13 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  def join_table(table_name, column_names, primary_key: nil)
+  def join_table(table_name, column_names, primary_key_columns: nil)
     RailsMmd::SchemaProbe::JoinTable.new(
       table_name: table_name,
       columns: column_names.map do |name|
         RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: false)
       end,
-      primary_key: primary_key
+      primary_key_columns: primary_key_columns
     )
   end
 
@@ -1620,13 +2241,15 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  def scope_only_reflection(name, model)
+  def scope_only_reflection(name, model, foreign_key:)
     reflection = Object.new
     reflection.define_singleton_method(:name) { name }
     reflection.define_singleton_method(:macro) { :has_many }
     reflection.define_singleton_method(:scope) { -> {} }
     reflection.define_singleton_method(:polymorphic?) { false }
     reflection.define_singleton_method(:klass) { model }
+    reflection.define_singleton_method(:foreign_key) { foreign_key }
+    reflection.define_singleton_method(:active_record_primary_key) { 'id' }
     reflection
   end
 
@@ -1662,7 +2285,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       value.respond_to?(:call) ? value.call : value
     end
 
-    def association_primary_key = @options.fetch(:association_primary_key, 'id')
+    def association_primary_key(_target_model = nil) = @options.fetch(:association_primary_key, 'id')
 
     def foreign_type = @options.fetch(:foreign_type, "#{name}_type")
 

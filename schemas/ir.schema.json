@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "domain_id", "entities", "relationships", "diagnostic_ids", "digest_sha256"],
   "properties": {
-    "schema_version": { "const": 3 },
+    "schema_version": { "const": 4 },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "entities": {
       "type": "array",
@@ -50,6 +50,7 @@
         "table_name": { "type": "string", "minLength": 1 },
         "attributes": {
           "type": "array",
+          "uniqueItems": true,
           "items": { "$ref": "#/$defs/attribute" }
         },
         "metadata": { "$ref": "#/$defs/sti_base_metadata" }
@@ -66,6 +67,7 @@
         "attributes": {
           "type": "array",
           "maxItems": 0,
+          "uniqueItems": true,
           "items": { "$ref": "#/$defs/attribute" }
         },
         "metadata": { "$ref": "#/$defs/sti_subtype_metadata" }
@@ -78,7 +80,7 @@
       "properties": {
         "attribute_id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
-        "role": { "enum": ["primary_key", "foreign_key"] },
+        "role": { "enum": ["primary_key", "foreign_key", "primary_foreign_key"] },
         "type": { "type": "string", "minLength": 1 }
       }
     },

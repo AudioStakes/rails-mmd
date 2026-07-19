@@ -34,7 +34,7 @@ claimed complete.
 | `RAILS_EAGER_LOAD_FAILED` | Rails boot | eager loading raises after Rails boot | 2 | diagnostics JSON or stderr before output | blocks selected artifacts |
 | `MULTI_DB_UNSUPPORTED` | schema probe | selected models require multiple connection contexts | 2 | diagnostics JSON | blocks selected artifacts |
 | `MODEL_TABLE_MISSING` | schema probe | selected model table is missing or inaccessible | 2 | diagnostics JSON | blocks selected artifacts |
-| `MODEL_PRIMARY_KEY_UNSUPPORTED` | schema probe | primary key is missing, composite, or unsupported | 2 | diagnostics JSON | blocks selected artifacts |
+| `MODEL_PRIMARY_KEY_UNSUPPORTED` | schema probe | primary key metadata is missing, empty, nested, has duplicate members, or is otherwise invalid | 2 | diagnostics JSON | blocks selected artifacts |
 | `SAFE_TOKEN_COLLISION` | tokenization | suffix exhaustion leaves an unresolved safe-token collision | 0 or 3 | diagnostics JSON | warning when suffix resolves; fatal when suffix exhaustion remains |
 | `MERMAID_SERIALIZATION_FAILED` | serialization | render plan cannot be serialized to valid Mermaid text | 3 | diagnostics JSON | no `.mmd` or render plan published |
 | `OUTPUT_WRITE_FAILED` | publish | atomic write, rename, cleanup, or rollback fails | 4 | diagnostics JSON or stderr | publish failed |

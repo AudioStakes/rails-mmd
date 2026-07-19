@@ -84,7 +84,7 @@ module RailsMmd
                          'render relationship_id')
       inheritances = inheritances_payload(entities, artifact_kind, token_sets)
       payload = {
-        'schema_version' => 3,
+        'schema_version' => 4,
         'artifact_kind' => artifact_kind,
         'domain_id' => ir.fetch('domain_id'),
         'direction' => direction,
@@ -157,7 +157,9 @@ module RailsMmd
           'type' => AttributeTypes.normalize(attribute['type']),
           'key_marker' => key_marker(attribute.fetch('role'))
         }
-      end.sort_by { |attribute| [attribute.fetch('key_marker') == 'PK' ? 0 : 1, attribute.fetch('attribute_id')] }
+      end.sort_by do |attribute|
+        [attribute.fetch('key_marker').start_with?('PK') ? 0 : 1, attribute.fetch('attribute_id')]
+      end
     end
 
     def relationships_payload(ir, token_sets)
@@ -300,7 +302,11 @@ module RailsMmd
     end
 
     def key_marker(role)
-      { 'primary_key' => 'PK', 'foreign_key' => 'FK' }.fetch(role)
+      {
+        'primary_key' => 'PK',
+        'foreign_key' => 'FK',
+        'primary_foreign_key' => 'PK, FK'
+      }.fetch(role)
     end
 
     def safe_token_for_entity(token_sets, entity_id)

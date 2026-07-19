@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "domain_id": "core",
   "generated_at": "2026-07-05T00:00:00Z",
   "absolute_path": "/tmp/project/app/models/user.rb",

@@ -16,7 +16,7 @@
     "digest_sha256"
   ],
   "properties": {
-    "schema_version": { "const": 3 },
+    "schema_version": { "const": 4 },
     "artifact_kind": { "enum": ["er", "class"] },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "direction": { "enum": ["TB", "BT", "LR", "RL"] },
@@ -80,6 +80,7 @@
         "label": { "$ref": "#/$defs/sanitized_comment" },
         "attributes": {
           "type": "array",
+          "uniqueItems": true,
           "items": { "$ref": "#/$defs/attribute" }
         }
       },
@@ -123,7 +124,7 @@
         "key_marker": {
           "anyOf": [
             { "type": "null" },
-            { "enum": ["PK", "FK"] }
+            { "enum": ["PK", "FK", "PK, FK"] }
           ]
         }
       }

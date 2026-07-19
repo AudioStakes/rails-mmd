@@ -316,7 +316,9 @@ Only selected domain entities are probed for:
 Domain-outside model schema is never read.
 
 Table or inaccessible metadata failure is `MODEL_TABLE_MISSING`.
-Missing or non-scalar primary key is `MODEL_PRIMARY_KEY_UNSUPPORTED`.
+Missing, empty, nested, duplicate-member, or otherwise invalid primary-key
+metadata is `MODEL_PRIMARY_KEY_UNSUPPORTED`. Scalar and ordered composite
+primary-key tuples are supported.
 
 Selected renderable entities must use exactly one connection context. Two or
 more selected connection contexts produce `MULTI_DB_UNSUPPORTED`.
@@ -336,29 +338,37 @@ strings never participate in emitted IDs.
 A relationship is eligible only when all conditions hold:
 
 - Owner entity is selected.
-- Reflection is scalar `belongs_to`.
+- Reflection is a direct `belongs_to`.
 - Reflection is non-polymorphic.
 - Reflection is unscoped.
 - Target constant resolves.
 - Target is renderable.
 - Target is in the same domain.
-- Owner foreign key has exactly one column.
-- Owner foreign-key column exists.
-- Target primary key has exactly one column.
-- Association primary key equals target primary key.
-- Target primary-key column exists.
+- The reflected owner foreign key is a non-empty ordered scalar/composite tuple.
+- Every owner foreign-key member column exists.
+- `association_primary_key(concrete_target)` is a non-empty ordered tuple of
+  equal length. Model-level `query_constraints` may make it wider than the raw
+  target primary key.
+- Every referenced member column exists.
 
 P1-03 extends Rails 7.2/8.1 eligibility to direct, unscoped,
-non-polymorphic-owner `has_many` and `has_one`. Their scalar target FK must exist,
-their `active_record_primary_key` must equal the declaring owner's actual
-primary key, and both entities must be selected in the same domain. `as:`
-variants remain omitted. Same-physical-tuple declarations are grouped by
-the P1-04 rule below without an additional warning.
+non-polymorphic-owner `has_many` and `has_one`. P2-04 extends their target FK and
+`active_record_primary_key` from one column to equal-length ordered tuples and
+requires every physical member column to exist. Model-level
+`query_constraints` may widen the reflected tuple beyond the declaring owner's
+raw primary key. Preserve the existing scalar `primary_key:` case only when its
+one reflected member equals the owner's one actual primary-key member; every
+other explicit specialization remains on the P2-05 boundary. Both entities
+must be selected in the same domain. `as:` variants are handled only by the
+polymorphic path. Same-physical-tuple declarations are grouped by the P1-04 rule
+below without an additional warning.
 
 P1-04 canonicalizes every supported direct physical tuple regardless of
 explicit, automatic, absent, or disabled inverse metadata. Canonical orientation
 is FK holder to referenced entity. The public ID is
-`relationships/<holder_table>/<fk_column>/<referenced_table>/<primary_key>`;
+`relationships/<holder_table>/<fk-segment>/<referenced_table>/<key-segment>`.
+A scalar segment is the unchanged column name; a composite segment is the
+canonical `tuple/<base64url-json>` production for its ordered member names.
 label priority is `belongs_to`, `has_one`, `has_many`, then lexical declaration
 ID. Thus inverse declarations and enumeration order do not change the edge.
 
@@ -374,20 +384,27 @@ cardinality is `0..many`; target cardinality is `0..many` for `has_many` and
 polymorphic hops remain omitted for later priorities.
 
 P1-06 supports direct, unscoped polymorphic `belongs_to` roots when both scalar
-id/type holder columns exist. Selected same-domain direct `has_many` / `has_one
-..., as:` reflections are candidates only when their interface, child model,
-id/type columns, and owner primary key match the root. The root's `klass` is
-never resolved. One edge is emitted per unique concrete target with ID
+id/type holder columns exist. P2-04 extends the identifier to an ordered tuple
+while the type discriminator remains scalar. Selected same-domain direct
+`has_many` / `has_one ..., as:` reflections are candidates only when their
+interface, child model, identifier/type columns, and concrete target key tuple
+match the root. The root's `klass` and unresolved
+`association_primary_key` are never read; target keys are resolved only with a
+concrete target class. One edge is emitted per unique concrete target. Scalar
+IDs retain
 `relationships/<holder_table>/polymorphic/<interface>/<id_column>/<type_column>/<target_table>`;
-the label is the root association name. Both holder columns are rendered as FK
-attributes. Target cardinality is always `0..1`; holder cardinality is `0..1`
-for a canonical `has_one` inverse or an exact total plain unique index on the
-id/type pair, otherwise `0..many`. Candidate aliases are canonicalized by
-`has_one`, `has_many`, then lexical association name. No matching target emits
+composite identifier tuples replace `<id_column>` with the canonical
+`tuple/<base64url-json>` production. The label is the root association name.
+Identifier and type columns are rendered as FK attributes. Target cardinality
+is always `0..1`; holder cardinality is `0..1` only for an exact total plain
+unique index over the full identifier tuple plus type column, otherwise
+`0..many`. A `has_one` inverse remains label-canonicalization evidence but not
+database uniqueness evidence. Candidate aliases are canonicalized by `has_one`,
+`has_many`, then lexical association name. No matching target emits
 `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED`; conflicting/deferred inverse
 declarations retain `ASSOCIATION_POLYMORPHIC_OMITTED` without suppressing valid
-candidates. STI expansion, scopes, through polymorphism, `source_type:`, and
-custom/composite keys remain deferred.
+candidates. STI expansion, scopes, through polymorphism, and `source_type:`
+remain deferred.
 
 P1-07 supports unscoped `has_and_belongs_to_many` declarations whose resolved
 target is renderable and selected in the same domain. The resolved scalar join
@@ -703,11 +720,12 @@ Render-plan JSON top-level shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "artifact_kind": "er|class",
   "domain_id": "core",
   "direction": "LR",
   "entities": [],
+  "inheritances": [],
   "relationships": [],
   "comments": [],
   "diagnostic_ids": [],

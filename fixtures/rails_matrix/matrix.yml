@@ -8,3 +8,4 @@ pairs:
 fixture_families:
   - default
   - delegated_type
+  - composite_keys
