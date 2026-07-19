@@ -5,11 +5,9 @@ require 'rails_mmd/diagnostics'
 module RailsMmd
   # Resolves configured domains exactly against schema-free inventory records.
   class DomainResolver
-    DomainResult = Struct.new(:domain_id, :records, :diagnostics, keyword_init: true)
-    Result = Struct.new(:domains, :diagnostics, :exit_code, keyword_init: true) do
-      def success?
-        diagnostics.empty?
-      end
+    DomainResult = Struct.new(:domain_id, :records, :diagnostics, :excluded_ruby_constants, keyword_init: true)
+    Result = Struct.new(:domains, :diagnostics, :exit_code, :owned_domain_ids_by_constant, keyword_init: true) do
+      def success? = diagnostics.empty?
     end
 
     EXIT_CONTRACT_ERROR = 2
@@ -24,9 +22,10 @@ module RailsMmd
         resolve_domain(config.domains.fetch(domain_id), records_by_constant)
       end
       all_diagnostics = domain_results.flat_map(&:diagnostics)
-
+      owned_domain_ids_by_constant = build_owned_domain_ids_by_constant(config)
       Result.new(domains: domain_results, diagnostics: all_diagnostics,
-                 exit_code: all_diagnostics.empty? ? 0 : EXIT_CONTRACT_ERROR)
+                 exit_code: all_diagnostics.empty? ? 0 : EXIT_CONTRACT_ERROR,
+                 owned_domain_ids_by_constant: owned_domain_ids_by_constant)
     end
 
     private
@@ -42,8 +41,31 @@ module RailsMmd
       DomainResult.new(
         domain_id: domain.id,
         records: selected_records,
-        diagnostics: include_diagnostics + exclude_diagnostics + empty_diagnostic
+        diagnostics: include_diagnostics + exclude_diagnostics + empty_diagnostic,
+        excluded_ruby_constants: domain.exclude_models.uniq.sort
       )
+    end
+
+    def build_owned_domain_ids_by_constant(config)
+      ownership = ownership_groups(config)
+      ownership.sort.to_h { |ruby_constant, domain_ids| [ruby_constant, domain_ids.uniq.sort] }
+    end
+
+    def included_constants(domain)
+      excluded = domain.exclude_models.to_set
+      domain.include_models.each_with_object([]) do |ruby_constant, included|
+        included << ruby_constant unless excluded.include?(ruby_constant)
+      end.uniq
+    end
+
+    def ownership_groups(config)
+      config.domains.keys.sort.each_with_object(Hash.new { |hash, key| hash[key] = [] }) do |domain_id, output|
+        append_owned_domain_ids(output, domain_id, config.domains.fetch(domain_id))
+      end
+    end
+
+    def append_owned_domain_ids(output, domain_id, domain)
+      included_constants(domain).each { |ruby_constant| output[ruby_constant] << domain_id }
     end
 
     def selected_records(include_records, exclude_records)

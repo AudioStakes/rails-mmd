@@ -35,6 +35,10 @@ module RailsMatrix
       end
     end
 
+    def fixture_families
+      data.fetch('fixture_families', ['default'])
+    end
+
     private
 
     attr_reader :data
@@ -105,7 +109,7 @@ module RailsMatrix
       @mermaid_serializer = mermaid_serializer
     end
 
-    def validate(app_root, pair)
+    def validate(app_root, pair, fixture_family: 'default')
       output = app_root.join('tmp/rails_mmd')
       plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
       validate_expected_mermaid(app_root, output.join('core.er.mmd'), 'ER', 'rails_mmd_expected_core_er.mmd', pair)
@@ -125,11 +129,18 @@ module RailsMatrix
       validate_expected_sti_entities(app_root, plans.fetch('class'), pair)
       validate_expected_inheritances(app_root, plans.fetch('class').fetch('inheritances'), pair)
       validate_expected_sti_runtime(app_root, output.join('sti_runtime.json'), pair)
+      validate_fixture_runtime(app_root, output, pair, fixture_family)
     end
 
     private
 
     attr_reader :mermaid_serializer, :schema_validator
+
+    def validate_fixture_runtime(app_root, output, pair, fixture_family)
+      return unless fixture_family == 'delegated_type'
+
+      validate_expected_delegated_type_runtime(app_root, output.join('delegated_type_runtime.json'), pair)
+    end
 
     def validate_artifact(output, kind, pair)
       plan_path = output.join("core.#{kind}.render_plan.json")
@@ -245,6 +256,18 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} published invalid #{actual_path.basename}: #{e.message}"
     end
 
+    def validate_expected_delegated_type_runtime(app_root, actual_path, pair)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_delegated_type_runtime.json', pair)
+      actual = JSON.parse(actual_path.read)
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} delegated type runtime did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    rescue Errno::ENOENT, JSON::ParserError => e
+      raise VerificationError, "#{pair.name} published invalid #{actual_path.basename}: #{e.message}"
+    end
+
     def projection(payload, keys)
       keys.to_h { |key| [key, payload.fetch(key)] }
     end
@@ -258,7 +281,7 @@ module RailsMatrix
   # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength
 
   # Orchestrates the repository-only Rails compatibility verification command.
-  # rubocop:disable Metrics/MethodLength
+  # rubocop:disable Metrics/ClassLength
   class Runner
     def initialize(root: Pathname(__dir__).join('..').expand_path)
       @root = root
@@ -269,13 +292,33 @@ module RailsMatrix
     def run
       pairs = selected_pairs
       verify_prerequisites(pairs)
-      pairs.each { |pair| verify_pair(pair) }
+      pairs.product(selected_fixture_families).each { |pair, family| verify_pair(pair, family) }
       puts "PASS #{pairs.length}/#{pairs.length} Rails matrix pairs"
     end
 
     private
 
     attr_reader :artifact_validator, :manifest, :root
+
+    def selected_fixture_families
+      selected = ENV.fetch('RAILS_MMD_MATRIX_FIXTURE_FAMILY', nil)
+      return [selected] if selected
+
+      manifest.fixture_families
+    end
+
+    def template_root
+      root.join('fixtures/rails_matrix/template')
+    end
+
+    def template_family_path(family)
+      return template_root if family == 'default'
+
+      path = template_root.join('families', family)
+      return path if path.directory?
+
+      raise PrerequisiteError, "Unknown rails matrix fixture family: #{family}"
+    end
 
     def verify_prerequisites(pairs)
       pairs.map(&:ruby_version).uniq.each do |version|
@@ -319,22 +362,38 @@ module RailsMatrix
       end
     end
 
-    def verify_pair(pair)
+    def verify_pair(pair, family)
       apps_root = root.join('.bundle/rails-matrix/apps').tap(&:mkpath)
       Dir.mktmpdir("#{pair.name}-", apps_root.to_s) do |directory|
-        app_root = Pathname(directory)
-        prepare_app(app_root, pair)
-        install_bundle(app_root, pair)
-        run_bundle(app_root, pair, %w[exec ruby bin/rails db:schema:load])
-        run_bundle(app_root, pair, %w[exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb])
-        run_bundle(app_root, pair, %w[exec rails-mmd generate])
-        artifact_validator.validate(app_root, pair)
+        verify_app(Pathname(directory), pair, family)
       end
-      puts "PASS #{pair.name}"
+      puts "PASS #{pair.name} [#{family}]"
     end
 
-    def prepare_app(app_root, pair)
-      FileUtils.cp_r("#{root.join('fixtures/rails_matrix/template')}/.", app_root)
+    def verify_app(app_root, pair, family)
+      prepare_app(app_root, pair, family)
+      install_bundle(app_root, pair)
+      run_bundle(app_root, pair, %w[exec ruby bin/rails db:schema:load])
+      run_bundle(app_root, pair, %w[exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb])
+      run_family_runtime_oracle(app_root, pair, family)
+      run_bundle(app_root, pair, %w[exec rails-mmd generate])
+      artifact_validator.validate(app_root, pair, fixture_family: family)
+    end
+
+    def run_family_runtime_oracle(app_root, pair, family)
+      return unless family == 'delegated_type'
+
+      run_bundle(
+        app_root,
+        pair,
+        %w[exec ruby bin/rails runner script/rails_mmd_delegated_type_runtime_oracle.rb]
+      )
+    end
+
+    def prepare_app(app_root, pair, family)
+      FileUtils.cp_r("#{template_root}/.", app_root)
+      family_path = template_family_path(family)
+      FileUtils.cp_r("#{family_path}/.", app_root) unless family_path == template_root
       bundle_root = root.join('fixtures/rails_matrix/bundles', pair.rails_series)
       %w[Gemfile Gemfile.lock].each do |name|
         FileUtils.cp(bundle_root.join(name), app_root.join(name))
@@ -366,7 +425,9 @@ module RailsMatrix
         'BUNDLE_GEMFILE' => app_root.join('Gemfile').to_s,
         'BUNDLE_PATH' => root.join('.bundle/rails-matrix/gems', pair.ruby_version).to_s,
         'PATH' => caller_path,
-        'RAILS_ENV' => 'development'
+        'RAILS_ENV' => 'development',
+        'RAILS_MMD_MATRIX_FIXTURE_FAMILY' => nil,
+        'RAILS_MMD_MATRIX_PAIR' => nil
       }
     end
 
@@ -378,5 +439,5 @@ module RailsMatrix
       raise VerificationError, "#{pair.name} failed (exit #{status.exitstatus}): #{operation}\n#{detail}"
     end
   end
-  # rubocop:enable Metrics/MethodLength
+  # rubocop:enable Metrics/ClassLength
 end

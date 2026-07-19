@@ -5,9 +5,18 @@ require 'rails_mmd/redactor'
 
 module RailsMmd
   # Reads selected-domain-only schema metadata for resolved renderable records.
-  # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
+  # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity
+  # rubocop:disable Metrics/MethodLength, Metrics/ParameterLists, Metrics/PerceivedComplexity
   class SchemaProbe
-    DomainResult = Struct.new(:domain_id, :entities, :sti_subtypes, :join_tables, :diagnostics, keyword_init: true)
+    DomainResult = Struct.new(
+      :domain_id,
+      :entities,
+      :sti_subtypes,
+      :join_tables,
+      :delegated_type_families,
+      :diagnostics,
+      keyword_init: true
+    )
     Entity = Struct.new(
       :ruby_constant,
       :table_name,
@@ -16,6 +25,7 @@ module RailsMmd
       :primary_key,
       :foreign_keys,
       :indexes,
+      :selection_origin,
       keyword_init: true
     )
     StiSubtype = Struct.new(
@@ -27,6 +37,24 @@ module RailsMmd
       :inheritance_column,
       :sti_name,
       :depth,
+      keyword_init: true
+    )
+    DelegatedTypeFamily = Struct.new(
+      :owner_entity_id,
+      :owner_ruby_constant,
+      :association_name,
+      :foreign_key,
+      :foreign_type,
+      :scoped,
+      :root_diagnostic_code,
+      :targets,
+      keyword_init: true
+    )
+    DelegatedTypeTarget = Struct.new(
+      :ruby_constant,
+      :entity_id,
+      :status,
+      :diagnostic_code,
       keyword_init: true
     )
     Column = Struct.new(:name, :type, :nullable, keyword_init: true)
@@ -49,6 +77,7 @@ module RailsMmd
     end
 
     EXIT_CONTRACT_ERROR = 2
+    ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
 
     def initialize(model_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
       @model_resolver = model_resolver
@@ -56,8 +85,11 @@ module RailsMmd
       @redactor = redactor
     end
 
-    def probe(domains:, inventory_records: [])
-      domain_results = domains.map { |domain| probe_domain(domain, inventory_records) }
+    def probe(domains:, inventory_records: [], owned_domain_ids_by_constant: {})
+      records_by_constant = inventory_records.to_h { |record| [record.ruby_constant, record] }
+      domain_results = domains.map do |domain|
+        probe_domain(domain, inventory_records, records_by_constant, owned_domain_ids_by_constant)
+      end
       all_diagnostics = domain_results.flat_map(&:diagnostics)
 
       Result.new(domains: domain_results, diagnostics: all_diagnostics, exit_code: exit_code(all_diagnostics))
@@ -67,13 +99,14 @@ module RailsMmd
 
     attr_reader :diagnostics, :model_resolver, :redactor
 
-    def probe_domain(domain, inventory_records)
+    def probe_domain(domain, inventory_records, records_by_constant, owned_domain_ids_by_constant)
       connection_diagnostic = multi_db_diagnostic(domain)
       return domain_result(domain, [], [connection_diagnostic]) if connection_diagnostic
 
       entities = []
       entity_models = []
       selected_entities = []
+      explicit_entity_by_constant = {}
       output_diagnostics = []
       domain.records.each do |record|
         model = model_for(record)
@@ -82,24 +115,333 @@ module RailsMmd
           entities << entity
           entity_models << model
           selected_entities << { entity: entity, model: model, record: record }
+          explicit_entity_by_constant[record.ruby_constant] = entity
         end
         output_diagnostics.concat(record_diagnostics)
       end
+      delegated_type_families, expanded_entities, delegated_diagnostics = probe_delegated_type_families(
+        domain: domain,
+        explicit_selected_entities: selected_entities,
+        explicit_entity_by_constant: explicit_entity_by_constant,
+        explicit_selected_constants: domain.records.map(&:ruby_constant),
+        records_by_constant: records_by_constant,
+        owned_domain_ids_by_constant: owned_domain_ids_by_constant
+      )
+      output_diagnostics.concat(delegated_diagnostics)
 
       domain_result(
         domain,
-        entities,
+        entities + expanded_entities,
         output_diagnostics,
         probe_join_tables(entity_models),
-        probe_sti_subtypes(selected_entities, inventory_records)
+        probe_sti_subtypes(selected_entities, inventory_records),
+        delegated_type_families
       )
     end
 
-    def domain_result(domain, entities, output_diagnostics, join_tables = [], sti_subtypes = [])
+    def domain_result(
+      domain,
+      entities,
+      output_diagnostics,
+      join_tables = [],
+      sti_subtypes = [],
+      delegated_type_families = []
+    )
       DomainResult.new(
         domain_id: domain.domain_id, entities: entities,
-        sti_subtypes: sti_subtypes, join_tables: join_tables, diagnostics: output_diagnostics
+        sti_subtypes: sti_subtypes,
+        join_tables: join_tables,
+        delegated_type_families: delegated_type_families,
+        diagnostics: output_diagnostics
       )
+    end
+
+    def probe_delegated_type_families(
+      domain:,
+      explicit_selected_entities:,
+      explicit_entity_by_constant:,
+      explicit_selected_constants:,
+      records_by_constant:,
+      owned_domain_ids_by_constant:
+    )
+      expanded_cache = {}
+      expanded_entities = []
+      output_diagnostics = []
+
+      families = explicit_selected_entities.flat_map do |selected|
+        delegated_root_reflections(selected.fetch(:model)).filter_map do |reflection|
+          build_delegated_type_family(
+            domain: domain,
+            selected: selected,
+            reflection: reflection,
+            explicit_entity_by_constant: explicit_entity_by_constant,
+            explicit_selected_constants: explicit_selected_constants,
+            expanded_cache: expanded_cache,
+            expanded_entities: expanded_entities,
+            output_diagnostics: output_diagnostics,
+            records_by_constant: records_by_constant,
+            owned_domain_ids_by_constant: owned_domain_ids_by_constant
+          )
+        end
+      end
+      families.sort_by! { |family| [family.owner_entity_id, family.association_name] }
+      output_diagnostics.sort_by! do |diagnostic|
+        [
+          diagnostic.dig('metadata', 'ruby_constant').to_s,
+          diagnostic.fetch('code').to_s,
+          diagnostic.fetch('subject_id').to_s
+        ]
+      end
+
+      [families, expanded_entities, output_diagnostics]
+    end
+
+    def build_delegated_type_family(
+      domain:,
+      selected:,
+      reflection:,
+      explicit_entity_by_constant:,
+      explicit_selected_constants:,
+      expanded_cache:,
+      expanded_entities:,
+      output_diagnostics:,
+      records_by_constant:,
+      owned_domain_ids_by_constant:
+    )
+      owner_entity = selected.fetch(:entity)
+      owner_model = selected.fetch(:model)
+      owner_record = selected.fetch(:record)
+      association_name = reflection_name(reflection)
+      delegated_types_method = delegated_types_method_for(owner_model, association_name)
+      return unless delegated_types_method
+
+      delegated_types = call_delegated_types_method(delegated_types_method)
+      return if delegated_types.nil?
+
+      foreign_key = scalar_key(safe_reflection_value(reflection, :foreign_key))
+      foreign_type = scalar_key(safe_reflection_value(reflection, :foreign_type))
+      family = DelegatedTypeFamily.new(
+        owner_entity_id: entity_id_for(owner_entity.table_name),
+        owner_ruby_constant: owner_entity.ruby_constant,
+        association_name: association_name,
+        foreign_key: foreign_key,
+        foreign_type: foreign_type,
+        scoped: scoped?(reflection),
+        root_diagnostic_code: delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key,
+                                                             foreign_type),
+        targets: []
+      )
+      return family if family.root_diagnostic_code
+
+      family.targets = normalized_delegated_types(delegated_types).map do |ruby_constant|
+        delegated_type_target(
+          domain: domain,
+          owner_record: owner_record,
+          ruby_constant: ruby_constant,
+          explicit_entity_by_constant: explicit_entity_by_constant,
+          explicit_selected_constants: explicit_selected_constants,
+          expanded_cache: expanded_cache,
+          expanded_entities: expanded_entities,
+          output_diagnostics: output_diagnostics,
+          records_by_constant: records_by_constant,
+          owned_domain_ids_by_constant: owned_domain_ids_by_constant
+        )
+      end
+      family
+    end
+
+    def delegated_type_target(
+      domain:,
+      owner_record:,
+      ruby_constant:,
+      explicit_entity_by_constant:,
+      explicit_selected_constants:,
+      expanded_cache:,
+      expanded_entities:,
+      output_diagnostics:,
+      records_by_constant:,
+      owned_domain_ids_by_constant:
+    )
+      if excluded_ruby_constants(domain).include?(ruby_constant)
+        return delegated_target(ruby_constant, nil, :excluded, 'DOMAIN_RELATIONSHIP_OMITTED')
+      end
+
+      record = records_by_constant[ruby_constant]
+      return delegated_target(ruby_constant, nil, :unresolved, 'ASSOCIATION_TARGET_UNRESOLVED') unless record
+      unless same_connection?(owner_record, record)
+        return delegated_target(ruby_constant, nil, :other_connection, 'DOMAIN_RELATIONSHIP_OMITTED')
+      end
+      if owned_by_other_domain?(owned_domain_ids_by_constant, domain.domain_id, ruby_constant)
+        return delegated_target(ruby_constant, nil, :other_domain, 'DOMAIN_RELATIONSHIP_OMITTED')
+      end
+      unless record.renderable
+        return delegated_target(ruby_constant, nil, :not_renderable, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
+      end
+
+      explicit_entity = explicit_entity_by_constant[ruby_constant]
+      if explicit_entity
+        return delegated_target(ruby_constant, entity_id_for(explicit_entity.table_name), :selected, nil)
+      end
+      if explicit_selected_constants.include?(ruby_constant)
+        return delegated_target(ruby_constant, nil, :not_renderable, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
+      end
+
+      expanded_probe = expanded_probe_result(
+        domain.domain_id,
+        record,
+        expanded_cache,
+        expanded_entities,
+        output_diagnostics
+      )
+      unless expanded_probe.fetch(:entity)
+        return delegated_target(ruby_constant, nil, :not_renderable, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED')
+      end
+
+      delegated_target(ruby_constant, entity_id_for(expanded_probe.fetch(:entity).table_name), :expanded, nil)
+    end
+
+    def delegated_target(ruby_constant, entity_id, status, diagnostic_code)
+      DelegatedTypeTarget.new(
+        ruby_constant: ruby_constant,
+        entity_id: entity_id,
+        status: status,
+        diagnostic_code: diagnostic_code
+      )
+    end
+
+    def expanded_probe_result(domain_id, record, expanded_cache, expanded_entities, output_diagnostics)
+      return expanded_cache[record.ruby_constant] if expanded_cache.key?(record.ruby_constant)
+
+      entity, diagnostics = probe_record(
+        domain_id,
+        record,
+        model_for(record),
+        selection_origin: :delegated_type_expanded
+      )
+      expanded_entities << entity if entity
+      output_diagnostics.concat(diagnostics)
+      expanded_cache[record.ruby_constant] = { entity: entity, diagnostics: diagnostics }
+    end
+
+    def delegated_root_reflections(model)
+      return [] unless model.respond_to?(:reflect_on_all_associations)
+
+      Array(model.reflect_on_all_associations).select do |reflection|
+        reflection_macro(reflection) == :belongs_to && polymorphic?(reflection)
+      end
+    rescue LoadError, SyntaxError, StandardError
+      []
+    end
+
+    def delegated_types_method_for(owner_model, association_name)
+      runtime_source = delegated_type_runtime_source
+      return unless runtime_source
+
+      types_method = owner_model.method("#{association_name}_types")
+      source_file = types_method.source_location&.first
+      return unless source_file && source_file == runtime_source
+
+      types_method
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def delegated_type_runtime_source
+      return @delegated_type_runtime_source if defined?(@delegated_type_runtime_source)
+
+      @delegated_type_runtime_source = ActiveRecord::DelegatedType
+                                       .instance_method(:delegated_type)
+                                       .source_location
+                                       &.first
+    rescue LoadError, SyntaxError, StandardError
+      @delegated_type_runtime_source = nil
+    end
+
+    def normalized_delegated_types(values)
+      Array(values).filter_map do |value|
+        next unless value.is_a?(String) || value.is_a?(Symbol)
+
+        normalized = value.to_s
+        normalized unless normalized.empty?
+      end.uniq.sort
+    end
+
+    def call_delegated_types_method(types_method)
+      types_method.call
+    rescue LoadError, SyntaxError, StandardError
+      nil
+    end
+
+    def delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key, foreign_type)
+      sanitized_name = sanitize_association_name(association_name)
+      return 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED' unless sanitized_name
+      return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless foreign_key && foreign_type
+      unless default_polymorphic_keys?(sanitized_name, foreign_key, foreign_type)
+        return 'ASSOCIATION_POLYMORPHIC_OMITTED'
+      end
+      return 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED' if primary_key_specialized?(reflection)
+      return 'ASSOCIATION_KEY_COLUMN_MISSING' unless owner_has_key_columns?(owner_entity, foreign_key, foreign_type)
+
+      nil
+    end
+
+    def excluded_ruby_constants(domain)
+      Array(safe_value_from(domain, :excluded_ruby_constants)).select { |value| present_string?(value) }.uniq
+    end
+
+    def same_connection?(owner_record, candidate_record)
+      owner_record.connection_context_id == candidate_record.connection_context_id
+    end
+
+    def owned_by_other_domain?(owned_domain_ids_by_constant, domain_id, ruby_constant)
+      owned_domain_ids = Array(owned_domain_ids_by_constant[ruby_constant])
+                         .select { |value| present_string?(value) }
+                         .uniq
+      !owned_domain_ids.empty? && !owned_domain_ids.include?(domain_id)
+    end
+
+    def reflection_macro(reflection)
+      safe_value_from(reflection, :macro)
+    end
+
+    def reflection_name(reflection)
+      safe_value_from(reflection, :name).to_s
+    end
+
+    def safe_reflection_value(reflection, method_name)
+      safe_value_from(reflection, method_name)
+    end
+
+    def polymorphic?(reflection)
+      safe_value_from(reflection, :polymorphic?) == true
+    end
+
+    def scoped?(reflection)
+      !!safe_value_from(reflection, :scope)
+    end
+
+    def scalar_key(value)
+      value if present_string?(value)
+    end
+
+    def sanitize_association_name(name)
+      return unless name.match?(ASSOCIATION_NAME_PATTERN)
+
+      name.delete_suffix('?').delete_suffix('!').delete_suffix('=')
+    end
+
+    def default_polymorphic_keys?(association_name, foreign_key, foreign_type)
+      foreign_key == "#{association_name}_id" && foreign_type == "#{association_name}_type"
+    end
+
+    def primary_key_specialized?(reflection)
+      reflection_options = safe_value_from(reflection, :options)
+      reflection_options.is_a?(Hash) && reflection_options.key?(:primary_key)
+    end
+
+    def owner_has_key_columns?(owner_entity, foreign_key, foreign_type)
+      column_names = owner_entity.columns.map(&:name)
+      column_names.include?(foreign_key) && column_names.include?(foreign_type)
     end
 
     def probe_sti_subtypes(selected_entities, inventory_records)
@@ -279,7 +621,7 @@ module RailsMmd
       )
     end
 
-    def probe_record(domain_id, record, model)
+    def probe_record(domain_id, record, model, selection_origin: nil)
       return invalid_record(domain_id, record, :table) if model.nil?
 
       return invalid_record(domain_id, record, :table) unless table_exists?(model)
@@ -289,7 +631,7 @@ module RailsMmd
       return invalid_record(domain_id, record, :table) if columns.nil?
       return invalid_record(domain_id, record, :primary_key) unless scalar_primary_key?(primary_key)
 
-      build_entity(domain_id, record, model, columns, primary_key)
+      build_entity(domain_id, record, model, columns, primary_key, selection_origin)
     end
 
     def exit_code(all_diagnostics)
@@ -311,7 +653,7 @@ module RailsMmd
       [nil, [diagnostic]]
     end
 
-    def build_entity(domain_id, record, model, columns, primary_key)
+    def build_entity(domain_id, record, model, columns, primary_key, selection_origin)
       foreign_keys, foreign_key_diagnostic = degradable_metadata(domain_id, record, 'foreign_key') do
         read_foreign_keys(model, record.table_name)
       end
@@ -327,7 +669,8 @@ module RailsMmd
           columns: columns,
           primary_key: primary_key,
           foreign_keys: foreign_keys,
-          indexes: indexes
+          indexes: indexes,
+          selection_origin: selection_origin
         ),
         [foreign_key_diagnostic, index_diagnostic].compact
       ]
@@ -566,5 +909,6 @@ module RailsMmd
       )
     end
   end
-  # rubocop:enable Metrics/ClassLength, Metrics/MethodLength
+  # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity
+  # rubocop:enable Metrics/MethodLength, Metrics/ParameterLists, Metrics/PerceivedComplexity
 end

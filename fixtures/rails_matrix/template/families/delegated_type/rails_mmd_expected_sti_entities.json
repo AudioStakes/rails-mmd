@@ -1,0 +1,8 @@
+[
+  {
+    "entity_id": "entities/delegated_type_sti_records/sti/DelegatedTypeStiLeaf",
+    "entity_kind": "sti_subtype",
+    "label": "DelegatedTypeStiLeaf",
+    "safe_token": "DELEGATED_TYPE_STI_LEAF"
+  }
+]

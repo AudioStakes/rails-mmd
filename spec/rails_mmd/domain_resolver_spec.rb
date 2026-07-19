@@ -23,6 +23,11 @@ RSpec.describe RailsMmd::DomainResolver do
     expect(result.exit_code).to eq(0)
     expect(result.domains.map(&:domain_id)).to eq(%w[core billing])
     expect(result.domains.map { |domain| domain.records.map(&:ruby_constant) }).to eq([['User'], ['Billing::Invoice']])
+    expect(result.domains.map(&:excluded_ruby_constants)).to eq([['Account'], []])
+    expect(result.owned_domain_ids_by_constant).to eq(
+      'Billing::Invoice' => ['billing'],
+      'User' => ['core']
+    )
   end
 
   it 'respects a future selected domain from config loading' do
@@ -39,6 +44,10 @@ RSpec.describe RailsMmd::DomainResolver do
     expect(result).to be_success
     expect(result.domains.map(&:domain_id)).to eq(['admin'])
     expect(result.domains.first.records.map(&:ruby_constant)).to eq(['Admin::User'])
+    expect(result.owned_domain_ids_by_constant).to eq(
+      'Admin::User' => ['admin'],
+      'User' => ['core']
+    )
   end
 
   it 'preserves first include order while applying set semantics for duplicates and excludes' do
@@ -56,6 +65,8 @@ RSpec.describe RailsMmd::DomainResolver do
 
     expect(result).to be_success
     expect(result.domains.first.records.map(&:ruby_constant)).to eq(%w[Invoice User])
+    expect(result.domains.first.excluded_ruby_constants).to eq(['Account'])
+    expect(result.owned_domain_ids_by_constant).to eq('Invoice' => ['core'], 'User' => ['core'])
   end
 
   it 'emits schema-valid diagnostics for missing, non-renderable, and empty domains' do
@@ -83,6 +94,37 @@ RSpec.describe RailsMmd::DomainResolver do
     expect(result.domains.map { |domain| [domain.domain_id, domain.records] }).to eq(
       [['core', []], ['empty_domain', []]]
     )
+    expect(result.domains.map(&:excluded_ruby_constants)).to eq([['Dog'], ['User']])
+    expect(result.owned_domain_ids_by_constant).to eq(
+      'ApplicationRecord' => ['core'],
+      'MissingModel' => ['core']
+    )
+  end
+
+  it 'carries exact configured exclude intent even for missing and non-renderable constants' do
+    config = config_for(
+      {
+        'core' => {
+          include: ['User'],
+          exclude: %w[MissingModel Billing::Invoice Billing::Invoice ApplicationRecord]
+        }
+      }
+    )
+
+    result = described_class.new.resolve(
+      config: config,
+      inventory_records: [
+        record('User'),
+        record('Billing::Invoice'),
+        record('ApplicationRecord', renderable: false, reason: 'abstract_class')
+      ]
+    )
+
+    expect(result.exit_code).to eq(2)
+    expect(result.domains.first.excluded_ruby_constants).to eq(
+      %w[ApplicationRecord Billing::Invoice MissingModel]
+    )
+    expect(result.owned_domain_ids_by_constant).to eq('User' => ['core'])
   end
 
   def config_for(domain_data, selected_domain_ids: nil)

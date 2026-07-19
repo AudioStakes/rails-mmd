@@ -293,6 +293,16 @@ Resolution order is exact:
 
 P0 has no depth expansion and no virtual auto-include.
 
+P2-03 adds one closed exception: an explicitly selected physical delegator with
+a provenance-verified Rails `delegated_type` root may auto-include only its
+declared, renderable, same-connection concrete delegate records in that domain.
+Exact exclusions and ownership by another configured domain take precedence.
+Auto-included delegates are relationship targets only: their ordinary
+associations, nested delegated families, join tables, and STI descendants are
+not traversed unless the delegate was explicitly selected. The normalized
+family whitelist and selection origin are carried through the schema-probe
+handoff; `RelationshipBuilder` never receives a raw database connection.
+
 ## Selected Schema Probe
 
 Only selected domain entities are probed for:

@@ -1,0 +1,17 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - DelegatedTypeSameLeafNamespaceHolder
+      - DelegatedTypeStiBase
+      - DelegatedTypeUndeclaredInverseTarget
+    exclude_models:
+      - DelegatedTypeExcludedTarget
+  secondary:
+    include_models:
+      - DelegatedTypeSecondDomainTarget
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

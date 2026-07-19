@@ -1,0 +1,9 @@
+[
+  {
+    "inheritance_id": "inheritances/entities/delegated_type_sti_records/sti/DelegatedTypeStiLeaf",
+    "parent_entity_id": "entities/delegated_type_sti_records",
+    "child_entity_id": "entities/delegated_type_sti_records/sti/DelegatedTypeStiLeaf",
+    "parent_safe_token": "DELEGATED_TYPE_STI_BASE",
+    "child_safe_token": "DELEGATED_TYPE_STI_LEAF"
+  }
+]

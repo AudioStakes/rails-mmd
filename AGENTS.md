@@ -82,3 +82,12 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Probe hidden association tables through `SchemaProbe` and pass only normalized
   metadata to `RelationshipBuilder`; never add raw database connection access
   to relationship construction.
+- Rails does not store a `delegated_type` type list in reflection options.
+  Discover `<role>_types` only when its generated method source file exactly
+  matches the active runtime's `ActiveRecord::DelegatedType` source file, then
+  pass a normalized family whitelist and entity selection origin downstream.
+  Auto-expanded delegates are target-only; do not traverse their unrelated
+  associations, nested delegated families, join tables, or STI descendants.
+- Matrix fixture-family selectors are harness-only environment. Remove
+  `RAILS_MMD_MATRIX_FIXTURE_FAMILY` and `RAILS_MMD_MATRIX_PAIR` from child Rails
+  processes so runtime behavior and redaction cannot depend on test selectors.

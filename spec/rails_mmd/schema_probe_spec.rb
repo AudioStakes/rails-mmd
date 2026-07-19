@@ -192,6 +192,450 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(result.domains.first.sti_subtypes).to eq([])
   end
 
+  it 'expands delegated-type families from explicit owners, caches expanded targets, and fences expanded owners' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+
+    entry = delegated_owner_model(
+      delegated_runtime_file,
+      'entryable',
+      %w[Comment Blog::Post],
+      columns: [
+        column('id', :integer, false),
+        column('entryable_id', :integer, true),
+        column('entryable_type', :string, true)
+      ]
+    )
+    message = delegated_owner_model(
+      delegated_runtime_file,
+      'subjectable',
+      ['Comment'],
+      columns: [
+        column('id', :integer, false),
+        column('subjectable_id', :integer, true),
+        column('subjectable_type', :string, true)
+      ]
+    )
+
+    comment_columns_reads = 0
+    comment = model(
+      table_exists: true,
+      columns: lambda {
+        comment_columns_reads += 1
+        [column('id', :integer, false)]
+      }
+    )
+    commentable_reflection = polymorphic_reflection(:commentable)
+    comment_labels_reflection = habtm_reflection('comment_labels')
+    comment.define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+      reflections = [commentable_reflection, comment_labels_reflection]
+      macro ? reflections.select { |reflection| reflection.macro == macro } : reflections
+    end
+    define_generated_types_method(comment, :commentable_types, delegated_runtime_file, ['NestedComment'])
+
+    blog_post = model(table_exists: true, columns: [column('id', :integer, false)])
+    models = {
+      'Entry' => entry,
+      'Message' => message,
+      'Comment' => comment,
+      'Blog::Post' => blog_post
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [
+        domain_result(
+          'core',
+          [
+            inventory_record('Entry', table_name: 'entries'),
+            inventory_record('Message', table_name: 'messages')
+          ]
+        )
+      ],
+      inventory_records: [
+        inventory_record('Entry', table_name: 'entries'),
+        inventory_record('Message', table_name: 'messages'),
+        inventory_record('Comment', table_name: 'comments'),
+        inventory_record('Blog::Post', table_name: 'blog_posts'),
+        inventory_record('NestedComment', base_class: 'Comment', table_name: 'comments', renderable: false,
+                                          reason: 'sti_subclass')
+      ]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(%w[Entry Message Blog::Post Comment])
+    expect(result.domains.first.entities.select do |entity|
+      entity.selection_origin == :delegated_type_expanded
+    end.map(&:ruby_constant)).to eq(%w[Blog::Post Comment])
+    expect(result.domains.first.delegated_type_families.map do |family|
+      [
+        family.owner_entity_id,
+        family.owner_ruby_constant,
+        family.association_name,
+        family.foreign_key,
+        family.foreign_type,
+        family.scoped,
+        family.root_diagnostic_code,
+        family.targets.map do |target|
+          [target.ruby_constant, target.entity_id, target.status, target.diagnostic_code]
+        end
+      ]
+    end).to eq([
+                 [
+                   'entities/entries',
+                   'Entry',
+                   'entryable',
+                   'entryable_id',
+                   'entryable_type',
+                   false,
+                   nil,
+                   [
+                     ['Blog::Post', 'entities/blog_posts', :expanded, nil],
+                     ['Comment', 'entities/comments', :expanded, nil]
+                   ]
+                 ],
+                 [
+                   'entities/messages',
+                   'Message',
+                   'subjectable',
+                   'subjectable_id',
+                   'subjectable_type',
+                   false,
+                   nil,
+                   [['Comment', 'entities/comments', :expanded, nil]]
+                 ]
+               ])
+    expect(result.domains.first.join_tables).to eq([])
+    expect(result.domains.first.sti_subtypes).to eq([])
+    expect(comment_columns_reads).to eq(2)
+  end
+
+  it 'rejects spoofed delegated-type discovery when the generated method provenance does not match runtime' do
+    install_delegated_type_runtime('/gems/activerecord/lib/active_record/delegated_type.rb')
+
+    spoof_called = false
+    entry = model(
+      table_exists: true,
+      columns: [
+        column('id', :integer, false),
+        column('entryable_id', :integer, true),
+        column('entryable_type', :string, true)
+      ]
+    )
+    entryable_reflection = polymorphic_reflection(:entryable)
+    entry.define_singleton_method(:reflect_on_all_associations) { |_macro = nil| [entryable_reflection] }
+    entry.define_singleton_method(:entryable_types) do
+      spoof_called = true
+      raise 'spoofed application method must not be called'
+    end
+
+    result = described_class.new(model_resolver: ->(_name) { entry }).probe(
+      domains: [domain_result('core', [record('Entry')])],
+      inventory_records: [inventory_record('Entry', table_name: 'entries')]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.delegated_type_families).to eq([])
+    expect(spoof_called).to be(false)
+  end
+
+  it 'contains missing, raising, and unavailable delegated-type discovery methods' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    columns = [column('id', :integer, false), column('entryable_id', :integer, true),
+               column('entryable_type', :string, true)]
+
+    install_delegated_type_runtime(delegated_runtime_file)
+    missing_method_owner = model(table_exists: true, columns: columns)
+    reflection = polymorphic_reflection('entryable')
+    missing_method_owner.define_singleton_method(:reflect_on_all_associations) { [reflection] }
+    missing_result = described_class.new(model_resolver: ->(_) { missing_method_owner }).probe(
+      domains: [domain_result('core', [record('MissingMethodOwner')])],
+      inventory_records: [inventory_record('MissingMethodOwner')]
+    )
+
+    raising_owner = delegated_owner_model(
+      delegated_runtime_file, 'entryable', ['Target'], columns: columns
+    )
+    # rubocop:disable Style/EvalWithLocation
+    raising_owner.singleton_class.class_eval(<<~RUBY, delegated_runtime_file, 1)
+      define_method(:entryable_types) { raise 'types unavailable' }
+    RUBY
+    # rubocop:enable Style/EvalWithLocation
+    raising_result = described_class.new(model_resolver: ->(_) { raising_owner }).probe(
+      domains: [domain_result('core', [record('RaisingOwner')])],
+      inventory_records: [inventory_record('RaisingOwner')]
+    )
+
+    unavailable_runtime = Module.new
+    unavailable_runtime.define_singleton_method(:instance_method) { |_| raise 'runtime source unavailable' }
+    active_record = Module.new
+    active_record.const_set(:DelegatedType, unavailable_runtime)
+    stub_const('ActiveRecord', active_record)
+    unavailable_result = described_class.new(model_resolver: ->(_) { missing_method_owner }).probe(
+      domains: [domain_result('core', [record('UnavailableRuntimeOwner')])],
+      inventory_records: [inventory_record('UnavailableRuntimeOwner')]
+    )
+
+    expect([missing_result, raising_result, unavailable_result].map do |result|
+      result.domains.first.delegated_type_families
+    end).to eq([[], [], []])
+  end
+
+  it 'normalizes delegated targets across exclusion, ownership, connection, renderability, and failed expansion' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+
+    entry = delegated_owner_model(
+      delegated_runtime_file,
+      'entryable',
+      %w[
+        Expanded
+        Excluded
+        Selected
+        SelectedBroken
+        Broken
+        Missing
+        OtherConnection
+        OtherDomain
+        StiLeaf
+      ],
+      columns: [
+        column('id', :integer, false),
+        column('entryable_id', :integer, true),
+        column('entryable_type', :string, true)
+      ]
+    )
+    selected = model(table_exists: true, columns: [column('id', :integer, false)])
+    selected_broken = model(table_exists: false)
+    expanded = model(table_exists: true, columns: [column('id', :integer, false)])
+    broken = model(table_exists: false)
+    models = {
+      'Entry' => entry,
+      'Selected' => selected,
+      'SelectedBroken' => selected_broken,
+      'Expanded' => expanded,
+      'Broken' => broken
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [
+        domain_result(
+          'core',
+          [
+            inventory_record('Entry', table_name: 'entries'),
+            inventory_record('Selected', table_name: 'selecteds'),
+            inventory_record('SelectedBroken', table_name: 'selected_brokens')
+          ],
+          excluded_ruby_constants: ['Excluded']
+        )
+      ],
+      inventory_records: [
+        inventory_record('Entry', table_name: 'entries'),
+        inventory_record('Selected', table_name: 'selecteds'),
+        inventory_record('SelectedBroken', table_name: 'selected_brokens'),
+        inventory_record('Expanded', table_name: 'expandeds'),
+        inventory_record('Broken', table_name: 'brokens'),
+        inventory_record(
+          'OtherConnection',
+          table_name: 'other_connections',
+          connection_context_id: '{"name":"replica","role":"reading","shard":"default"}'
+        ),
+        inventory_record('OtherDomain', table_name: 'other_domains'),
+        inventory_record('StiLeaf', table_name: 'selecteds', renderable: false, reason: 'sti_subclass')
+      ],
+      owned_domain_ids_by_constant: { 'OtherDomain' => ['billing'] }
+    )
+
+    family = result.domains.first.delegated_type_families.fetch(0)
+
+    expect(result).not_to be_success
+    expect(result.exit_code).to eq(2)
+    expect(result.diagnostics).to include(
+      include(
+        'code' => 'MODEL_TABLE_MISSING',
+        'metadata' => include('ruby_constant' => 'Broken')
+      )
+    )
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(%w[Entry Selected Expanded])
+    expect(result.domains.first.entities.find { |entity| entity.ruby_constant == 'Expanded' }.selection_origin).to eq(
+      :delegated_type_expanded
+    )
+    expect(family.owner_entity_id).to eq('entities/entries')
+    expect(family.owner_ruby_constant).to eq('Entry')
+    expect(family.association_name).to eq('entryable')
+    expect(family.root_diagnostic_code).to be_nil
+    expect(family.targets).to match([
+                                      have_attributes(
+                                        ruby_constant: 'Broken',
+                                        entity_id: nil,
+                                        status: :not_renderable,
+                                        diagnostic_code: 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'Excluded',
+                                        entity_id: nil,
+                                        status: :excluded,
+                                        diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'Expanded',
+                                        entity_id: 'entities/expandeds',
+                                        status: :expanded,
+                                        diagnostic_code: nil
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'Missing',
+                                        entity_id: nil,
+                                        status: :unresolved,
+                                        diagnostic_code: 'ASSOCIATION_TARGET_UNRESOLVED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'OtherConnection',
+                                        entity_id: nil,
+                                        status: :other_connection,
+                                        diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'OtherDomain',
+                                        entity_id: nil,
+                                        status: :other_domain,
+                                        diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'Selected',
+                                        entity_id: 'entities/selecteds',
+                                        status: :selected,
+                                        diagnostic_code: nil
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'SelectedBroken',
+                                        entity_id: nil,
+                                        status: :not_renderable,
+                                        diagnostic_code: 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED'
+                                      ),
+                                      have_attributes(
+                                        ruby_constant: 'StiLeaf',
+                                        entity_id: nil,
+                                        status: :not_renderable,
+                                        diagnostic_code: 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED'
+                                      )
+                                    ])
+  end
+
+  it 'orders failed delegated expansions independently of selected owner order' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+    columns = [column('id', :integer, false), column('entryable_id', :integer, true),
+               column('entryable_type', :string, true)]
+    models = {
+      'AOwner' => delegated_owner_model(delegated_runtime_file, 'entryable', ['ABroken'], columns: columns),
+      'ZOwner' => delegated_owner_model(delegated_runtime_file, 'entryable', ['ZBroken'], columns: columns),
+      'ABroken' => model(table_exists: false),
+      'ZBroken' => model(table_exists: false)
+    }
+    inventory = [
+      inventory_record('AOwner'), inventory_record('ZOwner'),
+      inventory_record('ABroken'), inventory_record('ZBroken')
+    ]
+    probe = described_class.new(model_resolver: ->(name) { models.fetch(name) })
+
+    diagnostics_for = lambda do |owner_names|
+      result = probe.probe(
+        domains: [domain_result('core', owner_names.map { |name| record(name) })],
+        inventory_records: inventory
+      )
+      result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'ruby_constant') }
+    end
+
+    expect(diagnostics_for.call(%w[ZOwner AOwner])).to eq(%w[ABroken ZBroken])
+    expect(diagnostics_for.call(%w[AOwner ZOwner])).to eq(%w[ABroken ZBroken])
+  end
+
+  it 'records delegated root preflight omissions without probing targets' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+
+    target = model(
+      table_exists: -> { raise 'delegated target should not be probed when root eligibility fails' },
+      columns: -> { raise 'delegated target should not be probed when root eligibility fails' }
+    )
+    models = {
+      'BadNameOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable::bad',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
+                  column('entryable_type', :string, true)]
+      ),
+      'CompositeOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
+                  column('entryable_type', :string, true)],
+        foreign_key: %w[entryable_id tenant_id]
+      ),
+      'CustomKeyOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
+                  column('entryable_type', :string, true)],
+        foreign_key: 'custom_entryable_id',
+        foreign_type: 'custom_entryable_type'
+      ),
+      'PrimaryKeyOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
+                  column('entryable_type', :string, true)],
+        active_record_primary_key: 'slug',
+        options: { primary_key: 'slug' }
+      ),
+      'MissingColumnOwner' => delegated_owner_model(
+        delegated_runtime_file,
+        'entryable',
+        ['Comment'],
+        columns: [column('id', :integer, false), column('entryable_id', :integer, true)]
+      ),
+      'Comment' => target
+    }
+
+    result = described_class.new(model_resolver: ->(name) { models.fetch(name) }).probe(
+      domains: [
+        domain_result(
+          'core',
+          %w[BadNameOwner CompositeOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner].map { |name| record(name) }
+        )
+      ],
+      inventory_records: [
+        inventory_record('BadNameOwner', table_name: 'bad_name_owners'),
+        inventory_record('CompositeOwner', table_name: 'composite_owners'),
+        inventory_record('CustomKeyOwner', table_name: 'custom_key_owners'),
+        inventory_record('PrimaryKeyOwner', table_name: 'primary_key_owners'),
+        inventory_record('MissingColumnOwner', table_name: 'missing_column_owners'),
+        inventory_record('Comment', table_name: 'comments')
+      ]
+    )
+
+    expect(result).to be_success
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.entities.map(&:ruby_constant)).to eq(
+      %w[BadNameOwner CompositeOwner CustomKeyOwner PrimaryKeyOwner MissingColumnOwner]
+    )
+    expect(result.domains.first.delegated_type_families.map do |family|
+      [family.owner_ruby_constant, family.association_name, family.root_diagnostic_code, family.targets]
+    end).to eq([
+                 ['BadNameOwner', 'entryable::bad', 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED', []],
+                 ['CompositeOwner', 'entryable', 'ASSOCIATION_COMPOSITE_KEY_OMITTED', []],
+                 ['CustomKeyOwner', 'entryable', 'ASSOCIATION_POLYMORPHIC_OMITTED', []],
+                 ['MissingColumnOwner', 'entryable', 'ASSOCIATION_KEY_COLUMN_MISSING', []],
+                 ['PrimaryKeyOwner', 'entryable', 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', []]
+               ])
+  end
+
   it 'caches hidden HABTM join-table metadata for selected public reflections' do
     reflection = Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, 'authors_tags')
     connection = Object.new
@@ -646,9 +1090,22 @@ RSpec.describe RailsMmd::SchemaProbe do
     expect(relationship.owner_cardinality).to eq('0..many')
   end
 
-  def domain_result(domain_id, records)
-    RailsMmd::DomainResolver::DomainResult.new(domain_id: domain_id, records: records, diagnostics: [])
+  # rubocop:disable Metrics/MethodLength
+  def domain_result(domain_id, records, excluded_ruby_constants: [])
+    domain_result_class = if RailsMmd::DomainResolver::DomainResult.members.include?(:excluded_ruby_constants)
+                            RailsMmd::DomainResolver::DomainResult
+                          else
+                            Struct.new(:domain_id, :records, :diagnostics, :excluded_ruby_constants, keyword_init: true)
+                          end
+
+    domain_result_class.new(
+      domain_id: domain_id,
+      records: records,
+      diagnostics: [],
+      excluded_ruby_constants: excluded_ruby_constants
+    )
   end
+  # rubocop:enable Metrics/MethodLength
 
   def record(ruby_constant, connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
     RailsMmd::ModelInventory::Record.new(
@@ -760,6 +1217,78 @@ RSpec.describe RailsMmd::SchemaProbe do
     model.define_singleton_method(:table_name) { "#{name.downcase}s" }
     define_db_config(model, database)
     model
+  end
+
+  # rubocop:disable Style/EvalWithLocation
+  def install_delegated_type_runtime(source_file)
+    delegated_type_module = Module.new
+    delegated_type_module.module_eval(<<~RUBY, source_file, 1)
+      def delegated_type(*)
+      end
+    RUBY
+    active_record = Module.new
+    active_record.const_set(:DelegatedType, delegated_type_module)
+    stub_const('ActiveRecord', active_record)
+  end
+  # rubocop:enable Style/EvalWithLocation
+
+  # rubocop:disable Metrics/MethodLength, Metrics/ParameterLists
+  def delegated_owner_model(
+    source_file,
+    association_name,
+    types,
+    columns:,
+    foreign_key: "#{association_name}_id",
+    foreign_type: "#{association_name}_type",
+    active_record_primary_key: nil,
+    scope: nil,
+    options: {}
+  )
+    owner = model(table_exists: true, columns: columns)
+    reflection = polymorphic_reflection(
+      association_name,
+      foreign_key: foreign_key,
+      foreign_type: foreign_type,
+      active_record_primary_key: active_record_primary_key,
+      scope: scope,
+      options: options
+    )
+    owner.define_singleton_method(:reflect_on_all_associations) do |macro = nil|
+      macro ? [reflection].select { |candidate| candidate.macro == macro } : [reflection]
+    end
+    define_generated_types_method(owner, "#{association_name}_types", source_file, types)
+    owner
+  end
+  # rubocop:enable Metrics/MethodLength, Metrics/ParameterLists
+
+  # rubocop:disable Style/DocumentDynamicEvalDefinition, Style/EvalWithLocation
+  def define_generated_types_method(model_class, method_name, source_file, values)
+    serialized_values = values.map(&:to_s).inspect
+    model_class.singleton_class.class_eval(<<~RUBY, source_file, 1)
+      define_method(#{method_name.to_sym.inspect}) do
+        #{serialized_values}
+      end
+    RUBY
+  end
+  # rubocop:enable Style/DocumentDynamicEvalDefinition, Style/EvalWithLocation
+
+  # rubocop:disable Metrics/ParameterLists
+  def polymorphic_reflection(
+    name,
+    foreign_key: "#{name}_id",
+    foreign_type: "#{name}_type",
+    active_record_primary_key: nil,
+    scope: nil,
+    options: {}
+  )
+    Struct.new(:name, :macro, :foreign_key, :foreign_type, :active_record_primary_key, :scope, :options) do
+      def polymorphic? = true
+    end.new(name, :belongs_to, foreign_key, foreign_type, active_record_primary_key, scope, options)
+  end
+  # rubocop:enable Metrics/ParameterLists
+
+  def habtm_reflection(join_table)
+    Struct.new(:macro, :join_table).new(:has_and_belongs_to_many, join_table)
   end
 
   def define_db_config(model, database)

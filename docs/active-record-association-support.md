@@ -21,7 +21,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 |---|---|---|---|
 | P2-01 | scoped関連 | 対応 | scope procを実行せず、解決済み関連へ`metadata.scoped: true`を保持する |
 | P2-02 | STI | 対応 | ERは共有tableの基底のみ、class図はloaded concrete subtypeと継承edgeを決定的に描画する |
-| P2-03 | `delegated_type` | 未対応 | 委譲元と具象型を描画する |
+| P2-03 | `delegated_type` | 対応 | Rails生成type whitelistを安全に検出し、委譲元から描画可能な宣言済み具象型へ具体edgeを描画する |
 | P2-04 | 複合primary/foreign key、`query_constraints` | 未対応 | 対応する列組を保持・照合する |
 | P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |
 | P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
@@ -40,6 +40,7 @@ Rails 7.2/8.1で次を対応済み。
 - 対応範囲内の`belongs_to`除外診断
 - direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
 - hidden join tableを持つunscoped scalar `has_and_belongs_to_many`
+- provenance確認済み`delegated_type`の宣言済み具象型（同一connection・同一domain）
 
 ## 根拠
 
