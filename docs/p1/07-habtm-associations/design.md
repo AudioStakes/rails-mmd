@@ -37,8 +37,10 @@ Status: design complete and reviewed
 
 ### Relationship identity and projection
 
-- Add internal `relationship_kind: :habtm` and `join_table_name`; keep public
-  schemas unchanged.
+- Keep public schemas unchanged. HABTM-specific join-table shape, canonical
+  winner selection evidence, and relationship kind stay private inside
+  `RelationshipBuilder` candidate state rather than on the published
+  relationship object.
 - Normalize endpoint tuples `(entity_id, join_column)` lexically.
 - Internal physical key:
   `habtm|<join_table>|<left_entity>|<left_column>|<right_entity>|<right_column>`.
@@ -46,7 +48,7 @@ Status: design complete and reviewed
   `relationships/<left_table>/habtm/<join_table>/<left_column>/<right_table>/<right_column>`.
 - Public owner/target endpoints are normalized left/right; both cardinalities
   are always `0..many`.
-- HABTM carries no `foreign_key_holder_entity_id`, `foreign_key_column`, or
+- The published HABTM relationship carries no `foreign_key_column` or
   `foreign_type_column`. `IrBuilder` therefore adds no synthetic entity key
   attributes.
 - Deduplicate by physical key. Choose the canonical declaration by preferring a

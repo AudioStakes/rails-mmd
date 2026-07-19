@@ -19,13 +19,16 @@ Status: design complete; reviewed with no remaining findings
 
 ### Internal relationship normalization
 
-- Keep public IR/render-plan schemas unchanged and preserve declaration
-  orientation in `owner_entity_id`, `target_entity_id`, association label, and
-  relationship ID.
-- Replace the internal owner-FK assumption with explicit FK-holder fields:
-  `foreign_key_holder_entity_id`, `foreign_key_column`,
-  `referenced_primary_key_column`, FK nullability/uniqueness, and DB-FK evidence.
-- `IrBuilder` marks the FK attribute on `foreign_key_holder_entity_id`.
+- Keep public IR/render-plan schemas unchanged.
+- Canonicalize every direct candidate to FK-holder -> referenced orientation
+  before it leaves `RelationshipBuilder`. The published relationship therefore
+  already carries the actual FK-holding entity in `owner_entity_id`, the
+  referenced entity in `target_entity_id`, the stable public relationship ID,
+  and any public FK columns.
+- Rich normalization evidence stays private to `RelationshipBuilder`
+  candidates: referenced primary key, declaration owner, inverse/declaration
+  macro, FK nullability/uniqueness, and DB-FK evidence.
+- `IrBuilder` marks the FK attribute on the published `owner_entity_id`.
 - Physical identity is the tuple FK-holder entity/column plus referenced
   entity/primary key. If a `belongs_to` candidate has the same tuple, it wins so
   P0 IDs and labels remain stable. P1-04 owns inverse-aware reconciliation;
@@ -83,7 +86,8 @@ Status: design complete; reviewed with no remaining findings
 1. `RelationshipBuilder#build` returns eligible direct has edges with correct
    endpoints, target-side FK evidence, cardinality, diagnostics, and provisional
    deduplication.
-2. `IrBuilder#build` marks the target-side FK attribute for a direct has edge.
+2. `IrBuilder#build` marks the FK attribute on the canonical holder-side
+   published by `RelationshipBuilder`.
 3. `verify:rails_matrix` rejects missing/wrong expected relationship
    projections and all three real Rails/Ruby pairs publish the exact projection.
 
@@ -92,8 +96,9 @@ Status: design complete; reviewed with no remaining findings
 1. Red: inverse-free direct `has_many` / `has_one` produce omission warnings.
    Green: add direct classification and key projection with their has-side
    labels.
-2. Red: IR marks no FK or marks it on the declaration owner. Green: introduce
-   explicit FK-holder internals.
+2. Red: IR marks no FK or marks it on the declaration owner. Green:
+   canonicalize to the actual holder before publication and project from that
+   published owner.
 3. Red: through, scoped, `as:`, non-primary, unresolved, and missing-column
    cases are misclassified or fatal. Green: order guardrails and reuse omission
    codes.
@@ -107,8 +112,8 @@ Status: design complete; reviewed with no remaining findings
 
 | Path | Purpose |
 |---|---|
-| `lib/rails_mmd/relationship_builder.rb` | Direct classification, FK-holder normalization, cardinality, provisional dedupe |
-| `lib/rails_mmd/ir_builder.rb` | Mark FK attributes on the actual holder |
+| `lib/rails_mmd/relationship_builder.rb` | Direct classification, private candidate normalization, holder-oriented publication, cardinality, provisional dedupe |
+| `lib/rails_mmd/ir_builder.rb` | Mark FK attributes from the published canonical holder |
 | `spec/rails_mmd/relationship_builder_spec.rb` | Public direct/omission/self/dedupe behavior |
 | `spec/rails_mmd/ir_builder_spec.rb` | Target-side FK projection |
 | `tooling/rails_matrix.rb` | Exact real-app relationship oracle |
@@ -128,7 +133,7 @@ Status: design complete; reviewed with no remaining findings
   composite, unsafe-name, and missing-column paths remain deterministic warning
   paths.
 - Direct self join emits one correctly labeled and cardinality-bearing loop.
-- IR marks the actual FK-holder column.
+- IR marks the published canonical holder-side FK column.
 - Exact relationship and diagnostic projections pass for all three Rails matrix
   pairs; default Rake and both repository hooks pass.
 

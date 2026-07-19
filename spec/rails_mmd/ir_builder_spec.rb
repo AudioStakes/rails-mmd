@@ -6,7 +6,7 @@ require 'rails_mmd/relationship_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::IrBuilder do
   it 'normalizes selected entities and relationships into schema-valid deterministic IR' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
@@ -42,7 +42,10 @@ RSpec.describe RailsMmd::IrBuilder do
       'owner_cardinality' => '0..many',
       'target_cardinality' => '1..1'
     )
-    expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
+    expect(JSON.generate(payload)).not_to include(
+      'safe_token', 'owner_foreign_key_column', 'target_primary_key_column',
+      'foreign_key_holder_entity_id', 'association_macro', 'physical_key'
+    )
     expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
     expect(schema_valid_ir?(payload)).to be(true)
     expect(payload.fetch('digest_sha256')).to eq(
@@ -69,9 +72,10 @@ RSpec.describe RailsMmd::IrBuilder do
                  entity('Profile', 'profiles', columns: [column('id'), column('author_id')])],
       diagnostics: []
     )
-    direct_has = relationship('relationships/authors/profile', 'entities/authors', 'entities/profiles', 'profile')
-    direct_has.foreign_key_holder_entity_id = 'entities/profiles'
-    direct_has.foreign_key_column = 'author_id'
+    direct_has = relationship(
+      'relationships/profiles/author_id/authors/id', 'entities/profiles', 'entities/authors', 'profile',
+      foreign_keys: ['author_id', nil]
+    )
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [direct_has], diagnostics: []
     )
@@ -97,11 +101,9 @@ RSpec.describe RailsMmd::IrBuilder do
     )
     polymorphic = relationship(
       'relationships/comments/polymorphic/commentable/commentable_id/commentable_type/posts',
-      'entities/comments', 'entities/posts', 'commentable'
+      'entities/comments', 'entities/posts', 'commentable',
+      foreign_keys: %w[commentable_id commentable_type]
     )
-    polymorphic.foreign_key_holder_entity_id = 'entities/comments'
-    polymorphic.foreign_key_column = 'commentable_id'
-    polymorphic.foreign_type_column = 'commentable_type'
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [polymorphic], diagnostics: []
     )
@@ -122,11 +124,8 @@ RSpec.describe RailsMmd::IrBuilder do
     )
     habtm = relationship(
       'relationships/authors/habtm/authors_tags/author_id/tags/tag_id',
-      'entities/authors', 'entities/tags', 'tags'
+      'entities/authors', 'entities/tags', 'tags', foreign_keys: [nil, nil]
     )
-    habtm.relationship_kind = :habtm
-    habtm.owner_foreign_key_column = nil
-    habtm.foreign_key_column = nil
     relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
       domain_id: 'core', relationships: [habtm], diagnostics: []
     )
@@ -170,17 +169,14 @@ RSpec.describe RailsMmd::IrBuilder do
     RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: false)
   end
 
-  def relationship(id, owner_id, target_id, name)
+  def relationship(id, owner_id, target_id, name, foreign_keys: ['account_id', nil])
     RailsMmd::RelationshipBuilder::Relationship.new(
       relationship_id: id,
       owner_entity_id: owner_id,
       target_entity_id: target_id,
       association_name: name,
-      owner_foreign_key_column: 'account_id',
-      target_primary_key_column: 'id',
-      owner_fk_unique: false,
-      db_foreign_key: true,
-      owner_fk_nullable: false,
+      foreign_key_column: foreign_keys.first,
+      foreign_type_column: foreign_keys.last,
       owner_cardinality: '0..many',
       target_cardinality: '1..1'
     )
@@ -194,4 +190,4 @@ RSpec.describe RailsMmd::IrBuilder do
     RailsMmd::SchemaValidator.new.valid?(:ir, payload)
   end
 end
-# rubocop:enable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

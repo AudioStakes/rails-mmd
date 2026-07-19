@@ -76,13 +76,9 @@ module RailsMmd
       return [] unless relationship_domain
 
       relationship_domain.relationships.flat_map do |relationship|
-        holder_id = relationship.foreign_key_holder_entity_id || relationship.owner_entity_id
-        next [] unless holder_id == entity_id(entity)
+        next [] unless relationship.owner_entity_id == entity_id(entity)
 
-        [
-          relationship.foreign_key_column || relationship.owner_foreign_key_column,
-          relationship.foreign_type_column
-        ].compact
+        [relationship.foreign_key_column, relationship.foreign_type_column].compact
       end
     end
 
