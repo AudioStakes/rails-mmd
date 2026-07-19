@@ -7,11 +7,11 @@ module RailsMmd
 
     module_function
 
-    def by_key(records, key)
+    def sort_by_key(records, key)
       records.sort_by { |record| record.fetch(key) }
     end
 
-    def diagnostics(records)
+    def sort_diagnostics(records)
       records.sort_by do |diagnostic|
         [
           SEVERITY_RANK.fetch(diagnostic.fetch('severity')),
@@ -21,5 +21,10 @@ module RailsMmd
         ]
       end
     end
+
+    # Backward-compatible method names for the recorded P1 seam.
+    def by_key(records, key) = sort_by_key(records, key)
+
+    def diagnostics(records) = sort_diagnostics(records)
   end
 end

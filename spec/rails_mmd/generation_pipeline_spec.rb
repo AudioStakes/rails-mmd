@@ -35,7 +35,7 @@ RSpec.describe RailsMmd::GenerationPipeline do
   end
 
   it 'runs the real in-process stages through one interface' do
-    result = described_class.new(active_record_base: empty_active_record_base).build(config: config)
+    result = described_class.new(active_record_base: empty_active_record_base).generate(config: config)
 
     expect_pipeline_result(result)
   end
@@ -43,13 +43,14 @@ RSpec.describe RailsMmd::GenerationPipeline do
   it 'uses one redaction policy across the in-process stages' do
     redactor = PrefixingRedactor.new(project_root: Dir.pwd, env: {})
     result = described_class.new(active_record_base: empty_active_record_base, redactor: redactor)
-                            .build(config: config)
+                            .generate(config: config)
 
     expect(result.diagnostics.fetch(0).fetch('message')).to start_with('shared:')
   end
 
   it 'accumulates render-plan diagnostics through the pipeline interface' do
-    result = pipeline(render_plan_diagnostics: [diagnostic('SAFE_TOKEN_COLLISION')]).build(config: config(format: 'er'))
+    result = pipeline(render_plan_diagnostics: [diagnostic('SAFE_TOKEN_COLLISION')])
+             .generate(config: config(format: 'er'))
 
     expect(result.diagnostics.map { |item| item.fetch('code') }).to eq(%w[DOMAIN_EMPTY SAFE_TOKEN_COLLISION])
     expect(result.artifacts.fetch('core')).to include('er')
@@ -57,7 +58,7 @@ RSpec.describe RailsMmd::GenerationPipeline do
 
   it 'accumulates serialization diagnostics and omits the failed artifact' do
     result = pipeline(serializer_diagnostics: [diagnostic('MERMAID_SERIALIZATION_FAILED')])
-             .build(config: config(format: 'er'))
+             .generate(config: config(format: 'er'))
 
     expect(result.diagnostics.map { |item| item.fetch('code') }).to eq(%w[DOMAIN_EMPTY MERMAID_SERIALIZATION_FAILED])
     expect(result.artifacts.fetch('core')).to be_empty

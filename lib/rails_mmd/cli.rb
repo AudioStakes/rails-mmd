@@ -2,7 +2,7 @@
 
 require 'thor'
 require 'rails_mmd/config'
-require 'rails_mmd/generate'
+require 'rails_mmd/generate_command'
 require_relative 'version'
 
 module RailsMmd
@@ -45,7 +45,7 @@ module RailsMmd
     def generate(*args)
       return say(GENERATE_HELP) if args.include?('--help')
 
-      result = Generate.new.run(cli_options: cli_options, fail_on_warning: fail_on_warning?)
+      result = GenerateCommand.new.run(cli_options: cli_options, fail_on_warning: fail_on_warning?)
       emit_result(result)
     end
 

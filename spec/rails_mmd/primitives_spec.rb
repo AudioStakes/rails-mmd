@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/canonical_json'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/ordering'
 require 'rails_mmd/redactor'
-require 'rails_mmd/safe_tokens'
+require 'rails_mmd/safe_token_assigner'
 require 'rails_mmd/schema_validator'
 
 # rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations
@@ -122,7 +122,7 @@ RSpec.describe 'runtime primitives' do
     end
   end
 
-  describe RailsMmd::Diagnostics do
+  describe RailsMmd::DiagnosticFactory do
     it 'exposes the closed diagnostic catalog from the schema fixture' do
       expect(described_class.codes).to include('CONFIG_NOT_FOUND', 'SAFE_TOKEN_COLLISION', 'INTERNAL_ERROR')
       expect(described_class.codes).not_to include('UNKNOWN_CODE')
@@ -243,7 +243,7 @@ RSpec.describe 'runtime primitives' do
     end
   end
 
-  describe RailsMmd::SafeTokens do
+  describe RailsMmd::SafeTokenAssigner do
     it 'implements the P0 safe-token examples' do
       subjects = {
         'Admin::User' => 'ADMIN_USER',
@@ -386,7 +386,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def structured_identifier_metadata
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'DOMAIN_MODEL_NOT_FOUND',
       message: 'missing model',
       metadata: { domain_id: 'core', ruby_constant: 'Credential::ApiKey' }
@@ -398,7 +398,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def config_schema_invalid_diagnostic
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'CONFIG_SCHEMA_INVALID',
       message: 'invalid config',
       metadata: { config_path: 'rails_mmd.yml', field_path: "#{Dir.pwd}/config/rails_mmd.yml" }
@@ -406,7 +406,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def domain_model_not_renderable_diagnostic
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'DOMAIN_MODEL_NOT_RENDERABLE',
       message: 'not renderable',
       metadata: domain_model_not_renderable_metadata
@@ -422,7 +422,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def machine_local_config_id
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'CONFIG_NOT_FOUND',
       message: 'missing',
       metadata: { config_path: "#{Dir.pwd}/rails_mmd.yml" }
@@ -430,7 +430,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def relative_config_id
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'CONFIG_NOT_FOUND',
       message: 'missing',
       metadata: { config_path: 'rails_mmd.yml' }
@@ -438,7 +438,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def structured_subject_id
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'DOMAIN_MODEL_NOT_FOUND',
       subject_id: 'core:Credential::ApiKey:password_digest',
       message: 'missing model',
@@ -451,7 +451,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def valid_artifact_ref_diagnostic
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'CONFIG_NOT_FOUND',
       message: 'missing',
       metadata: { config_path: 'rails_mmd.yml' },
@@ -460,7 +460,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def association_target_unresolved_diagnostic
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'ASSOCIATION_TARGET_UNRESOLVED',
       message: 'target missing',
       metadata: { domain_id: 'core', owner_constant: 'User', association_name: 'api_key_logs' }
@@ -468,7 +468,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   def output_write_failed_diagnostic
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: 'OUTPUT_WRITE_FAILED',
       message: 'write failed',
       metadata: { operation: 'write' }

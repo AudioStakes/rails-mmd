@@ -3,7 +3,7 @@
 module RailsMmd
   # Maps diagnostics to the public P0 process exit contract.
   module ExitPolicy
-    CODE_BY_DIAGNOSTIC = {
+    EXIT_CODE_BY_DIAGNOSTIC_CODE = {
       'MERMAID_SERIALIZATION_FAILED' => 3,
       'SAFE_TOKEN_COLLISION' => 3,
       'OUTPUT_WRITE_FAILED' => 4,
@@ -21,7 +21,10 @@ module RailsMmd
         return 0
       end
 
-      blocking.map { |diagnostic| CODE_BY_DIAGNOSTIC.fetch(diagnostic.fetch('code'), 2) }.max
+      blocking.map { |diagnostic| EXIT_CODE_BY_DIAGNOSTIC_CODE.fetch(diagnostic.fetch('code'), 2) }.max
     end
+
+    # Backward-compatible constant name.
+    CODE_BY_DIAGNOSTIC = EXIT_CODE_BY_DIAGNOSTIC_CODE
   end
 end

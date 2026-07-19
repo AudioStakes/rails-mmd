@@ -8,11 +8,12 @@ module RailsMmd
   # Validates and resolves project-root-relative output directories.
   # rubocop:disable Metrics/ClassLength
   class OutputDirectory
-    Result = Struct.new(:path, :relative_path, :reason, keyword_init: true) do
+    Resolution = Struct.new(:path, :relative_path, :reason, keyword_init: true) do
       def valid?
         reason.nil?
       end
     end
+    Result = Resolution
 
     DRIVE_OR_UNC_PATTERN = /\A(?:[A-Za-z]:|\\\\)/
     SAFE_RELATIVE_PATH_PATTERN = %r{\A[A-Za-z0-9._/-]+\z}
@@ -31,22 +32,22 @@ module RailsMmd
     def resolve(value)
       text = value.to_s
       reason = lexical_rejection_reason(text)
-      return invalid(reason) if reason
+      return invalid_resolution(reason) if reason
 
       relative_path = normalize(text)
-      return invalid('normalizes to project root') if relative_path == '.'
-      return invalid('escapes project root') if relative_path.start_with?('../') || relative_path == '..'
+      return invalid_resolution('normalizes to project root') if relative_path == '.'
+      return invalid_resolution('escapes project root') if relative_path.start_with?('../') || relative_path == '..'
 
       absolute_path = project_root.join(relative_path)
-      return invalid('symlink escapes project root') unless inside_project_root?(absolute_path)
+      return invalid_resolution('symlink escapes project root') unless inside_project_root?(absolute_path)
 
-      Result.new(path: absolute_path, relative_path: relative_path)
+      Resolution.new(path: absolute_path, relative_path: relative_path)
     end
 
-    def publish!(result, selected_domain_ids:)
-      raise ArgumentError, 'output directory is unresolved' unless result&.valid? && result.path
+    def publish!(resolution, selected_domain_ids:)
+      raise ArgumentError, 'output directory is unresolved' unless resolution&.valid? && resolution.path
 
-      output_path = result.path
+      output_path = resolution.path
       raise ArgumentError, 'output path escapes project root' unless inside_project_root?(output_path)
 
       output_path.mkpath
@@ -91,12 +92,12 @@ module RailsMmd
 
     def write_plan(output_path, plan, selected_domain_ids)
       ensure_safe_replacement_set!(output_path, plan, selected_domain_ids)
-      Dir.mktmpdir('.rails-mmd-', output_path.to_s) do |tmp|
-        tmp_path = Pathname(tmp)
-        plan.each { |relative_path, content| tmp_path.join(relative_path).write(content) }
+      Dir.mktmpdir('.rails-mmd-', output_path.to_s) do |staging_directory|
+        staging_path = Pathname(staging_directory)
+        plan.each { |relative_path, content| staging_path.join(relative_path).write(content) }
         ensure_inside_project_root!(output_path)
         ensure_safe_replacement_set!(output_path, plan, selected_domain_ids)
-        replace_plan_files(output_path, tmp_path, plan, selected_domain_ids)
+        replace_plan_files(output_path, staging_path, plan, selected_domain_ids)
       end
     end
 
@@ -185,8 +186,8 @@ module RailsMmd
       raise ArgumentError, 'output path escapes project root' if relative.start_with?('..')
     end
 
-    def invalid(reason)
-      Result.new(reason: reason)
+    def invalid_resolution(reason)
+      Resolution.new(reason: reason)
     end
   end
   # rubocop:enable Metrics/ClassLength

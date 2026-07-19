@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'yaml'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/output_directory'
 require 'rails_mmd/redactor'
 require 'rails_mmd/schema_validator'
@@ -22,7 +22,14 @@ module RailsMmd
     EXIT_CONTRACT_ERROR = 2
 
     CliOptions = Struct.new(:config_path, :output_dir, :domain, :format, keyword_init: true)
-    Domain = Struct.new(:id, :include_models, :exclude_models, keyword_init: true)
+    Domain = Struct.new(:domain_id, :include_models, :exclude_models, keyword_init: true) do
+      def initialize(include_models:, exclude_models:, domain_id: nil, id: nil)
+        super(domain_id: domain_id || id, include_models: include_models, exclude_models: exclude_models)
+      end
+
+      alias_method :id, :domain_id
+      alias_method :id=, :domain_id=
+    end
     Output = Struct.new(:directory, :path, :format, :attributes, :direction, :sources, keyword_init: true)
     Resolved = Struct.new(:config_path, :domains, :output, :selected_domain_ids, keyword_init: true)
     Result = Struct.new(:config, :diagnostics, :exit_code, keyword_init: true) do
@@ -35,7 +42,7 @@ module RailsMmd
       @project_root = Pathname(project_root).expand_path
       @validator = validator
       @redactor = redactor || Redactor.new(project_root: @project_root)
-      @diagnostics = Diagnostics.new(redactor: @redactor)
+      @diagnostic_factory = DiagnosticFactory.new(redactor: @redactor)
       @output_directory = OutputDirectory.new(project_root: @project_root)
     end
 
@@ -62,7 +69,7 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics, :output_directory, :project_root, :validator
+    attr_reader :diagnostic_factory, :output_directory, :project_root, :validator
 
     def build_config(config_path, data, cli_options)
       domains = build_domains(data.fetch('domains'))
@@ -83,7 +90,7 @@ module RailsMmd
 
       selected_domain_ids = selected_domain_ids(domains, cli_options.domain)
       if selected_domain_ids.nil?
-        return failure(diagnostics.build(
+        return failure(diagnostic_factory.build(
                          code: 'CONFIG_DOMAIN_NOT_FOUND',
                          message: "Unknown domain #{cli_options.domain}",
                          subject_id: "domain:#{cli_options.domain}",
@@ -94,12 +101,12 @@ module RailsMmd
       success(config_path, domains, output, selected_domain_ids)
     end
 
-    def build_domains(data)
-      data.to_h do |id, domain|
+    def build_domains(domain_data)
+      domain_data.to_h do |domain_id, domain|
         [
-          id,
+          domain_id,
           Domain.new(
-            id: id,
+            domain_id: domain_id,
             include_models: domain.fetch('include_models'),
             exclude_models: domain.fetch('exclude_models', [])
           )
@@ -155,7 +162,7 @@ module RailsMmd
     end
 
     def config_not_found(config_path)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'CONFIG_NOT_FOUND',
         message: "Config file not found: #{display_path(config_path)}",
         subject_id: 'config',
@@ -164,7 +171,7 @@ module RailsMmd
     end
 
     def config_schema_invalid(config_path, field_path_value, reason)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'CONFIG_SCHEMA_INVALID',
         message: "Invalid config #{display_path(config_path)}: #{reason}",
         subject_id: 'config',
@@ -173,7 +180,7 @@ module RailsMmd
     end
 
     def output_directory_invalid(result, field_path_value)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'OUTPUT_DIRECTORY_INVALID',
         message: "Invalid output directory: #{result.reason}",
         subject_id: 'output.directory',

@@ -11,9 +11,10 @@ ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook install
 ## Pre-Commit
 
 The `pre-commit` hook passes all staged paths to the deep
-`RailsMmd::VerificationRouting` module. Lefthook is only the adapter; path
+`RailsMmd::VerificationRunner` class. Lefthook is only the adapter; path
 classification, deduplication, and repair-first ordering live behind the
-module's single `run!` interface.
+class's single `run!` interface. `RailsMmd::VerificationRouting` remains as a
+backward-compatible constant alias.
 
 For Ruby-like staged files, it runs:
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/constant_resolver'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/redactor'
 
 module RailsMmd
@@ -34,9 +34,9 @@ module RailsMmd
     end
     Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
-    def initialize(constant_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
+    def initialize(constant_resolver:, diagnostics: DiagnosticFactory.new, redactor: Redactor.new)
       @constant_resolver = ConstantResolver.wrap(constant_resolver)
-      @diagnostics = diagnostics
+      @diagnostic_factory = diagnostics
       @redactor = redactor
     end
 
@@ -49,7 +49,7 @@ module RailsMmd
 
     private
 
-    attr_reader :constant_resolver, :diagnostics, :redactor
+    attr_reader :constant_resolver, :diagnostic_factory, :redactor
 
     def probe_domain(domain)
       connection_diagnostic = multi_db_diagnostic(domain)
@@ -84,7 +84,7 @@ module RailsMmd
 
       connection_context_ids = raw_context_ids.map { |context_id| redactor.sanitize(context_id) }.sort
 
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'MULTI_DB_UNSUPPORTED',
         message: "Domain #{domain.domain_id} selects multiple connection contexts",
         subject_id: domain.domain_id,
@@ -93,14 +93,14 @@ module RailsMmd
     end
 
     def probe_record(domain_id, record, model)
-      return invalid_record(domain_id, record, :table) if model.nil?
+      return probe_record_failure(domain_id, record, :table) if model.nil?
 
-      return invalid_record(domain_id, record, :table) unless table_exists?(model)
+      return probe_record_failure(domain_id, record, :table) unless table_exists?(model)
 
       columns = read_columns(model)
       primary_key = read_primary_key(model)
-      return invalid_record(domain_id, record, :table) if columns.nil?
-      return invalid_record(domain_id, record, :primary_key) unless scalar_primary_key?(primary_key)
+      return probe_record_failure(domain_id, record, :table) if columns.nil?
+      return probe_record_failure(domain_id, record, :primary_key) unless scalar_primary_key?(primary_key)
 
       build_entity(domain_id, record, model, columns, primary_key)
     end
@@ -109,11 +109,11 @@ module RailsMmd
       constant_resolver.resolve(record.ruby_constant)
     end
 
-    def invalid_record(domain_id, record, kind)
-      diagnostic = if kind == :primary_key
+    def probe_record_failure(domain_id, record, failure_kind)
+      diagnostic = if failure_kind == :primary_key
                      primary_key_unsupported(domain_id, record)
                    else
-                     table_missing(domain_id, record, 'table metadata unavailable')
+                     table_metadata_unavailable(domain_id, record, 'table metadata unavailable')
                    end
       [nil, [diagnostic]]
     end
@@ -341,8 +341,8 @@ module RailsMmd
       object.public_send(method_name)
     end
 
-    def table_missing(domain_id, record, reason)
-      diagnostics.build(
+    def table_metadata_unavailable(domain_id, record, reason)
+      diagnostic_factory.build(
         code: 'MODEL_TABLE_MISSING',
         message: "#{record.ruby_constant} table metadata is unavailable: #{reason}",
         subject_id: "#{domain_id}:#{record.ruby_constant}",
@@ -351,7 +351,7 @@ module RailsMmd
     end
 
     def primary_key_unsupported(domain_id, record)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'MODEL_PRIMARY_KEY_UNSUPPORTED',
         message: "#{record.ruby_constant} primary key is unsupported",
         subject_id: "#{domain_id}:#{record.ruby_constant}",
@@ -360,7 +360,7 @@ module RailsMmd
     end
 
     def metadata_degraded(domain_id, record, metadata_kind, reason)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'DB_METADATA_DEGRADED',
         message: "#{record.ruby_constant} #{metadata_kind} metadata is degraded",
         subject_id: domain_id,

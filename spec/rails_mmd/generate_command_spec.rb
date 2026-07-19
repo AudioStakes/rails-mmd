@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/generate'
+require 'rails_mmd/generate_command'
 require 'tmpdir'
 
 # rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
-RSpec.describe RailsMmd::Generate do
+RSpec.describe RailsMmd::GenerateCommand do
   LoaderResult = Struct.new(:success?, :application, :diagnostics, :exit_code)
 
   class FakeLoader
@@ -32,10 +32,24 @@ RSpec.describe RailsMmd::Generate do
       @configs = []
     end
 
-    def build(config:)
+    def generate(config:)
       configs << config
       raise @result if @result.is_a?(Exception)
 
+      @result
+    end
+  end
+
+  class LegacyPipeline
+    attr_reader :configs
+
+    def initialize(result)
+      @result = result
+      @configs = []
+    end
+
+    def build(config:)
+      configs << config
       @result
     end
   end
@@ -56,6 +70,36 @@ RSpec.describe RailsMmd::Generate do
       expect(result).to be_success
       expect(root.join('out/core.er.mmd')).to exist
       expect(root.join('out/core.er.render_plan.json')).to exist
+    end
+  end
+
+  it 'supports the former pipeline build seam during the compatibility window' do
+    in_project do |root|
+      pipeline = LegacyPipeline.new(pipeline_result)
+      result = described_class.new(project_root: root, rails_loader: successful_loader, pipeline: pipeline)
+                              .run(cli_options: cli_options)
+
+      expect(result).to be_success
+      expect(pipeline.configs.length).to eq(1)
+    end
+  end
+
+  it 'builds stderr when publication fails without supplying it' do
+    in_project do |root|
+      failure_diagnostic = diagnostic('OUTPUT_WRITE_FAILED')
+      publisher = instance_double(
+        RailsMmd::Publisher,
+        publish: RailsMmd::Publisher::Result.new(
+          success: false, diagnostics: [failure_diagnostic], written_paths: [], stderr: nil
+        ),
+        pre_output_stderr: "fallback stderr\n"
+      )
+      generator = generate(root, pipeline_result)
+      allow(generator).to receive(:publisher).and_return(publisher)
+
+      result = generator.run(cli_options: cli_options)
+
+      expect(result.stderr).to eq("fallback stderr\n")
     end
   end
 
