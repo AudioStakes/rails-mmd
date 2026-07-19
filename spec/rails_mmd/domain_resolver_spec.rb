@@ -93,7 +93,7 @@ RSpec.describe RailsMmd::DomainResolver do
 
   def config_domain(domain_id, domain)
     RailsMmd::Config::Domain.new(
-      id: domain_id,
+      domain_id: domain_id,
       include_models: domain.fetch(:include),
       exclude_models: domain.fetch(:exclude)
     )

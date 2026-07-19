@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/verification_routing'
+require 'rails_mmd/verification_runner'
 require 'stringio'
 require 'tmpdir'
 require 'yaml'
 
 # rubocop:disable Lint/ConstantDefinitionInBlock, Metrics/MethodLength, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
-RSpec.describe RailsMmd::VerificationRouting do
+RSpec.describe RailsMmd::VerificationRunner do
   Status = Struct.new(:success?)
 
   class RecordingProcess
@@ -22,7 +22,7 @@ RSpec.describe RailsMmd::VerificationRouting do
 
     def run!(*command)
       commands << command
-      raise RailsMmd::VerificationRouting::CommandFailed, 'recorded failure' if failure == command
+      raise RailsMmd::VerificationRunner::CommandFailed, 'recorded failure' if failure == command
     end
 
     def capture3(*command)
@@ -36,7 +36,7 @@ RSpec.describe RailsMmd::VerificationRouting do
     end
   end
 
-  class GitProcess < RailsMmd::VerificationRouting::ProcessAdapter
+  class GitProcess < RailsMmd::VerificationRunner::ProcessAdapter
     attr_reader :commands
 
     def initialize(repair: nil)
@@ -50,11 +50,36 @@ RSpec.describe RailsMmd::VerificationRouting do
     end
   end
 
+  class SystemProcess < RailsMmd::VerificationRunner::ProcessAdapter
+    def initialize(command_success)
+      @command_success = command_success
+    end
+
+    def system(*)
+      @command_success
+    end
+  end
+
   subject(:routing) { described_class.new(process: process, output: output, error: error) }
 
   let(:process) { RecordingProcess.new }
   let(:output) { StringIO.new }
   let(:error) { StringIO.new }
+
+  describe RailsMmd::VerificationRunner::ProcessAdapter do
+    it 'returns when the command succeeds' do
+      adapter = SystemProcess.new(true)
+
+      expect(adapter.run!('true')).to be_nil
+    end
+
+    it 'raises a command failure when the command fails' do
+      adapter = SystemProcess.new(false)
+
+      expect { adapter.run!('false') }
+        .to raise_error(RailsMmd::VerificationRunner::CommandFailed, 'verification command failed: false')
+    end
+  end
 
   it 'runs the complete repair-first sequence and mutually exclusive routes once' do
     routing.run!(full_path_set)
@@ -116,12 +141,12 @@ RSpec.describe RailsMmd::VerificationRouting do
   it 'keeps Lefthook as a single adapter to the routing interface' do
     commands = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands')
 
-    expect(commands.keys).to eq(['verification-routing'])
-    expect(commands.fetch('verification-routing').fetch('run')).to include('VerificationRouting.new.run!(ARGV)')
+    expect(commands.keys).to eq(['verification-runner'])
+    expect(commands.fetch('verification-runner').fetch('run')).to include('VerificationRunner.new.run!(ARGV)')
   end
 
   it 'limits the Lefthook adapter to the union of verification paths' do
-    adapter = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands').fetch('verification-routing')
+    adapter = YAML.safe_load_file('lefthook.yml').fetch('pre-commit').fetch('commands').fetch('verification-runner')
 
     expect(adapter.fetch('glob')).to match_array(activation_globs)
   end

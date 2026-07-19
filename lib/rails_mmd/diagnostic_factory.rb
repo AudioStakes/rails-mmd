@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'rails_mmd/artifact_refs'
+require 'rails_mmd/artifact_ref_sanitizer'
 require 'rails_mmd/canonical_json'
 require 'rails_mmd/metadata_shapes'
 require 'rails_mmd/redactor'
@@ -9,12 +9,12 @@ require 'rails_mmd/subject_ids'
 
 module RailsMmd
   # Schema-backed diagnostic object factory.
-  class Diagnostics
+  class DiagnosticFactory
     CATALOG_PATH = Pathname(__dir__).join('../../fixtures/schemas/diagnostics/valid/catalog.json').expand_path
     SCHEMA_PATH = Pathname(__dir__).join('../../schemas/diagnostics.schema.json').expand_path
     FREE_TEXT_REFS = %w[#/$defs/relative_path #/$defs/sanitized_string].freeze
 
-    def initialize(redactor: Redactor.new, artifact_refs: ArtifactRefs.new(redactor: redactor))
+    def initialize(redactor: Redactor.new, artifact_refs: ArtifactRefSanitizer.new(redactor: redactor))
       @redactor = redactor
       @artifact_refs = artifact_refs
     end

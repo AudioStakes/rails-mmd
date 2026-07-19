@@ -4,7 +4,7 @@ require 'open3'
 
 module RailsMmd
   # Owns pre-commit path classification, ordering, and command selection.
-  class VerificationRouting
+  class VerificationRunner
     class CommandFailed < StandardError; end
 
     RUBY_PATH = %r{

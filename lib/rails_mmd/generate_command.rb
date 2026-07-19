@@ -10,7 +10,7 @@ require 'rails_mmd/redactor'
 module RailsMmd
   # Coordinates the P0 generate pipeline behind the Thor command.
   # @api private
-  class Generate
+  class GenerateCommand
     Result = Struct.new(:exit_code, :stdout, :stderr, :diagnostics, keyword_init: true) do
       def success?
         exit_code.zero?
@@ -40,38 +40,38 @@ module RailsMmd
       rails_result = rails_loader.boot
       return pre_output_result(rails_result.diagnostics, rails_result.exit_code) unless rails_result.success?
 
-      result = pipeline.build(config: config)
-      publish_result(config, result.diagnostics, result.artifacts, fail_on_warning)
+      pipeline_result = generate_artifacts(config)
+      publish_result(config, pipeline_result.diagnostics, pipeline_result.artifacts, fail_on_warning)
     end
 
     def publish_result(config, diagnostics, artifacts, fail_on_warning)
-      result = publisher.publish(
+      publication_result = publisher.publish(
         output_dir: config.output.directory,
         selected_domain_ids: config.selected_domain_ids,
         diagnostics: diagnostics,
         artifacts: artifacts
       )
-      result_for_publish(result, fail_on_warning)
+      command_result_for(publication_result, fail_on_warning)
     end
 
-    def result_for_publish(result, fail_on_warning)
+    def command_result_for(publication_result, fail_on_warning)
       Result.new(
-        exit_code: publish_exit_code(result, fail_on_warning),
+        exit_code: publication_exit_code(publication_result, fail_on_warning),
         stdout: '',
-        stderr: publish_stderr(result),
-        diagnostics: result.diagnostics
+        stderr: publication_stderr(publication_result),
+        diagnostics: publication_result.diagnostics
       )
     end
 
-    def publish_exit_code(result, fail_on_warning)
-      ExitPolicy.exit_code(result.diagnostics, fail_on_warning: fail_on_warning)
+    def publication_exit_code(publication_result, fail_on_warning)
+      ExitPolicy.exit_code(publication_result.diagnostics, fail_on_warning: fail_on_warning)
     end
 
-    def publish_stderr(result)
-      return result.stderr.to_s unless result.stderr.to_s.empty?
-      return '' if result.success?
+    def publication_stderr(publication_result)
+      return publication_result.stderr.to_s unless publication_result.stderr.to_s.empty?
+      return '' if publication_result.success?
 
-      publisher.pre_output_stderr(result.diagnostics)
+      publisher.pre_output_stderr(publication_result.diagnostics)
     end
 
     def pre_output_result(diagnostics, exit_code)
@@ -98,7 +98,7 @@ module RailsMmd
     end
 
     def diagnostics_factory
-      @diagnostics_factory ||= Diagnostics.new(redactor: redactor)
+      @diagnostics_factory ||= DiagnosticFactory.new(redactor: redactor)
     end
 
     def redactor
@@ -107,6 +107,10 @@ module RailsMmd
 
     def pipeline
       @pipeline ||= GenerationPipeline.new(redactor: redactor)
+    end
+
+    def generate_artifacts(config)
+      pipeline.generate(config: config)
     end
   end
 end

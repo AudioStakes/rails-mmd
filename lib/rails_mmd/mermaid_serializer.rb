@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/schema_validator'
 
 module RailsMmd
@@ -12,8 +12,8 @@ module RailsMmd
     DOMAIN_ID_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
     ARTIFACT_KINDS = %w[er class].freeze
 
-    def initialize(diagnostics: Diagnostics.new, schema_validator: SchemaValidator.new)
-      @diagnostics = diagnostics
+    def initialize(diagnostics: DiagnosticFactory.new, schema_validator: SchemaValidator.new)
+      @diagnostic_factory = diagnostics
       @schema_validator = schema_validator
     end
 
@@ -26,7 +26,7 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics, :schema_validator
+    attr_reader :diagnostic_factory, :schema_validator
 
     def text_for(render_plan)
       return er_text(render_plan) if render_plan.fetch('artifact_kind') == 'er'
@@ -131,7 +131,7 @@ module RailsMmd
     end
 
     def serialization_diagnostic(render_plan, exception)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'MERMAID_SERIALIZATION_FAILED',
         message: 'serialization failed',
         subject_id: "#{safe_domain_id(render_plan)}:#{safe_artifact_kind(render_plan)}",

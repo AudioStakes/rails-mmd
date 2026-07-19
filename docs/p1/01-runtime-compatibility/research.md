@@ -14,7 +14,7 @@ instead of a Cartesian matrix.
   `activesupport` dependency.
 - `RailsMmd::RailsLoader#boot` loads the target application's
   `config/environment.rb` and eager-loads its `Rails.application`.
-- `RailsMmd::Generate#run` reads `ActiveRecord::Base` from the target Rails
+- `RailsMmd::GenerateCommand#run` reads `ActiveRecord::Base` from the target Rails
   application. Active Record itself is not a rails-mmd runtime dependency.
 - No file under `lib/` or `exe/` references Active Support directly. The direct
   `activesupport` dependency is therefore coupling, not an implementation need.

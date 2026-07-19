@@ -343,7 +343,7 @@ RSpec.describe RailsMmd::Publisher do
   end
 
   def diagnostic(code, severity, _scope, metadata)
-    RailsMmd::Diagnostics.new.build(
+    RailsMmd::DiagnosticFactory.new.build(
       code: code,
       severity: severity,
       subject_id: metadata[:domain_id],

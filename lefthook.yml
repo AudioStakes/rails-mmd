@@ -4,7 +4,7 @@ output:
 pre-commit:
   parallel: false
   commands:
-    verification-routing:
+    verification-runner:
       glob:
         - "*.rb"
         - "*.rake"
@@ -34,7 +34,7 @@ pre-commit:
         - "README.md"
         - "docs/*.md"
         - "docs/**/*.md"
-      run: bundle exec ruby -Ilib -rrails_mmd/verification_routing -e 'RailsMmd::VerificationRouting.new.run!(ARGV)' -- {staged_files}
+      run: bundle exec ruby -Ilib -rrails_mmd/verification_runner -e 'RailsMmd::VerificationRunner.new.run!(ARGV)' -- {staged_files}
 
 pre-push:
   commands:

@@ -100,7 +100,7 @@ module RailsMmd
         'schema_version' => 1,
         'scope' => scope,
         'domain_id' => domain_id,
-        'diagnostics' => Ordering.diagnostics(diagnostics),
+        'diagnostics' => Ordering.sort_diagnostics(diagnostics),
         'digest_sha256' => nil
       }
       payload.merge('digest_sha256' => CanonicalJson.digest_sha256(payload))

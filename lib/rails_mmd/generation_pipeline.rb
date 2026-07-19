@@ -2,7 +2,7 @@
 
 require 'rails_mmd/constant_resolver'
 require 'rails_mmd/domain_resolver'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/ir_builder'
 require 'rails_mmd/mermaid_serializer'
 require 'rails_mmd/model_inventory'
@@ -22,51 +22,51 @@ module RailsMmd
       @active_record_base = active_record_base
       @constant_resolver = ConstantResolver.wrap(constant_resolver)
       @redactor = redactor
-      @diagnostics = Diagnostics.new(redactor: redactor)
+      @diagnostic_factory = DiagnosticFactory.new(redactor: redactor)
       @render_plan_builder = render_plan_builder || RenderPlanBuilder.new(redactor: redactor)
-      @mermaid_serializer = mermaid_serializer || MermaidSerializer.new(diagnostics: @diagnostics)
+      @mermaid_serializer = mermaid_serializer || MermaidSerializer.new(diagnostics: @diagnostic_factory)
     end
 
-    def build(config:)
-      resolved, probed, relationships, ir_payload = internal_payloads(config)
-      diagnostics = resolved.diagnostics + probed.diagnostics + relationships.diagnostics
+    def generate(config:)
+      domain_resolution, schema_probe_result, relationship_result, ir_payload = build_stage_results(config)
+      diagnostics = domain_resolution.diagnostics + schema_probe_result.diagnostics + relationship_result.diagnostics
       artifacts = render_artifacts(config, ir_payload, diagnostics)
       Result.new(diagnostics: diagnostics, artifacts: artifacts)
     end
 
     private
 
-    attr_reader :active_record_base, :constant_resolver, :diagnostics, :mermaid_serializer, :redactor,
+    attr_reader :active_record_base, :constant_resolver, :diagnostic_factory, :mermaid_serializer, :redactor,
                 :render_plan_builder
 
-    def internal_payloads(config)
-      resolved = resolve_domains(config)
-      probed = probe_domains(resolved)
-      relationships = build_relationships(probed)
-      ir_payload = build_ir(config, probed, relationships)
-      [resolved, probed, relationships, ir_payload]
+    def build_stage_results(config)
+      domain_resolution = resolve_domains(config)
+      schema_probe_result = probe_domains(domain_resolution)
+      relationship_result = build_relationships(schema_probe_result)
+      ir_payload = build_ir(config, schema_probe_result, relationship_result)
+      [domain_resolution, schema_probe_result, relationship_result, ir_payload]
     end
 
     def resolve_domains(config)
       inventory = ModelInventory.new(
         active_record_base: resolved_active_record_base, constant_resolver: constant_resolver, redactor: redactor
       )
-      DomainResolver.new(diagnostics: diagnostics).resolve(config: config, inventory_records: inventory.records)
+      DomainResolver.new(diagnostics: diagnostic_factory).resolve(config: config, inventory_records: inventory.records)
     end
 
-    def probe_domains(resolved)
-      SchemaProbe.new(constant_resolver: constant_resolver, diagnostics: diagnostics, redactor: redactor)
-                 .probe(domains: resolved.domains)
+    def probe_domains(domain_resolution)
+      SchemaProbe.new(constant_resolver: constant_resolver, diagnostics: diagnostic_factory, redactor: redactor)
+                 .probe(domains: domain_resolution.domains)
     end
 
-    def build_relationships(probed)
-      RelationshipBuilder.new(constant_resolver: constant_resolver, diagnostics: diagnostics)
-                         .build(domains: probed.domains)
+    def build_relationships(schema_probe_result)
+      RelationshipBuilder.new(constant_resolver: constant_resolver, diagnostics: diagnostic_factory)
+                         .build(domains: schema_probe_result.domains)
     end
 
-    def build_ir(config, probed, relationships)
+    def build_ir(config, schema_probe_result, relationship_result)
       IrBuilder.new(attributes: config.output.attributes).build(
-        domains: probed.domains, relationship_domains: relationships.domains
+        domains: schema_probe_result.domains, relationship_domains: relationship_result.domains
       )
     end
 
@@ -78,13 +78,13 @@ module RailsMmd
 
     def render_domain_artifacts(config, domain, diagnostics)
       artifact_kinds(config).each_with_object({}) do |kind, artifacts|
-        result = render_plan_for(config, domain, kind, diagnostics)
-        diagnostics.concat(result.diagnostics)
-        serialized = mermaid_serializer.serialize(render_plan: result.payload)
-        diagnostics.concat(serialized.diagnostics)
-        next unless serialized.diagnostics.empty?
+        render_plan_result = render_plan_for(config, domain, kind, diagnostics)
+        diagnostics.concat(render_plan_result.diagnostics)
+        serialization_result = mermaid_serializer.serialize(render_plan: render_plan_result.payload)
+        diagnostics.concat(serialization_result.diagnostics)
+        next unless serialization_result.diagnostics.empty?
 
-        artifacts[kind] = { render_plan: result.payload, mermaid: serialized.text }
+        artifacts[kind] = { render_plan: render_plan_result.payload, mermaid: serialization_result.text }
       end
     end
 

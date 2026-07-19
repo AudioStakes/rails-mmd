@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/output_directory'
 require 'rails_mmd/schema_validator'
 
@@ -22,7 +22,7 @@ module RailsMmd
       OUTPUT_DIRECTORY_INVALID
     ].freeze
     ARTIFACT_KINDS = %w[er class].freeze
-    def initialize(project_root:, schema_validator: SchemaValidator.new, diagnostics_factory: Diagnostics.new)
+    def initialize(project_root:, schema_validator: SchemaValidator.new, diagnostics_factory: DiagnosticFactory.new)
       @output_directory = OutputDirectory.new(project_root: project_root)
       @schema_validator = schema_validator
       @diagnostics_factory = diagnostics_factory
@@ -36,10 +36,10 @@ module RailsMmd
     def publish(output_dir:, selected_domain_ids:, diagnostics:, artifacts:)
       return pre_output_fatal_result(diagnostics) if pre_output_fatal?(diagnostics)
 
-      result = output_directory.resolve(output_dir)
-      return invalid_output_result(result.reason) unless result.valid?
+      output_resolution = output_directory.resolve(output_dir)
+      return invalid_output_result(output_resolution.reason) unless output_resolution.valid?
 
-      publish_inside_output(result, selected_domain_ids, diagnostics, artifacts)
+      publish_inside_output(output_resolution, selected_domain_ids, diagnostics, artifacts)
     rescue StandardError => e
       Result.new(success: false, diagnostics: [output_write_failed(e)], written_paths: [], stderr: nil)
     end
@@ -48,8 +48,8 @@ module RailsMmd
 
     attr_reader :diagnostics_factory, :output_directory, :schema_validator
 
-    def publish_inside_output(result, selected_domain_ids, diagnostics, artifacts)
-      written_paths = output_directory.publish!(result, selected_domain_ids: selected_domain_ids) do
+    def publish_inside_output(output_resolution, selected_domain_ids, diagnostics, artifacts)
+      written_paths = output_directory.publish!(output_resolution, selected_domain_ids: selected_domain_ids) do
         diagnostics = scoped_diagnostics(diagnostics, selected_domain_ids)
         artifacts = scoped_artifacts(artifacts, selected_domain_ids)
         diagnostic_documents = validate_payloads!(diagnostics, artifacts)

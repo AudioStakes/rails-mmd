@@ -3,7 +3,7 @@
 module RailsMmd
   # Normalizes DB/Rails attribute type hints for Mermaid-facing render plans.
   module AttributeTypes
-    SUPPORTED = %w[
+    SUPPORTED_TYPES = %w[
       bigint
       boolean
       date
@@ -21,7 +21,7 @@ module RailsMmd
 
     def normalize(value)
       type = value.to_s.downcase.gsub(/[^a-z0-9]+/, '_').gsub(/\A_+|_+\z/, '')
-      return type if SUPPORTED.include?(type)
+      return type if SUPPORTED_TYPES.include?(type)
 
       'unknown'
     end

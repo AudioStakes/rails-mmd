@@ -3,7 +3,7 @@
 require 'rails_mmd/attribute_types'
 require 'rails_mmd/canonical_json'
 require 'rails_mmd/redactor'
-require 'rails_mmd/safe_tokens'
+require 'rails_mmd/safe_token_assigner'
 
 module RailsMmd
   # Projects normalized IR into renderer-only ER or class render plans.
@@ -25,7 +25,7 @@ module RailsMmd
     }.freeze
     ASSOCIATION_LABEL_SUFFIX = /[?!=]\z/
 
-    def initialize(safe_tokens: SafeTokens.new, redactor: Redactor.new)
+    def initialize(safe_tokens: SafeTokenAssigner.new, redactor: Redactor.new)
       @safe_tokens = safe_tokens
       @redactor = redactor
     end

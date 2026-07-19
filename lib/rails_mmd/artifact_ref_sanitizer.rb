@@ -4,7 +4,7 @@ require 'rails_mmd/redactor'
 
 module RailsMmd
   # Sanitizes and validates diagnostic artifact references.
-  class ArtifactRefs
+  class ArtifactRefSanitizer
     ALLOWED_KEYS = %w[artifact_kind domain_id path].freeze
     ARTIFACT_KINDS = %w[diagnostics er class render_plan stderr].freeze
     DOMAIN_ID_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
@@ -17,7 +17,7 @@ module RailsMmd
 
     def sanitize(artifact_refs)
       artifact_refs.map do |artifact_ref|
-        sanitize_ref(artifact_ref)
+        sanitize_reference(artifact_ref)
       end
     end
 
@@ -25,25 +25,25 @@ module RailsMmd
 
     attr_reader :redactor
 
-    def sanitize_ref(artifact_ref)
-      ref = artifact_ref.to_h.transform_keys(&:to_s)
-      unknown_keys = ref.keys - ALLOWED_KEYS
+    def sanitize_reference(artifact_ref)
+      reference = artifact_ref.to_h.transform_keys(&:to_s)
+      unknown_keys = reference.keys - ALLOWED_KEYS
       raise ArgumentError, "unknown artifact ref keys: #{unknown_keys.join(', ')}" unless unknown_keys.empty?
 
-      validate_ref!(ref)
-      ref['path'] = safe_path(ref.fetch('path')) if ref.key?('path')
-      ref
+      validate_reference!(reference)
+      reference['path'] = safe_path(reference.fetch('path')) if reference.key?('path')
+      reference
     end
 
-    def validate_ref!(ref)
-      missing_keys = REQUIRED_KEYS - ref.keys
+    def validate_reference!(reference)
+      missing_keys = REQUIRED_KEYS - reference.keys
       raise ArgumentError, "missing artifact ref keys: #{missing_keys.join(', ')}" unless missing_keys.empty?
-      unless ARTIFACT_KINDS.include?(ref.fetch('artifact_kind'))
+      unless ARTIFACT_KINDS.include?(reference.fetch('artifact_kind'))
         raise ArgumentError,
-              "invalid artifact_kind: #{ref.fetch('artifact_kind')}"
+              "invalid artifact_kind: #{reference.fetch('artifact_kind')}"
       end
 
-      domain_id = ref.fetch('domain_id')
+      domain_id = reference.fetch('domain_id')
       return if domain_id.nil? || domain_id.match?(DOMAIN_ID_PATTERN)
 
       raise ArgumentError, "invalid artifact domain_id: #{domain_id}"

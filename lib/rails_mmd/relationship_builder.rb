@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/constant_resolver'
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 
 module RailsMmd
   # Builds selected-domain direct and through relationship records.
@@ -19,7 +19,7 @@ module RailsMmd
       :target_cardinality,
       keyword_init: true
     )
-    Candidate = Struct.new(
+    RelationshipCandidate = Struct.new(
       :relationship_id,
       :owner_entity_id,
       :target_entity_id,
@@ -36,14 +36,14 @@ module RailsMmd
       :physical_key,
       :owner_foreign_key_column,
       :target_primary_key_column,
-      :owner_fk_unique,
-      :db_foreign_key,
-      :owner_fk_nullable,
+      :foreign_key_unique,
+      :foreign_key_constraint,
+      :foreign_key_nullable,
       :owner_cardinality,
       :target_cardinality,
       keyword_init: true
     )
-    private_constant :Candidate
+    private_constant :RelationshipCandidate
     Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
@@ -64,9 +64,9 @@ module RailsMmd
       end
     end
 
-    def initialize(constant_resolver:, diagnostics: Diagnostics.new)
+    def initialize(constant_resolver:, diagnostics: DiagnosticFactory.new)
       @constant_resolver = ConstantResolver.wrap(constant_resolver)
-      @diagnostics = diagnostics
+      @diagnostic_factory = diagnostics
     end
 
     def build(domains:)
@@ -77,7 +77,7 @@ module RailsMmd
 
     private
 
-    attr_reader :constant_resolver, :diagnostics
+    attr_reader :constant_resolver, :diagnostic_factory
 
     def build_domain(domain)
       context = DomainContext.new(domain)
@@ -128,7 +128,7 @@ module RailsMmd
     end
 
     def classify_reflection(context, owner, reflection)
-      return build_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
+      return build_belongs_to_reflection(context, owner, reflection) if reflection_macro(reflection) == :belongs_to
       return build_habtm_reflection(context, owner, reflection) if habtm?(reflection)
       return build_through_reflection(context, owner, reflection) if through?(reflection)
       return build_direct_reflection(context, owner, reflection) if direct_has?(reflection)
@@ -159,20 +159,22 @@ module RailsMmd
       target = context.entity_by_constant[target_constant]
       return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
 
-      keys = habtm_keys(reflection)
-      return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
+      habtm_key_metadata = habtm_keys(reflection)
+      unless habtm_key_metadata
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant)
+      end
 
-      join_table = context.join_table_by_name[keys.fetch(:join_table)]
-      invalid_reason = habtm_join_table_invalid_reason(join_table, keys)
+      join_table = context.join_table_by_name[habtm_key_metadata.fetch(:join_table)]
+      invalid_reason = habtm_join_table_invalid_reason(join_table, habtm_key_metadata)
       if invalid_reason
         return habtm_join_table_invalid(
           context, owner,
-          keys.merge(association_name: sanitized_name, target_constant: target_constant),
+          habtm_key_metadata.merge(association_name: sanitized_name, target_constant: target_constant),
           invalid_reason
         )
       end
 
-      [habtm_relationship_for(owner, target, sanitized_name, keys), nil]
+      [habtm_relationship_for(owner, target, sanitized_name, habtm_key_metadata), nil]
     end
 
     def habtm_keys(reflection)
@@ -186,13 +188,13 @@ module RailsMmd
       values
     end
 
-    def habtm_join_table_invalid_reason(join_table, keys)
-      return 'ambiguous_columns' if keys.fetch(:owner_column) == keys.fetch(:target_column)
+    def habtm_join_table_invalid_reason(join_table, habtm_key_metadata)
+      return 'ambiguous_columns' if habtm_key_metadata.fetch(:owner_column) == habtm_key_metadata.fetch(:target_column)
       return 'unresolved' unless join_table
       return 'primary_key_present' unless join_table.primary_key.nil?
 
       actual = join_table.columns.map(&:name)
-      required = [keys.fetch(:owner_column), keys.fetch(:target_column)]
+      required = [habtm_key_metadata.fetch(:owner_column), habtm_key_metadata.fetch(:target_column)]
       return 'join_column_missing' unless (required - actual).empty?
 
       'extra_columns' unless actual.sort == required.sort
@@ -204,7 +206,7 @@ module RailsMmd
                  .merge(join_table: details.fetch(:join_table), reason: reason)
       [
         nil,
-        diagnostics.build(
+        diagnostic_factory.build(
           code: 'ASSOCIATION_JOIN_TABLE_INVALID',
           message: omission_message(owner, association_name, 'ASSOCIATION_JOIN_TABLE_INVALID'),
           subject_id: "#{owner.table_name}.#{safe_subject_association(association_name)}",
@@ -213,16 +215,16 @@ module RailsMmd
       ]
     end
 
-    def habtm_relationship_for(owner, target, association_name, keys)
+    def habtm_relationship_for(owner, target, association_name, habtm_key_metadata)
       left, right = [
-        [entity_id(owner), owner.table_name, keys.fetch(:owner_column)],
-        [entity_id(target), target.table_name, keys.fetch(:target_column)]
+        [entity_id(owner), owner.table_name, habtm_key_metadata.fetch(:owner_column)],
+        [entity_id(target), target.table_name, habtm_key_metadata.fetch(:target_column)]
       ].sort_by { |entity, _table, column| [entity, column] }
-      join_table = keys.fetch(:join_table)
+      join_table = habtm_key_metadata.fetch(:join_table)
       relationship_id = [
         'relationships', left[1], 'habtm', join_table, left[2], right[1], right[2]
       ].join('/')
-      Candidate.new(
+      RelationshipCandidate.new(
         relationship_id: relationship_id,
         owner_entity_id: left[0],
         target_entity_id: right[0],
@@ -286,17 +288,20 @@ module RailsMmd
         return polymorphic_failure(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED')
       end
 
-      keys = polymorphic_key_columns(reflection)
-      return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED') unless keys
-      unless default_polymorphic_keys?(sanitized_name, keys)
+      polymorphic_keys = polymorphic_key_columns(reflection)
+      unless polymorphic_keys
+        return polymorphic_failure(context, owner, sanitized_name,
+                                   'ASSOCIATION_COMPOSITE_KEY_OMITTED')
+      end
+      unless default_polymorphic_keys?(sanitized_name, polymorphic_keys)
         return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_OMITTED')
       end
-      unless keys.values.all? { |column| column_names(owner).include?(column) }
+      unless polymorphic_keys.values.all? { |column| column_names(owner).include?(column) }
         return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING')
       end
 
       candidates, candidate_diagnostics, handled = polymorphic_candidates(
-        context, root, inverses, sanitized_name, keys
+        context, root, inverses, sanitized_name, polymorphic_keys
       )
       if candidates.empty?
         candidate_diagnostics << omitted(
@@ -304,7 +309,7 @@ module RailsMmd
         ).last
       end
       relationships = candidates.map do |candidate|
-        polymorphic_relationship_for(owner, candidate.owner, sanitized_name, keys, candidate.reflection)
+        polymorphic_relationship_for(owner, candidate.owner, sanitized_name, polymorphic_keys, candidate.reflection)
       end
       [relationships, candidate_diagnostics, handled]
     end
@@ -321,14 +326,14 @@ module RailsMmd
       { foreign_key: foreign_key, foreign_type: foreign_type }
     end
 
-    def default_polymorphic_keys?(association_name, keys)
-      keys == {
+    def default_polymorphic_keys?(association_name, polymorphic_keys)
+      polymorphic_keys == {
         foreign_key: "#{association_name}_id",
         foreign_type: "#{association_name}_type"
       }
     end
 
-    def polymorphic_candidates(context, root, inverses, association_name, keys)
+    def polymorphic_candidates(context, root, inverses, association_name, polymorphic_keys)
       valid = []
       output_diagnostics = []
       handled = []
@@ -339,7 +344,7 @@ module RailsMmd
         next unless target_model && target_constant == root.owner.ruby_constant
 
         handled << candidate.reflection
-        diagnostic = polymorphic_candidate_diagnostic(context, candidate, keys, target_model)
+        diagnostic = polymorphic_candidate_diagnostic(context, candidate, polymorphic_keys, target_model)
         if diagnostic
           output_diagnostics << diagnostic
         else
@@ -416,17 +421,20 @@ module RailsMmd
       target = context.entity_by_constant[target_constant]
       return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
 
-      keys = direct_key_columns(reflection, owner)
-      return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
-      unless keys.fetch(:referenced_primary_key) == owner.primary_key
+      inverse_keys = inverse_key_columns(reflection, owner)
+      unless inverse_keys
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED',
+                       target_constant)
+      end
+      unless inverse_keys.fetch(:referenced_primary_key) == owner.primary_key
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
       end
-      unless column_names(target).include?(keys.fetch(:foreign_key)) &&
-             column_names(owner).include?(keys.fetch(:referenced_primary_key))
+      unless column_names(target).include?(inverse_keys.fetch(:foreign_key)) &&
+             column_names(owner).include?(inverse_keys.fetch(:referenced_primary_key))
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
       end
 
-      [direct_relationship_for(owner, target, sanitized_name, reflection_macro(reflection), keys), nil]
+      [direct_relationship_for(owner, target, sanitized_name, reflection_macro(reflection), inverse_keys), nil]
     end
 
     def build_through_reflection(context, owner, reflection)
@@ -470,7 +478,7 @@ module RailsMmd
 
     def omitted_macro(context, owner, reflection)
       association_name = reflection_name(reflection)
-      diagnostics.build(
+      diagnostic_factory.build(
         code: 'ASSOCIATION_MACRO_OMITTED',
         message: omission_message(owner, association_name, 'ASSOCIATION_MACRO_OMITTED'),
         subject_id: "#{owner.table_name}.#{safe_subject_association(association_name)}",
@@ -480,7 +488,7 @@ module RailsMmd
       )
     end
 
-    def build_reflection(context, owner, reflection)
+    def build_belongs_to_reflection(context, owner, reflection)
       association_name = reflection_name(reflection)
       sanitized_name = sanitize_association_name(association_name)
       return omitted(context, owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED') if polymorphic?(reflection)
@@ -501,27 +509,30 @@ module RailsMmd
       target = context.entity_by_constant[target_constant]
       return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
 
-      keys = key_columns(reflection, target)
-      return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) if keys.nil?
-      unless keys.fetch(:association_primary_key) == target.primary_key
+      belongs_to_keys = belongs_to_key_columns(reflection, target)
+      if belongs_to_keys.nil?
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant)
+      end
+      unless belongs_to_keys.fetch(:association_primary_key) == target.primary_key
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
       end
-      unless column_names(owner).include?(keys.fetch(:owner_foreign_key)) &&
-             column_names(target).include?(keys.fetch(:target_primary_key))
+      unless column_names(owner).include?(belongs_to_keys.fetch(:owner_foreign_key)) &&
+             column_names(target).include?(belongs_to_keys.fetch(:target_primary_key))
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
       end
 
-      [relationship_for(owner, target, sanitized_name, keys), nil]
+      [belongs_to_relationship_for(owner, target, sanitized_name, belongs_to_keys), nil]
     end
 
-    def relationship_for(owner, target, association_name, keys)
-      owner_fk = keys.fetch(:owner_foreign_key)
-      target_pk = keys.fetch(:target_primary_key)
-      owner_unique = unique_owner_fk?(owner, owner_fk)
-      db_foreign_key = db_foreign_key?(owner, target, owner_fk, target_pk)
-      owner_fk_nullable = column_nullable?(owner, owner_fk)
+    def belongs_to_relationship_for(owner, target, association_name, belongs_to_keys)
+      owner_foreign_key_column = belongs_to_keys.fetch(:owner_foreign_key)
+      target_primary_key_column = belongs_to_keys.fetch(:target_primary_key)
+      foreign_key_unique = unique_foreign_key_column?(owner, owner_foreign_key_column)
+      foreign_key_constraint = foreign_key_constraint?(owner, target, owner_foreign_key_column,
+                                                       target_primary_key_column)
+      foreign_key_nullable = column_nullable?(owner, owner_foreign_key_column)
 
-      Candidate.new(
+      RelationshipCandidate.new(
         relationship_id: "relationships/#{owner.table_name}/#{association_name}",
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -529,26 +540,27 @@ module RailsMmd
         association_macro: :belongs_to,
         relationship_kind: :direct,
         foreign_key_holder_entity_id: entity_id(owner),
-        foreign_key_column: owner_fk,
-        referenced_primary_key_column: target_pk,
-        physical_key: physical_key(entity_id(owner), owner_fk, entity_id(target), target_pk),
-        owner_foreign_key_column: owner_fk,
-        target_primary_key_column: target_pk,
-        owner_fk_unique: owner_unique,
-        db_foreign_key: db_foreign_key,
-        owner_fk_nullable: owner_fk_nullable,
-        owner_cardinality: owner_unique ? '0..1' : '0..many',
-        target_cardinality: db_foreign_key && owner_fk_nullable == false ? '1..1' : '0..1'
+        foreign_key_column: owner_foreign_key_column,
+        referenced_primary_key_column: target_primary_key_column,
+        physical_key: physical_key(entity_id(owner), owner_foreign_key_column, entity_id(target),
+                                   target_primary_key_column),
+        owner_foreign_key_column: owner_foreign_key_column,
+        target_primary_key_column: target_primary_key_column,
+        foreign_key_unique: foreign_key_unique,
+        foreign_key_constraint: foreign_key_constraint,
+        foreign_key_nullable: foreign_key_nullable,
+        owner_cardinality: foreign_key_unique ? '0..1' : '0..many',
+        target_cardinality: foreign_key_constraint && foreign_key_nullable == false ? '1..1' : '0..1'
       )
     end
 
-    def direct_relationship_for(owner, target, association_name, macro, keys)
-      foreign_key = keys.fetch(:foreign_key)
-      referenced_primary_key = keys.fetch(:referenced_primary_key)
-      db_foreign_key = db_foreign_key?(target, owner, foreign_key, referenced_primary_key)
+    def direct_relationship_for(owner, target, association_name, macro, inverse_keys)
+      foreign_key = inverse_keys.fetch(:foreign_key)
+      referenced_primary_key = inverse_keys.fetch(:referenced_primary_key)
+      foreign_key_constraint = foreign_key_constraint?(target, owner, foreign_key, referenced_primary_key)
       foreign_key_nullable = column_nullable?(target, foreign_key)
 
-      Candidate.new(
+      RelationshipCandidate.new(
         relationship_id: "relationships/#{owner.table_name}/#{association_name}",
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -561,24 +573,24 @@ module RailsMmd
         physical_key: physical_key(entity_id(target), foreign_key, entity_id(owner), referenced_primary_key),
         owner_foreign_key_column: foreign_key,
         target_primary_key_column: referenced_primary_key,
-        owner_fk_unique: unique_owner_fk?(target, foreign_key),
-        db_foreign_key: db_foreign_key,
-        owner_fk_nullable: foreign_key_nullable,
-        owner_cardinality: db_foreign_key && foreign_key_nullable == false ? '1..1' : '0..1',
+        foreign_key_unique: unique_foreign_key_column?(target, foreign_key),
+        foreign_key_constraint: foreign_key_constraint,
+        foreign_key_nullable: foreign_key_nullable,
+        owner_cardinality: foreign_key_constraint && foreign_key_nullable == false ? '1..1' : '0..1',
         target_cardinality: macro == :has_one ? '0..1' : '0..many'
       )
     end
 
-    def polymorphic_relationship_for(owner, target, association_name, keys, inverse_reflection)
-      foreign_key = keys.fetch(:foreign_key)
-      foreign_type = keys.fetch(:foreign_type)
+    def polymorphic_relationship_for(owner, target, association_name, polymorphic_keys, inverse_reflection)
+      foreign_key = polymorphic_keys.fetch(:foreign_key)
+      foreign_type = polymorphic_keys.fetch(:foreign_type)
       relationship_id = [
         'relationships', owner.table_name, 'polymorphic', association_name,
         foreign_key, foreign_type, target.table_name
       ].join('/')
       singular = reflection_macro(inverse_reflection) == :has_one ||
-                 unique_owner_keys?(owner, [foreign_type, foreign_key])
-      Candidate.new(
+                 unique_foreign_key_columns?(owner, [foreign_type, foreign_key])
+      RelationshipCandidate.new(
         relationship_id: relationship_id,
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -595,9 +607,9 @@ module RailsMmd
         ].join('|'),
         owner_foreign_key_column: foreign_key,
         target_primary_key_column: target.primary_key,
-        owner_fk_unique: singular,
-        db_foreign_key: false,
-        owner_fk_nullable: column_nullable?(owner, foreign_key) || column_nullable?(owner, foreign_type),
+        foreign_key_unique: singular,
+        foreign_key_constraint: false,
+        foreign_key_nullable: column_nullable?(owner, foreign_key) || column_nullable?(owner, foreign_type),
         owner_cardinality: singular ? '0..1' : '0..many',
         target_cardinality: '0..1'
       )
@@ -607,7 +619,7 @@ module RailsMmd
       relationship_id = [
         'relationships', owner.table_name, 'through', *path_names, target.table_name
       ].join('/')
-      Candidate.new(
+      RelationshipCandidate.new(
         relationship_id: relationship_id,
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
@@ -690,12 +702,14 @@ module RailsMmd
     end
 
     def canonical_holder_cardinality(candidates)
-      singular = candidates.any? { |candidate| candidate.association_macro == :has_one || candidate.owner_fk_unique }
+      singular = candidates.any? { |candidate| candidate.association_macro == :has_one || candidate.foreign_key_unique }
       singular ? '0..1' : '0..many'
     end
 
     def canonical_referenced_cardinality(candidates)
-      required = candidates.any? { |candidate| candidate.db_foreign_key && candidate.owner_fk_nullable == false }
+      required = candidates.any? do |candidate|
+        candidate.foreign_key_constraint && candidate.foreign_key_nullable == false
+      end
       required ? '1..1' : '0..1'
     end
 
@@ -706,7 +720,7 @@ module RailsMmd
     def omitted(context, owner, association_name, code, target_constant = nil)
       [
         nil,
-        diagnostics.build(
+        diagnostic_factory.build(
           code: code,
           message: omission_message(owner, association_name, code),
           subject_id: "#{owner.table_name}.#{safe_subject_association(association_name)}",
@@ -757,7 +771,7 @@ module RailsMmd
       false
     end
 
-    def key_columns(reflection, target)
+    def belongs_to_key_columns(reflection, target)
       owner_foreign_key = scalar_key(reflection_value(reflection, :foreign_key))
       association_primary_key = scalar_key(reflection_value(reflection, :association_primary_key))
       target_primary_key = scalar_key(target.primary_key)
@@ -770,7 +784,7 @@ module RailsMmd
       }
     end
 
-    def direct_key_columns(reflection, owner)
+    def inverse_key_columns(reflection, owner)
       foreign_key = scalar_key(reflection_value(reflection, :foreign_key))
       referenced_primary_key = scalar_key(reflection_value(reflection, :active_record_primary_key))
       referenced_primary_key ||= scalar_key(owner.primary_key)
@@ -781,18 +795,18 @@ module RailsMmd
       nil
     end
 
-    def unique_owner_fk?(owner, owner_fk)
-      owner.indexes.any? do |index|
+    def unique_foreign_key_column?(entity, foreign_key_column)
+      entity.indexes.any? do |index|
         index.unique == true &&
-          Array(index.columns) == [owner_fk] &&
+          Array(index.columns) == [foreign_key_column] &&
           total_plain_index?(index)
       end
     end
 
-    def unique_owner_keys?(owner, key_columns)
-      owner.indexes.any? do |index|
+    def unique_foreign_key_columns?(entity, foreign_key_columns)
+      entity.indexes.any? do |index|
         index.unique == true &&
-          Array(index.columns).sort == key_columns.sort &&
+          Array(index.columns).sort == foreign_key_columns.sort &&
           total_plain_index?(index)
       end
     end
@@ -801,12 +815,13 @@ module RailsMmd
       index.where.nil? && index.expression.nil? && [nil, 'btree', :btree].include?(index.using)
     end
 
-    def db_foreign_key?(owner, target, owner_fk, target_pk)
-      owner.foreign_keys.any? do |foreign_key|
-        foreign_key.from_table == owner.table_name &&
-          foreign_key.column == owner_fk &&
-          foreign_key.to_table == target.table_name &&
-          foreign_key.primary_key == target_pk
+    def foreign_key_constraint?(holder_entity, referenced_entity, foreign_key_column,
+                                referenced_primary_key_column)
+      holder_entity.foreign_keys.any? do |foreign_key|
+        foreign_key.from_table == holder_entity.table_name &&
+          foreign_key.column == foreign_key_column &&
+          foreign_key.to_table == referenced_entity.table_name &&
+          foreign_key.primary_key == referenced_primary_key_column
       end
     end
 

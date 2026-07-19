@@ -99,8 +99,8 @@ done
 - `RelationshipBuilder` currently renders only scalar `belongs_to`. Every other
   reflection becomes `ASSOCIATION_MACRO_OMITTED`.
 - The current `Relationship` internal shape assumes the FK lives on the owner
-  side: `owner_foreign_key_column`, `owner_fk_unique`, and
-  `owner_fk_nullable`.
+  side: `owner_foreign_key_column`, `foreign_key_unique`, and
+  `foreign_key_nullable`.
 - `IrBuilder` marks foreign-key attributes only on
   `relationship.owner_entity_id` via `relationship.owner_foreign_key_column`.
 - The public IR and render-plan schemas do not expose FK-side internals. They

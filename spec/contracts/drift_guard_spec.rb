@@ -15,7 +15,7 @@ RSpec.describe 'repository drift guards' do
     stdout, stderr, status = Open3.capture3('git', 'ls-files')
     raise stderr unless status.success?
 
-    stdout.lines.map(&:chomp)
+    stdout.lines.map(&:chomp).select { |path| File.file?(path) }
   end
 
   def repository_text(path)

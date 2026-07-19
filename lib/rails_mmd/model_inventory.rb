@@ -29,7 +29,7 @@ module RailsMmd
 
     def records
       active_record_base.descendants.filter_map do |model|
-        next unless inventoriable?(model)
+        next unless constant_backed_model?(model)
 
         build_record(model)
       end
@@ -39,11 +39,11 @@ module RailsMmd
 
     attr_reader :active_record_base, :constant_resolver, :redactor
 
-    def inventoriable?(model)
-      name = model.name
-      return false unless name.is_a?(String) && !name.empty?
+    def constant_backed_model?(model)
+      model_name = model.name
+      return false unless model_name.is_a?(String) && !model_name.empty?
 
-      constant_resolver.resolve(name).equal?(model)
+      constant_resolver.resolve(model_name).equal?(model)
     end
 
     def build_record(model)
@@ -108,14 +108,14 @@ module RailsMmd
     def context_from_db_config(model)
       db_config = model.connection_db_config
       {
-        'name' => value_from(db_config, :name),
-        'role' => value_from(model, :current_role) || 'default',
-        'shard' => value_from(model, :current_shard) || 'default',
-        'adapter' => value_from(db_config, :adapter),
-        'database' => value_from(db_config, :database),
-        'host' => value_from(db_config, :host),
-        'port' => value_from(db_config, :port),
-        'username' => value_from(db_config, :username)
+        'name' => connection_context_value(db_config, :name),
+        'role' => connection_context_value(model, :current_role) || 'default',
+        'shard' => connection_context_value(model, :current_shard) || 'default',
+        'adapter' => connection_context_value(db_config, :adapter),
+        'database' => connection_context_value(db_config, :database),
+        'host' => connection_context_value(db_config, :host),
+        'port' => connection_context_value(db_config, :port),
+        'username' => connection_context_value(db_config, :username)
       }
     end
 
@@ -134,11 +134,11 @@ module RailsMmd
       %w[role shard].include?(key) ? 'default' : nil
     end
 
-    def value_from(object, method_name)
-      return unless object.respond_to?(method_name)
+    def connection_context_value(connection_source, method_name)
+      return unless connection_source.respond_to?(method_name)
 
-      value = object.public_send(method_name)
-      sanitize_context_value(value)
+      context_value = connection_source.public_send(method_name)
+      sanitize_context_value(context_value)
     end
   end
   # rubocop:enable Metrics/ClassLength, Metrics/MethodLength

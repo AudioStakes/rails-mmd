@@ -38,7 +38,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       %i[relationship_id owner_entity_id target_entity_id association_name foreign_key_column foreign_type_column
          owner_cardinality target_cardinality]
     )
-    expect { described_class::Candidate }.to raise_error(NameError)
+    expect { described_class::RelationshipCandidate }.to raise_error(NameError)
   end
 
   it 'handles owner models without associations' do
@@ -124,6 +124,20 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         foreign_key_column: nil
       )
     )
+  end
+
+  it 'omits HABTM reflections whose key metadata is composite' do
+    tag_model = renderable_model('Tag', 'tags')
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: %w[author_id tenant_id], association_foreign_key: 'tag_id'
+    )
+    domain = domain_result('core', [entity('Author', 'authors'), entity('Tag', 'tags')])
+
+    result = build(domain, 'Author' => owner_model(tags), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics).to contain_exactly(include('code' => 'ASSOCIATION_COMPOSITE_KEY_OMITTED'))
   end
 
   it 'deduplicates reciprocal HABTM declarations with left-owner label priority' do

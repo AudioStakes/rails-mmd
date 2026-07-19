@@ -135,8 +135,8 @@ RSpec.describe RailsMmd::CLI do
 
   def stub_generator
     result = Struct.new(:stdout, :stderr, :exit_code).new('', '', 0)
-    instance_double(RailsMmd::Generate, run: result).tap do |generator|
-      allow(RailsMmd::Generate).to receive(:new).and_return(generator)
+    instance_double(RailsMmd::GenerateCommand, run: result).tap do |generator|
+      allow(RailsMmd::GenerateCommand).to receive(:new).and_return(generator)
     end
   end
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/diagnostics'
+require 'rails_mmd/diagnostic_factory'
 
 module RailsMmd
   # Boots a host Rails app and eager-loads it through explicit, testable paths.
@@ -15,11 +15,11 @@ module RailsMmd
     EXIT_CONTRACT_ERROR = 2
 
     def initialize(project_root:, kernel: Kernel, rails_provider: -> { Object.const_get(:Rails) },
-                   diagnostics: Diagnostics.new, bundler: (Bundler if defined?(Bundler)))
+                   diagnostics: DiagnosticFactory.new, bundler: (Bundler if defined?(Bundler)))
       @project_root = Pathname(project_root).expand_path
       @kernel = kernel
       @rails_provider = rails_provider
-      @diagnostics = diagnostics
+      @diagnostic_factory = diagnostics
       @bundler = bundler
     end
 
@@ -43,7 +43,7 @@ module RailsMmd
     class BundleContextError < StandardError
     end
 
-    attr_reader :bundler, :diagnostics, :kernel, :project_root, :rails_provider
+    attr_reader :bundler, :diagnostic_factory, :kernel, :project_root, :rails_provider
 
     def environment_path
       project_root.join('config/environment.rb')
@@ -80,11 +80,11 @@ module RailsMmd
       Result.new(
         application: nil,
         diagnostics: [
-          diagnostics.build(
+          diagnostic_factory.build(
             code: code,
             message: exception.message,
             subject_id: 'rails',
-            metadata: diagnostics.exception_metadata(exception)
+            metadata: diagnostic_factory.exception_metadata(exception)
           )
         ],
         exit_code: EXIT_CONTRACT_ERROR
