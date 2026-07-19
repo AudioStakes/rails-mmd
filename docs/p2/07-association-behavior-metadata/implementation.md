@@ -1,6 +1,6 @@
 # P2-07 association behavior metadata implementation
 
-Status: complete pending publication
+Status: complete
 
 ## Delivered implementation slices
 
@@ -127,15 +127,14 @@ PASS 3/3 Rails matrix pairs
 
 ## Final verification
 
-Completed before repository hooks:
+Completed final verification:
 
 ```text
-RSpec:        450 examples, 0 failures
+RSpec:        452 examples, 0 failures
 RuboCop:      170 files inspected, no offenses detected
 Bundler Audit: No vulnerabilities found
 Undercover:   No coverage is missing in latest changes
 Rails matrix: all 6 fixture families passed on all 3 declared pairs
+pre-commit:   passed
+pre-push:     passed (CI-equivalent default Rake gate)
 ```
-
-Pre-commit and pre-push are recorded after the final specialist review and
-staging inspection.
