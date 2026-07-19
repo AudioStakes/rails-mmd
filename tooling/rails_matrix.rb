@@ -39,6 +39,12 @@ module RailsMatrix
       actual: 'specialized_options_runtime.json',
       expected: 'rails_mmd_expected_specialized_options_runtime.json',
       label: 'specialized options'
+    },
+    'cross_domain_multi_db' => {
+      command: %w[exec ruby bin/rails runner script/rails_mmd_cross_domain_runtime_oracle.rb],
+      actual: 'cross_domain_runtime.json',
+      expected: 'rails_mmd_expected_cross_domain_runtime.json',
+      label: 'cross-domain multi-DB'
     }
   }.freeze
 
@@ -46,6 +52,10 @@ module RailsMatrix
     'composite_keys' => {
       script: 'docs/p2/04-composite-keys/probes/composite_habtm_probe.rb',
       label: 'composite HABTM'
+    },
+    'cross_domain_multi_db' => {
+      script: 'docs/p2/06-cross-domain-multi-db/probes/connection_boundary_probe.rb',
+      label: 'connection boundary'
     }
   }.freeze
 
@@ -60,6 +70,79 @@ module RailsMatrix
     'author_sql_has_full_owner_tuple' => false,
     'author_sql_uses_scalar_fallback' => true
   }.freeze
+
+  # Validates the checked-in P2-06 probe without snapshotting temporary paths.
+  class ConnectionBoundaryProbeValidator
+    def validate(payload, pair)
+      primary_database, archive_database, reading_database = databases(payload)
+      expected = expected_payload(pair, primary_database, archive_database, reading_database)
+      return if valid_payload?(payload, expected, primary_database, archive_database, reading_database)
+
+      raise VerificationError,
+            "#{pair.name} connection boundary probe did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(payload)}"
+    rescue KeyError, NoMethodError => e
+      raise VerificationError, "#{pair.name} published invalid connection boundary probe: #{e.message}"
+    end
+
+    private
+
+    def databases(payload)
+      contexts = payload.fetch('contexts')
+      %w[primary archive reading].map { |name| context_database(contexts, name) }
+    end
+
+    def valid_payload?(payload, expected, primary_database, archive_database, reading_database)
+      primary_database == reading_database && primary_database != archive_database && payload == expected
+    end
+
+    def context_database(contexts, name)
+      database = contexts.fetch(name).fetch('database')
+      raise KeyError, "#{name}.database must be a non-empty string" unless database.is_a?(String) && !database.empty?
+
+      database
+    end
+
+    def expected_payload(pair, primary_database, archive_database, reading_database)
+      {
+        'rails_version' => LOCKED_RAILS_VERSIONS.fetch(pair.rails_series),
+        'reflections' => expected_reflections,
+        'contexts' => expected_contexts(primary_database, archive_database, reading_database),
+        'database_evidence' => {
+          'primary_foreign_keys_for_archive_table' => 0,
+          'archive_foreign_keys_for_owner_table' => 0
+        },
+        'identity_collision' => { 'same_table_name' => true, 'different_context_name' => true }
+      }
+    end
+
+    def expected_reflections
+      {
+        'belongs_to' => {
+          'klass' => 'P206Account', 'foreign_key' => 'account_id', 'association_primary_key' => 'id'
+        },
+        'has_many' => {
+          'klass' => 'P206Audit', 'foreign_key' => 'account_id', 'association_primary_key' => 'id'
+        }
+      }
+    end
+
+    def expected_contexts(primary_database, archive_database, reading_database)
+      {
+        'primary' => context('primary', 'writing', primary_database),
+        'archive' => context('archive', 'writing', archive_database),
+        'reading' => context('primary_replica', 'reading', reading_database),
+        'primary_vs_archive_same_database' => false,
+        'primary_vs_archive_same_context' => false,
+        'primary_vs_reading_same_database' => true,
+        'primary_vs_reading_same_context' => false
+      }
+    end
+
+    def context(name, role, database)
+      { 'name' => name, 'role' => role, 'shard' => 'default', 'database' => database }
+    end
+  end
 
   # Reads the versioned compatibility matrix without owning execution policy.
   class Manifest
@@ -152,6 +235,16 @@ module RailsMatrix
   # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength
   class ArtifactValidator
     ARTIFACT_KINDS = %w[er class].freeze
+    CROSS_DOMAIN_ARTIFACTS = %w[
+      core.class.mmd
+      core.class.render_plan.json
+      core.diagnostics.json
+      core.er.mmd
+      core.er.render_plan.json
+      cross_domain_runtime.json
+      sti_runtime.json
+    ].freeze
+    ENTITY_KEYS = %w[entity_id entity_kind label safe_token].freeze
     STI_ENTITY_KEYS = %w[entity_id entity_kind label safe_token].freeze
     INHERITANCE_KEYS = %w[inheritance_id parent_entity_id child_entity_id parent_safe_token child_safe_token].freeze
 
@@ -163,6 +256,7 @@ module RailsMatrix
 
     def validate(app_root, pair, fixture_family: 'default')
       output = app_root.join('tmp/rails_mmd')
+      validate_cross_domain_publication_set(output, pair) if fixture_family == 'cross_domain_multi_db'
       plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
       validate_expected_render_plans(app_root, plans, pair) if fixture_family == 'composite_keys'
       validate_expected_mermaid(app_root, output.join('core.er.mmd'), 'ER', 'rails_mmd_expected_core_er.mmd', pair)
@@ -178,6 +272,7 @@ module RailsMatrix
       end
       validate_expected_diagnostics(app_root, diagnostics, pair)
       validate_expected_relationships(app_root, plans.fetch('er').fetch('relationships'), pair)
+      validate_expected_entities(app_root, plans.fetch('er'), pair) if fixture_family == 'cross_domain_multi_db'
       validate_expected_polymorphic_groups(app_root, plans.fetch('er'), pair)
       validate_expected_sti_entities(app_root, plans.fetch('class'), pair)
       validate_expected_inheritances(app_root, plans.fetch('class').fetch('inheritances'), pair)
@@ -188,6 +283,14 @@ module RailsMatrix
     private
 
     attr_reader :mermaid_serializer, :schema_validator
+
+    def validate_cross_domain_publication_set(output, pair)
+      actual = output.children.select(&:file?).map { |path| path.basename.to_s }.sort
+      return if actual == CROSS_DOMAIN_ARTIFACTS
+
+      raise VerificationError,
+            "#{pair.name} success publication did not match expectation: #{JSON.generate(actual)}"
+    end
 
     def validate_fixture_runtime(app_root, output, pair, fixture_family)
       return if fixture_family == 'default'
@@ -269,6 +372,16 @@ module RailsMatrix
             "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
     end
 
+    def validate_expected_entities(app_root, render_plan, pair)
+      expected = read_expected_json(app_root, 'rails_mmd_expected_entities.json', pair)
+      actual = render_plan.fetch('entities').map { |entity| projection(entity, ENTITY_KEYS) }
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} entities did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+
     def relationship_projection(relationship)
       keys = %w[relationship_id owner_safe_token target_safe_token label owner_cardinality target_cardinality]
       projection = keys.to_h do |key|
@@ -347,6 +460,76 @@ module RailsMatrix
   end
   # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength
 
+  # Verifies the fatal collision scenario remains diagnostics-only and redacted.
+  class CollisionArtifactValidator
+    DIAGNOSTIC_KEYS = %w[code severity phase scope subject_id metadata].freeze
+
+    def initialize(schema_validator: RailsMmd::SchemaValidator.new)
+      @schema_validator = schema_validator
+    end
+
+    def validate(app_root, pair, result)
+      validate_process_result(pair, result)
+      output = app_root.join('tmp/rails_mmd_collision')
+      validate_publication_set(output, pair)
+      document = JSON.parse(output.join('collision.diagnostics.json').read)
+      validate_schema(document, pair)
+      validate_redaction(document, app_root, pair)
+      validate_exact_diagnostics(document, app_root, pair)
+    rescue Errno::ENOENT, JSON::ParserError => e
+      raise VerificationError, "#{pair.name} published invalid collision diagnostics: #{e.message}"
+    end
+
+    private
+
+    attr_reader :schema_validator
+
+    def validate_process_result(pair, result)
+      stdout, stderr, status = result
+      return if status.exitstatus == 2 && stdout.empty? && stderr.empty?
+
+      raise VerificationError,
+            "#{pair.name} collision scenario expected exit 2 with empty stdout/stderr; " \
+            "got exit #{status.exitstatus}"
+    end
+
+    def validate_publication_set(output, pair)
+      actual = output.children.select(&:file?).map { |path| path.basename.to_s }.sort
+      expected = ['collision.diagnostics.json']
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} collision publication did not match expectation: #{JSON.generate(actual)}"
+    end
+
+    def validate_schema(document, pair)
+      return if schema_validator.valid?(:diagnostics, document)
+
+      raise VerificationError, "#{pair.name} published schema-invalid collision diagnostics"
+    end
+
+    def validate_redaction(document, app_root, pair)
+      serialized = JSON.generate(document)
+      forbidden = [app_root.to_s, '/Users/', 'password', 'passwd', 'secret', 'sqlite3://']
+      leaked = forbidden.find { |value| serialized.downcase.include?(value.downcase) }
+      return unless leaked
+
+      raise VerificationError, "#{pair.name} collision diagnostics leaked forbidden connection material"
+    end
+
+    def validate_exact_diagnostics(document, app_root, pair)
+      expected = JSON.parse(app_root.join('rails_mmd_expected_collision_diagnostics.json').read)
+      actual = document.fetch('diagnostics').map do |diagnostic|
+        DIAGNOSTIC_KEYS.to_h { |key| [key, diagnostic.fetch(key)] }
+      end
+      return if actual == expected
+
+      raise VerificationError,
+            "#{pair.name} collision diagnostics did not match expectation\n" \
+            "expected: #{JSON.generate(expected)}\nactual: #{JSON.generate(actual)}"
+    end
+  end
+
   # Orchestrates the repository-only Rails compatibility verification command.
   # rubocop:disable Metrics/ClassLength
   class Runner
@@ -354,6 +537,7 @@ module RailsMatrix
       @root = root
       @manifest = Manifest.new(root.join('fixtures/rails_matrix/matrix.yml'))
       @artifact_validator = ArtifactValidator.new
+      @collision_artifact_validator = CollisionArtifactValidator.new
     end
 
     def run
@@ -365,7 +549,7 @@ module RailsMatrix
 
     private
 
-    attr_reader :artifact_validator, :manifest, :root
+    attr_reader :artifact_validator, :collision_artifact_validator, :manifest, :root
 
     def selected_fixture_families
       selected = ENV.fetch('RAILS_MMD_MATRIX_FIXTURE_FAMILY', nil)
@@ -444,8 +628,22 @@ module RailsMatrix
       run_bundle(app_root, pair, %w[exec ruby bin/rails runner script/rails_mmd_sti_runtime_oracle.rb])
       run_family_runtime_oracle(app_root, pair, family)
       run_pair_probe(app_root, pair, family)
-      run_bundle(app_root, pair, %w[exec rails-mmd generate])
+      run_bundle(app_root, pair, generate_arguments(family))
       artifact_validator.validate(app_root, pair, fixture_family: family)
+      run_collision_scenario(app_root, pair) if family == 'cross_domain_multi_db'
+    end
+
+    def generate_arguments(family)
+      arguments = %w[exec rails-mmd generate]
+      arguments += %w[--domain core] if family == 'cross_domain_multi_db'
+      arguments
+    end
+
+    def run_collision_scenario(app_root, pair)
+      result = capture_bundle(
+        app_root, pair, %w[exec rails-mmd generate --config rails_mmd_collision.yml]
+      )
+      collision_artifact_validator.validate(app_root, pair, result)
     end
 
     def run_family_runtime_oracle(app_root, pair, family)
@@ -464,9 +662,17 @@ module RailsMatrix
       script = root.join(probe.fetch(:script))
       result = capture_bundle(app_root, pair, ['exec', 'ruby', script.to_s])
       verify_result(result, pair, "#{probe.fetch(:label)} probe")
-      validate_composite_habtm_probe(JSON.parse(json_object(result.first)), pair)
+      validate_pair_probe(JSON.parse(json_object(result.first)), pair, family)
     rescue JSON::ParserError => e
       raise VerificationError, "#{pair.name} published invalid #{probe.fetch(:label)} probe: #{e.message}"
+    end
+
+    def validate_pair_probe(payload, pair, family)
+      if family == 'cross_domain_multi_db'
+        ConnectionBoundaryProbeValidator.new.validate(payload, pair)
+      else
+        validate_composite_habtm_probe(payload, pair)
+      end
     end
 
     def json_object(output)

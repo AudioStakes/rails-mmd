@@ -82,6 +82,9 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Probe hidden association tables through `SchemaProbe` and pass only normalized
   metadata to `RelationshipBuilder`; never add raw database connection access
   to relationship construction.
+- Treat `connection_context_id` as opaque after `ModelInventory`. Key normalized
+  connection-owned metadata such as hidden join tables by both context ID and
+  local name; never parse context JSON or use table name alone across contexts.
 - Rails does not store a `delegated_type` type list in reflection options.
   Discover `<role>_types` only when its generated method source file exactly
   matches the active runtime's `ActiveRecord::DelegatedType` source file, then

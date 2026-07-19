@@ -58,8 +58,32 @@ RSpec.describe 'runtime primitives' do
 
   describe RailsMmd::Diagnostics do
     it 'exposes the closed diagnostic catalog from the schema fixture' do
-      expect(described_class.codes).to include('CONFIG_NOT_FOUND', 'SAFE_TOKEN_COLLISION', 'INTERNAL_ERROR')
+      expect(described_class.codes).to include(
+        'CONFIG_NOT_FOUND', 'CONNECTION_RELATIONSHIP_OMITTED', 'SAFE_TOKEN_COLLISION', 'INTERNAL_ERROR'
+      )
       expect(described_class.codes).not_to include('UNKNOWN_CODE')
+    end
+
+    it 'builds a connection-boundary warning without exposing connection details' do
+      diagnostic = described_class.new.build(
+        code: 'CONNECTION_RELATIONSHIP_OMITTED',
+        subject_id: 'audits.account',
+        message: 'cross-context relationship omitted',
+        metadata: {
+          domain_id: 'core', owner_constant: 'Audit', association_name: 'account', target_constant: 'Account'
+        }
+      )
+
+      expect(diagnostic).to include(
+        'code' => 'CONNECTION_RELATIONSHIP_OMITTED',
+        'severity' => 'warning',
+        'phase' => 'relationship_build',
+        'scope' => 'relationship'
+      )
+      expect(diagnostic.fetch('metadata').keys).to contain_exactly(
+        'association_name', 'domain_id', 'owner_constant', 'target_constant'
+      )
+      expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document([diagnostic]))).to be(true)
     end
 
     it 'builds schema-valid closed diagnostics and rejects extra metadata' do

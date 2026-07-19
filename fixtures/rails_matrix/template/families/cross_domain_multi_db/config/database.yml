@@ -1,0 +1,11 @@
+development:
+  primary:
+    adapter: sqlite3
+    database: <%= Rails.root.join('tmp/matrix_primary.sqlite3') %>
+  primary_replica:
+    adapter: sqlite3
+    database: <%= Rails.root.join('tmp/matrix_primary.sqlite3') %>
+    replica: true
+  archive:
+    adapter: sqlite3
+    database: <%= Rails.root.join('tmp/matrix_archive.sqlite3') %>

@@ -1,0 +1,16 @@
+[
+  {
+    "code": "MULTI_DB_UNSUPPORTED",
+    "severity": "error",
+    "phase": "schema_probe",
+    "scope": "domain",
+    "subject_id": "collision",
+    "metadata": {
+      "domain_id": "collision",
+      "connection_context_ids": [
+        "{\"adapter\":\"sqlite3\",\"database\":\"tmp/matrix_archive.sqlite3\",\"host\":null,\"name\":\"archive\",\"port\":null,\"role\":\"writing\",\"shard\":\"default\",\"username\":null}",
+        "{\"adapter\":\"sqlite3\",\"database\":\"tmp/matrix_primary.sqlite3\",\"host\":null,\"name\":\"primary\",\"port\":null,\"role\":\"writing\",\"shard\":\"default\",\"username\":null}"
+      ]
+    }
+  }
+]

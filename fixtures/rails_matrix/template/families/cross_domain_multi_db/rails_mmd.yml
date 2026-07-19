@@ -1,0 +1,36 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - P206::Account
+      - P206::Order
+      - P206::Audit
+      - P206::ArchiveProfile
+      - P206::Membership
+      - P206::ArchiveNote
+      - P206::SharedTarget
+      - P206::Attachment
+      - P206::LocalDocument
+      - P206::ArchiveDocument
+      - P206::ArchiveOnlyAttachment
+      - P206::ArchiveAsset
+      - P206::Entry
+      - P206::LocalArticle
+      - P206::ArchiveArticle
+      - P206::ArchiveOnlyEntry
+      - P206::ArchiveOnlyArticle
+      - P206::PrimaryAuthor
+      - P206::PrimaryTag
+      - P206::ArchiveAuthor
+      - P206::ArchiveTag
+    exclude_models: []
+  secondary:
+    include_models:
+      - P206::SharedTarget
+      - P206::ExternalTarget
+    exclude_models: []
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

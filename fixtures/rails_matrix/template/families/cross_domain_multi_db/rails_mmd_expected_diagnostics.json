@@ -1,0 +1,274 @@
+[
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_accounts.archive_notes",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Account",
+      "association_name": "archive_notes",
+      "target_constant": "P206::ArchiveNote"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_accounts.archive_profile",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Account",
+      "association_name": "archive_profile",
+      "target_constant": "P206::ArchiveProfile"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_accounts.audits",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Account",
+      "association_name": "audits",
+      "target_constant": "P206::Audit"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_archive_articles.entry",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::ArchiveArticle",
+      "association_name": "entry",
+      "target_constant": "P206::Entry"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_archive_only_articles.archive_only_entry",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::ArchiveOnlyArticle",
+      "association_name": "archive_only_entry",
+      "target_constant": "P206::ArchiveOnlyEntry"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_archive_only_attachments.archived_asset",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::ArchiveOnlyAttachment",
+      "association_name": "archived_asset",
+      "target_constant": "P206::ArchiveAsset"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_archive_only_entries.archive_subject",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::ArchiveOnlyEntry",
+      "association_name": "archive_subject",
+      "target_constant": "P206::ArchiveOnlyArticle"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_archive_profiles.account",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::ArchiveProfile",
+      "association_name": "account",
+      "target_constant": "P206::Account"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_attachments.attachable",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Attachment",
+      "association_name": "attachable",
+      "target_constant": "P206::ArchiveDocument"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_audits.account",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Audit",
+      "association_name": "account",
+      "target_constant": "P206::Account"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_entries.entryable",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Entry",
+      "association_name": "entryable",
+      "target_constant": "P206::ArchiveArticle"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_memberships.archive_note",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Membership",
+      "association_name": "archive_note",
+      "target_constant": "P206::ArchiveNote"
+    }
+  },
+  {
+    "code": "CONNECTION_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_primary_authors.archive_tags",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::PrimaryAuthor",
+      "association_name": "archive_tags",
+      "target_constant": "P206::ArchiveTag"
+    }
+  },
+  {
+    "code": "DOMAIN_RELATIONSHIP_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "p206_accounts.external_targets",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "P206::Account",
+      "association_name": "external_targets",
+      "target_constant": "P206::ExternalTarget"
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ACCOUNT_ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ACCOUNT_ID",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 21,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:ACCOUNT",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ACCOUNT_ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ACCOUNT_ID",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 21,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:ACCOUNT",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  }
+]

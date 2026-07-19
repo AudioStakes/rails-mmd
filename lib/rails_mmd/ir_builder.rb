@@ -33,9 +33,10 @@ module RailsMmd
     end
 
     def payload_without_digest(domain, relationship_domain)
+      physical_entity_ids = domain.entities.map { |entity| entity_id(entity) }
+      ensure_unique_ids!(physical_entity_ids, 'physical entity_id')
       subtype_entities = validated_sti_subtypes(domain)
       base_metadata = base_metadata_by_entity_id(subtype_entities)
-      physical_entity_ids = domain.entities.map { |entity| entity_id(entity) }
 
       {
         'schema_version' => 4,

@@ -1,0 +1,128 @@
+[
+  {
+    "entity_id": "entities/p206_accounts",
+    "entity_kind": "physical",
+    "label": "Account",
+    "safe_token": "P206_ACCOUNT"
+  },
+  {
+    "entity_id": "entities/p206_archive_articles",
+    "entity_kind": "physical",
+    "label": "ArchiveArticle",
+    "safe_token": "P206_ARCHIVE_ARTICLE"
+  },
+  {
+    "entity_id": "entities/p206_archive_assets",
+    "entity_kind": "physical",
+    "label": "ArchiveAsset",
+    "safe_token": "P206_ARCHIVE_ASSET"
+  },
+  {
+    "entity_id": "entities/p206_archive_authors",
+    "entity_kind": "physical",
+    "label": "ArchiveAuthor",
+    "safe_token": "P206_ARCHIVE_AUTHOR"
+  },
+  {
+    "entity_id": "entities/p206_archive_documents",
+    "entity_kind": "physical",
+    "label": "ArchiveDocument",
+    "safe_token": "P206_ARCHIVE_DOCUMENT"
+  },
+  {
+    "entity_id": "entities/p206_archive_notes",
+    "entity_kind": "physical",
+    "label": "ArchiveNote",
+    "safe_token": "P206_ARCHIVE_NOTE"
+  },
+  {
+    "entity_id": "entities/p206_archive_only_articles",
+    "entity_kind": "physical",
+    "label": "ArchiveOnlyArticle",
+    "safe_token": "P206_ARCHIVE_ONLY_ARTICLE"
+  },
+  {
+    "entity_id": "entities/p206_archive_only_attachments",
+    "entity_kind": "physical",
+    "label": "ArchiveOnlyAttachment",
+    "safe_token": "P206_ARCHIVE_ONLY_ATTACHMENT"
+  },
+  {
+    "entity_id": "entities/p206_archive_only_entries",
+    "entity_kind": "physical",
+    "label": "ArchiveOnlyEntry",
+    "safe_token": "P206_ARCHIVE_ONLY_ENTRY"
+  },
+  {
+    "entity_id": "entities/p206_archive_profiles",
+    "entity_kind": "physical",
+    "label": "ArchiveProfile",
+    "safe_token": "P206_ARCHIVE_PROFILE"
+  },
+  {
+    "entity_id": "entities/p206_archive_tags",
+    "entity_kind": "physical",
+    "label": "ArchiveTag",
+    "safe_token": "P206_ARCHIVE_TAG"
+  },
+  {
+    "entity_id": "entities/p206_attachments",
+    "entity_kind": "physical",
+    "label": "Attachment",
+    "safe_token": "P206_ATTACHMENT"
+  },
+  {
+    "entity_id": "entities/p206_audits",
+    "entity_kind": "physical",
+    "label": "Audit",
+    "safe_token": "P206_AUDIT"
+  },
+  {
+    "entity_id": "entities/p206_entries",
+    "entity_kind": "physical",
+    "label": "Entry",
+    "safe_token": "P206_ENTRY"
+  },
+  {
+    "entity_id": "entities/p206_local_articles",
+    "entity_kind": "physical",
+    "label": "LocalArticle",
+    "safe_token": "P206_LOCAL_ARTICLE"
+  },
+  {
+    "entity_id": "entities/p206_local_documents",
+    "entity_kind": "physical",
+    "label": "LocalDocument",
+    "safe_token": "P206_LOCAL_DOCUMENT"
+  },
+  {
+    "entity_id": "entities/p206_memberships",
+    "entity_kind": "physical",
+    "label": "Membership",
+    "safe_token": "P206_MEMBERSHIP"
+  },
+  {
+    "entity_id": "entities/p206_orders",
+    "entity_kind": "physical",
+    "label": "Order",
+    "safe_token": "P206_ORDER"
+  },
+  {
+    "entity_id": "entities/p206_primary_authors",
+    "entity_kind": "physical",
+    "label": "PrimaryAuthor",
+    "safe_token": "P206_PRIMARY_AUTHOR"
+  },
+  {
+    "entity_id": "entities/p206_primary_tags",
+    "entity_kind": "physical",
+    "label": "PrimaryTag",
+    "safe_token": "P206_PRIMARY_TAG"
+  },
+  {
+    "entity_id": "entities/p206_shared_targets",
+    "entity_kind": "physical",
+    "label": "SharedTarget",
+    "safe_token": "P206_SHARED_TARGET"
+  }
+]

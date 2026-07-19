@@ -41,6 +41,89 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationship.target_cardinality).to eq('1..1')
   end
 
+  it 'omits a selected cross-context belongs-to before reading key bindings' do
+    account_model = renderable_model('Account', 'accounts')
+    reflection = belongs_to('account', klass: account_model)
+    reflection.define_singleton_method(:foreign_key) { raise 'cross-context key reader must not run' }
+    domain = domain_result(
+      'core',
+      [
+        entity('Audit', 'audits', columns: [column('id', false), column('account_id', false)]),
+        entity('Account', 'accounts', connection_context_id: '{"name":"archive"}')
+      ]
+    )
+
+    result = build(domain, 'Audit' => owner_model(reflection), 'Account' => account_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics).to contain_exactly(
+      include(
+        'code' => 'CONNECTION_RELATIONSHIP_OMITTED',
+        'subject_id' => 'audits.account',
+        'metadata' => include(
+          'domain_id' => 'core', 'owner_constant' => 'Audit',
+          'association_name' => 'account', 'target_constant' => 'Account'
+        )
+      )
+    )
+    expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
+  end
+
+  it 'omits direct has-one and has-many declarations across connection contexts' do
+    profile = renderable_model('Profile', 'profiles')
+    post = renderable_model('Post', 'posts')
+    author = owner_model(
+      association('profile', :has_one, klass: profile, foreign_key: 'author_id'),
+      association('posts', :has_many, klass: post, foreign_key: 'author_id')
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity('Profile', 'profiles', columns: [column('id', false), column('author_id', false)],
+                                      connection_context_id: '{"name":"archive"}'),
+        entity('Post', 'posts', columns: [column('id', false), column('author_id', false)],
+                                connection_context_id: '{"name":"archive"}')
+      ]
+    )
+
+    result = build(domain, 'Author' => author, 'Profile' => profile, 'Post' => post)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[CONNECTION_RELATIONSHIP_OMITTED CONNECTION_RELATIONSHIP_OMITTED]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'association_name') })
+      .to contain_exactly('profile', 'posts')
+  end
+
+  it 'publishes same-context siblings while omitting an independent cross-context edge' do
+    account_model = renderable_model('Account', 'accounts')
+    author_model = renderable_model('Author', 'authors')
+    audit = owner_model(
+      belongs_to('account', klass: account_model),
+      belongs_to('author', klass: author_model)
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Audit', 'audits', columns: [column('id', false), column('account_id', false),
+                                            column('author_id', false)]),
+        entity('Account', 'accounts'),
+        entity('Author', 'authors', connection_context_id: '{"name":"archive"}')
+      ]
+    )
+
+    result = build(domain, 'Audit' => audit, 'Account' => account_model, 'Author' => author_model)
+
+    expect(result.domains.first.relationships).to contain_exactly(
+      have_attributes(association_name: 'account', target_entity_id: 'entities/accounts')
+    )
+    expect(result.diagnostics).to contain_exactly(
+      include('code' => 'CONNECTION_RELATIONSHIP_OMITTED', 'subject_id' => 'audits.author')
+    )
+  end
+
   it 'publishes an ordered composite belongs-to tuple with exact tuple evidence' do
     account_model = renderable_model('Account', 'accounts')
     membership_model = owner_model(
@@ -193,6 +276,61 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         foreign_key_holder_entity_id: nil, foreign_key_columns: nil
       )
     )
+  end
+
+  it 'omits cross-context HABTM before reading hidden join-table keys' do
+    tag_model = renderable_model('Tag', 'tags')
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    tags.define_singleton_method(:join_table) { raise 'cross-context join reader must not run' }
+    domain = domain_result(
+      'core',
+      [entity('Author', 'authors'), entity('Tag', 'tags', connection_context_id: '{"name":"archive"}')]
+    )
+
+    result = build(domain, 'Author' => owner_model(tags), 'Tag' => tag_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics).to contain_exactly(
+      include('code' => 'CONNECTION_RELATIONSHIP_OMITTED', 'subject_id' => 'authors.tags')
+    )
+  end
+
+  it 'selects same-named hidden HABTM tables by connection context and local name' do
+    tag_model = renderable_model('Tag', 'tags')
+    role_model = renderable_model('Role', 'roles')
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'memberships',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id'
+    )
+    roles = association(
+      'roles', :has_and_belongs_to_many, klass: role_model, join_table: 'memberships',
+                                         foreign_key: 'admin_id', association_foreign_key: 'role_id'
+    )
+    archive_context = '{"name":"archive"}'
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'), entity('Tag', 'tags'),
+        entity('Admin', 'admins', connection_context_id: archive_context),
+        entity('Role', 'roles', connection_context_id: archive_context)
+      ],
+      join_tables: [
+        join_table('memberships', %w[author_id tag_id]),
+        join_table('memberships', %w[admin_id role_id], connection_context_id: archive_context)
+      ]
+    )
+
+    result = build(
+      domain,
+      'Author' => owner_model(tags), 'Tag' => tag_model,
+      'Admin' => owner_model(roles), 'Role' => role_model
+    )
+
+    expect(result.diagnostics).to eq([])
+    expect(result.domains.first.relationships.map(&:association_name)).to contain_exactly('tags', 'roles')
   end
 
   it 'deduplicates reciprocal HABTM declarations with left-owner label priority' do
@@ -427,10 +565,40 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  it 'keeps a rootless scoped polymorphic inverse on the structural omission path' do
+  it 'classifies a rootless inverse with an unselected holder as a domain boundary' do
     inverse = association(
       'comments', :has_many, klass: renderable_model('Comment', 'comments'), as: :commentable,
                              scope: -> {}, foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result('core', [entity('Post', 'posts')])
+
+    result = build(domain, 'Post' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['DOMAIN_RELATIONSHIP_OMITTED']
+    )
+  end
+
+  it 'contains an unsupported rootless polymorphic inverse name' do
+    inverse = association(
+      'BadName', :has_many, klass: renderable_model('Comment', 'comments'), as: :commentable,
+                            foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result('core', [entity('Post', 'posts'), entity('Comment', 'comments')])
+
+    result = build(domain, 'Post' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['ASSOCIATION_NAME_UNSUPPORTED_OMITTED']
+    )
+  end
+
+  it 'keeps the generic rootless inverse fallback when its target reader fails' do
+    inverse = association(
+      'comments', :has_many, klass: -> { raise 'target unavailable' }, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
     )
     domain = domain_result('core', [entity('Post', 'posts')])
 
@@ -489,6 +657,70 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         metadata: { scoped: true }
       )
     )
+  end
+
+  it 'classifies an unhandled inverse whose selected holder is on another context' do
+    comment_model = renderable_model('Comment', 'comments')
+    inverse = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type'
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Post', 'posts', connection_context_id: '{"name":"archive"}'),
+        entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                                column('commentable_type', false)])
+      ]
+    )
+
+    result = build(domain, 'Post' => owner_model(inverse), 'Comment' => comment_model)
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics).to contain_exactly(
+      include(
+        'code' => 'CONNECTION_RELATIONSHIP_OMITTED',
+        'subject_id' => 'posts.comments',
+        'metadata' => include('target_constant' => 'Comment')
+      )
+    )
+  end
+
+  it 'keeps same-context polymorphic candidates and diagnoses each rejected concrete target' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to('commentable', polymorphic: true)
+    inverse = lambda do |name|
+      association(name, :has_many, klass: comment_model, as: :commentable,
+                                   foreign_key: 'commentable_id', type: 'commentable_type')
+    end
+    domain = domain_result(
+      'core',
+      [
+        entity('Comment', 'comments', columns: [column('id', false), column('commentable_id', false),
+                                                column('commentable_type', false)]),
+        entity('Post', 'posts'),
+        entity('Image', 'images', connection_context_id: '{"name":"archive"}'),
+        entity('Video', 'videos', connection_context_id: '{"name":"archive"}')
+      ]
+    )
+
+    result = build(
+      domain,
+      'Comment' => owner_model(root),
+      'Post' => owner_model(inverse.call('comments')),
+      'Image' => owner_model(inverse.call('comments')),
+      'Video' => owner_model(inverse.call('comments'))
+    )
+
+    polymorphic = result.domains.first.relationships.select do |relationship|
+      relationship.relationship_kind == :polymorphic
+    end
+    expect(polymorphic).to contain_exactly(have_attributes(target_entity_id: 'entities/posts'))
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      %w[CONNECTION_RELATIONSHIP_OMITTED CONNECTION_RELATIONSHIP_OMITTED]
+    )
+    expect(result.diagnostics.map { |diagnostic| diagnostic.dig('metadata', 'target_constant') })
+      .to contain_exactly('Image', 'Video')
   end
 
   it 'publishes a composite polymorphic identifier against a concrete target tuple' do
@@ -1001,7 +1233,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  it 'emits delegated target diagnostics in declared order followed by one root warning' do
+  it 'preserves the generic delegated root warning for domain-only target omissions' do
     domain = domain_result(
       'core',
       [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
@@ -1041,6 +1273,34 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'stops delegated connection-boundary targets before inverse and key readers' do
+    root = belongs_to('entryable', polymorphic: true)
+    root.define_singleton_method(:association_primary_key) { raise 'cross-context key reader must not run' }
+    inverse = association(
+      'entries', :has_many, klass: -> { raise 'cross-context inverse reader must not run' }, as: :entryable
+    )
+    domain = domain_result(
+      'core',
+      [entity('Entry', 'entries', columns: [column('id', false), column('entryable_id', false),
+                                            column('entryable_type', false)])],
+      delegated_type_families: [
+        delegated_type_family(
+          owner_entity_id: 'entities/entries', owner_ruby_constant: 'Entry', association_name: 'entryable',
+          foreign_key_columns: ['entryable_id'], foreign_type: 'entryable_type',
+          targets: [delegated_type_target(ruby_constant: 'Message', status: :other_connection,
+                                          diagnostic_code: 'CONNECTION_RELATIONSHIP_OMITTED')]
+        )
+      ]
+    )
+
+    result = build(domain, 'Entry' => owner_model(root), 'Message' => owner_model(inverse))
+
+    expect(result.domains.first.relationships).to eq([])
+    expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
+      ['CONNECTION_RELATIONSHIP_OMITTED']
+    )
+  end
+
   it 'builds an inferred-source has-many-through semantic edge beside direct physical edges' do
     membership_model = renderable_model('Membership', 'memberships')
     team_model = renderable_model('Team', 'teams')
@@ -1074,6 +1334,42 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       owner_entity_id: 'entities/authors', target_entity_id: 'entities/teams',
       association_name: 'teams', owner_cardinality: '0..many', target_cardinality: '0..many',
       metadata: { scoped: true }
+    )
+  end
+
+  it 'omits a through declaration at the first cross-context semantic hop' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    team_source = belongs_to('team', klass: team_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source, klass: team_model
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity('Membership', 'memberships',
+               columns: [column('id', false), column('author_id', false), column('team_id', false)],
+               connection_context_id: '{"name":"archive"}'),
+        entity('Team', 'teams', connection_context_id: '{"name":"archive"}')
+      ]
+    )
+
+    result = build(
+      domain,
+      'Author' => owner_model(teams),
+      'Membership' => owner_model(team_source),
+      'Team' => team_model
+    )
+
+    expect(result.domains.first.relationships).not_to include(have_attributes(relationship_kind: :through))
+    expect(result.diagnostics).to contain_exactly(
+      include(
+        'code' => 'CONNECTION_RELATIONSHIP_OMITTED',
+        'subject_id' => 'authors.teams',
+        'metadata' => include('target_constant' => 'Membership')
+      )
     )
   end
 
@@ -1537,12 +1833,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
                           klass: renderable_model('Team', 'teams')
     )
     owner = entity('Author', 'authors')
-    unstable_cache = Object.new
-    unstable_cache.define_singleton_method(:[]) do |_target_name|
-      raise 'unreadable domain cache'
-    end
     unstable_context = Object.new
-    unstable_context.define_singleton_method(:entity_by_constant) { unstable_cache }
+    unstable_context.define_singleton_method(:selected_endpoint) { |*| raise 'unreadable domain cache' }
     expect do
       described_class.new(model_resolver: ->(_name) {}).send(
         :through_physical_key_omission_code,
@@ -1551,6 +1843,24 @@ RSpec.describe RailsMmd::RelationshipBuilder do
         teams
       )
     end.to raise_error(RuntimeError, 'unreadable domain cache')
+  end
+
+  it 'checks a normalized physical through hop before reading its key binding' do
+    team_model = renderable_model('Team', 'teams')
+    physical_reflection = belongs_to('team', klass: team_model, foreign_key: -> { raise 'must not bind' })
+    hop = described_class::ThroughPhysicalHop.new(
+      reflection: physical_reflection, target_model: team_model, target_constant: 'Team'
+    )
+    builder = described_class.new(model_resolver: ->(_name) { team_model })
+    allow(builder).to receive(:through_physical_hops).and_return([[hop], nil, nil])
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Team', 'teams', connection_context_id: '{"name":"archive"}')]
+    )
+    context = described_class::DomainContext.new(domain)
+
+    expect(builder.send(:through_physical_key_omission_code, context, domain.entities.first, Object.new)).to eq(
+      %w[CONNECTION_RELATIONSHIP_OMITTED Team]
+    )
   end
 
   it 'retains scope presence from a resolved through source without executing it' do
@@ -2377,17 +2687,20 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   end
 
   def entity(ruby_constant, table_name, columns: [column('id', false)], primary_key_columns: ['id'], foreign_keys: [],
-             indexes: [], selection_origin: nil)
-    attributes = entity_attributes(ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:)
+             indexes: [], selection_origin: nil, connection_context_id: '{"name":"primary"}')
+    attributes = entity_attributes(
+      ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:, connection_context_id:
+    )
 
     decorate_entity_selection_origin(RailsMmd::SchemaProbe::Entity.new(**attributes), selection_origin)
   end
 
-  def entity_attributes(ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:)
+  def entity_attributes(ruby_constant:, table_name:, columns:, primary_key_columns:, foreign_keys:, indexes:,
+                        connection_context_id:)
     {
       ruby_constant: ruby_constant,
       table_name: table_name,
-      connection_context_id: '{"name":"primary"}',
+      connection_context_id: connection_context_id,
       columns: columns,
       primary_key_columns: primary_key_columns,
       foreign_keys: foreign_keys,
@@ -2434,9 +2747,11 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
-  def join_table(table_name, column_names, primary_key_columns: nil)
+  def join_table(table_name, column_names, primary_key_columns: nil,
+                 connection_context_id: '{"name":"primary"}')
     RailsMmd::SchemaProbe::JoinTable.new(
       table_name: table_name,
+      connection_context_id: connection_context_id,
       columns: column_names.map do |name|
         RailsMmd::SchemaProbe::Column.new(name: name, type: :integer, nullable: false)
       end,

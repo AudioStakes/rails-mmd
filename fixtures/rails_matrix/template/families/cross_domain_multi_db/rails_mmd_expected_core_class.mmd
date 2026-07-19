@@ -1,0 +1,79 @@
+classDiagram
+  direction LR
+  class P206_ACCOUNT {
+    +integer id
+  }
+  class P206_ARCHIVE_ARTICLE {
+    +integer id
+  }
+  class P206_ARCHIVE_ASSET {
+    +integer id
+  }
+  class P206_ARCHIVE_AUTHOR {
+    +integer id
+  }
+  class P206_ARCHIVE_DOCUMENT {
+    +integer id
+  }
+  class P206_ARCHIVE_NOTE {
+    +integer id
+  }
+  class P206_ARCHIVE_ONLY_ARTICLE {
+    +integer id
+  }
+  class P206_ARCHIVE_ONLY_ATTACHMENT {
+    +integer id
+  }
+  class P206_ARCHIVE_ONLY_ENTRY {
+    +integer id
+  }
+  class P206_ARCHIVE_PROFILE {
+    +integer id
+  }
+  class P206_ARCHIVE_TAG {
+    +integer id
+  }
+  class P206_ATTACHMENT {
+    +integer id
+    +integer attachable_id
+    +string attachable_type
+  }
+  class P206_AUDIT {
+    +integer id
+  }
+  class P206_ENTRY {
+    +integer id
+    +integer entryable_id
+    +string entryable_type
+  }
+  class P206_LOCAL_ARTICLE {
+    +integer id
+  }
+  class P206_LOCAL_DOCUMENT {
+    +integer id
+  }
+  class P206_MEMBERSHIP {
+    +integer id
+    +integer account_id
+  }
+  class P206_ORDER {
+    +integer id
+    +integer account_id
+  }
+  class P206_PRIMARY_AUTHOR {
+    +integer id
+  }
+  class P206_PRIMARY_TAG {
+    +integer id
+  }
+  class P206_SHARED_TARGET {
+    +integer id
+    +integer account_id
+  }
+  P206_ARCHIVE_AUTHOR "0..*" --> "0..*" P206_ARCHIVE_TAG : archive_tags
+  P206_ATTACHMENT "0..*" --> "0..1" P206_LOCAL_DOCUMENT : attachable
+  P206_ENTRY "0..*" --> "0..1" P206_LOCAL_ARTICLE : entryable
+  P206_MEMBERSHIP "0..*" --> "1" P206_ACCOUNT : account
+  P206_ORDER "0..*" --> "1" P206_ACCOUNT : account
+  P206_PRIMARY_AUTHOR "0..*" --> "0..*" P206_PRIMARY_TAG : primary_tags
+  P206_SHARED_TARGET "0..*" --> "0..1" P206_ACCOUNT : shared_targets

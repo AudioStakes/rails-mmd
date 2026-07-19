@@ -43,8 +43,10 @@ module RailsMmd
     ASSOCIATION_NAME_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*[!?=]?\z/
     STRUCTURED_COLUMN_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
     MACRO_PRIORITY = { belongs_to: 0, has_one: 1, has_many: 2 }.freeze
+    CONNECTION_BOUNDARY_DIAGNOSTIC_CODES = %w[CONNECTION_RELATIONSHIP_OMITTED].freeze
     ReflectionEntry = Struct.new(:owner, :reflection, :metadata, :referenced_key_columns, keyword_init: true)
     ThroughPhysicalHop = Struct.new(:reflection, :target_model, :target_constant, keyword_init: true)
+    Endpoint = Struct.new(:entity, :diagnostic_code, keyword_init: true)
     DomainContext = Struct.new(:domain, keyword_init: false) do
       def domain_id = domain.domain_id
 
@@ -57,8 +59,10 @@ module RailsMmd
         end
       end
 
-      def join_table_by_name
-        @join_table_by_name ||= Array(domain.join_tables).to_h { |table| [table.table_name, table] }
+      def join_table_by_context_and_name
+        @join_table_by_context_and_name ||= Array(domain.join_tables).to_h do |table|
+          [[table.connection_context_id, table.table_name], table]
+        end
       end
 
       def entity_by_constant
@@ -74,6 +78,16 @@ module RailsMmd
           families = safe_value(domain, :delegated_type_families)
           Array(families)
         end
+      end
+
+      def selected_endpoint(source_entity, target_constant)
+        target = entity_by_constant[target_constant]
+        return Endpoint.new(diagnostic_code: 'DOMAIN_RELATIONSHIP_OMITTED') unless target
+        unless source_entity.connection_context_id == target.connection_context_id
+          return Endpoint.new(diagnostic_code: 'CONNECTION_RELATIONSHIP_OMITTED')
+        end
+
+        Endpoint.new(entity: target)
       end
 
       private
@@ -178,13 +192,17 @@ module RailsMmd
                        'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_constant)
       end
 
-      target = context.entity_by_constant[target_constant]
-      return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
+      endpoint = context.selected_endpoint(owner, target_constant)
+      if endpoint.diagnostic_code
+        return omitted(context, owner, sanitized_name, endpoint.diagnostic_code, target_constant)
+      end
+
+      target = endpoint.entity
 
       keys = habtm_keys(reflection)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
 
-      join_table = context.join_table_by_name[keys.fetch(:join_table)]
+      join_table = context.join_table_by_context_and_name[[owner.connection_context_id, keys.fetch(:join_table)]]
       invalid_reason = habtm_join_table_invalid_reason(join_table, keys)
       if invalid_reason
         return habtm_join_table_invalid(
@@ -300,10 +318,29 @@ module RailsMmd
       inverses.each do |entry|
         next if handled_inverses.key?(entry.reflection)
 
-        output_diagnostics << omitted(context, entry.owner, reflection_name(entry.reflection),
-                                      'ASSOCIATION_POLYMORPHIC_OMITTED').last
+        output_diagnostics << unhandled_polymorphic_inverse_diagnostic(context, entry)
       end
       [relationships, output_diagnostics]
+    end
+
+    def unhandled_polymorphic_inverse_diagnostic(context, entry)
+      association_name = reflection_name(entry.reflection)
+      sanitized_name = sanitize_association_name(association_name)
+      unless sanitized_name
+        return omitted(context, entry.owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED').last
+      end
+
+      target_model, target_constant = resolve_target(entry.reflection)
+      unless target_model && renderable_model?(target_model)
+        return omitted(context, entry.owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
+      end
+
+      endpoint = context.selected_endpoint(entry.owner, target_constant)
+      if endpoint.diagnostic_code
+        return omitted(context, entry.owner, sanitized_name, endpoint.diagnostic_code, target_constant).last
+      end
+
+      omitted(context, entry.owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
     end
 
     def build_polymorphic_root(context, root, inverses)
@@ -343,7 +380,7 @@ module RailsMmd
         else
           polymorphic_candidates(context, root, inverses, sanitized_name, root_binding)
         end
-      if candidates.empty?
+      if candidates.empty? && candidate_diagnostics.none? { |diagnostic| boundary_diagnostic?(diagnostic) }
         candidate_diagnostics << omitted(
           context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED'
         ).last
@@ -551,6 +588,17 @@ module RailsMmd
                        'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_model.name).last
       end
 
+      endpoint = context.selected_endpoint(root.owner, candidate.owner.ruby_constant)
+      if endpoint.diagnostic_code
+        return omitted(
+          context,
+          root.owner,
+          reflection_name(root.reflection),
+          endpoint.diagnostic_code,
+          candidate.owner.ruby_constant
+        ).last
+      end
+
       candidate_binding = polymorphic_inverse_binding(reflection, candidate.owner)
       unless candidate_binding
         return omitted(context, candidate.owner, association_name,
@@ -577,6 +625,10 @@ module RailsMmd
 
       candidate.referenced_key_columns = referenced_key_columns
       nil
+    end
+
+    def boundary_diagnostic?(diagnostic)
+      CONNECTION_BOUNDARY_DIAGNOSTIC_CODES.include?(diagnostic.fetch('code'))
     end
 
     def polymorphic_inverse_binding(reflection, owner)
@@ -658,8 +710,12 @@ module RailsMmd
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_constant)
       end
 
-      target = context.entity_by_constant[target_constant]
-      return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
+      endpoint = context.selected_endpoint(owner, target_constant)
+      if endpoint.diagnostic_code
+        return omitted(context, owner, sanitized_name, endpoint.diagnostic_code, target_constant)
+      end
+
+      target = endpoint.entity
 
       keys = direct_key_columns(reflection, owner)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
@@ -742,8 +798,12 @@ module RailsMmd
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_constant)
       end
 
-      target = context.entity_by_constant[target_constant]
-      return omitted(context, owner, sanitized_name, 'DOMAIN_RELATIONSHIP_OMITTED', target_constant) unless target
+      endpoint = context.selected_endpoint(owner, target_constant)
+      if endpoint.diagnostic_code
+        return omitted(context, owner, sanitized_name, endpoint.diagnostic_code, target_constant)
+      end
+
+      target = endpoint.entity
 
       keys = key_columns(reflection, target_model)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) if keys.nil?
@@ -1067,6 +1127,8 @@ module RailsMmd
     end
 
     def db_foreign_key?(owner, target, foreign_key_columns, referenced_key_columns)
+      return false unless owner.connection_context_id == target.connection_context_id
+
       owner.foreign_keys.any? do |foreign_key|
         foreign_key.from_table == owner.table_name &&
           foreign_key.columns == foreign_key_columns &&
@@ -1133,8 +1195,10 @@ module RailsMmd
       hops.each do |hop|
         return ['ASSOCIATION_TARGET_UNRESOLVED', hop.target_constant] unless hop.target_model
 
-        target = context.entity_by_constant[hop.target_constant]
-        return ['DOMAIN_RELATIONSHIP_OMITTED', hop.target_constant] unless target
+        endpoint = context.selected_endpoint(current, hop.target_constant)
+        return [endpoint.diagnostic_code, hop.target_constant] if endpoint.diagnostic_code
+
+        target = endpoint.entity
 
         code = direct_hop_key_omission_code(current, target, hop.target_model, hop.reflection)
         return [code, hop.target_constant] if code
@@ -1296,6 +1360,7 @@ module RailsMmd
 
     def through_entities(context, owner, association_name, chain, terminal_target: nil)
       entities = []
+      current = owner
       chain.each_with_index do |hop, index|
         model, constant = if terminal_target && index == chain.length - 1
                             [terminal_target.target_model, terminal_target.target_constant]
@@ -1309,13 +1374,14 @@ module RailsMmd
                                'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', constant).last]
         end
 
-        entity = context.entity_by_constant[constant]
-        unless entity
-          return [nil,
-                  omitted(context, owner, association_name, 'DOMAIN_RELATIONSHIP_OMITTED', constant).last]
+        endpoint = context.selected_endpoint(current, constant)
+        if endpoint.diagnostic_code
+          return [nil, omitted(context, owner, association_name, endpoint.diagnostic_code, constant).last]
         end
 
+        entity = endpoint.entity
         entities << entity
+        current = entity
       end
       [entities, nil]
     end

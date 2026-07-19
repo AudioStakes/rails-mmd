@@ -74,6 +74,27 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     expect(registration).to eq(fixture_family: true, runtime_oracle: true)
   end
 
+  it 'registers the cross-domain multi-DB family, runtime oracle, and pair probe' do
+    manifest = RailsMatrix::Manifest.new(
+      Pathname(__dir__).join('../../fixtures/rails_matrix/matrix.yml').expand_path
+    )
+    registration = {
+      fixture_family: manifest.fixture_families.include?('cross_domain_multi_db'),
+      runtime_oracle: RailsMatrix::FAMILY_RUNTIME_ORACLES.key?('cross_domain_multi_db'),
+      pair_probe: RailsMatrix::PAIR_PROBES.key?('cross_domain_multi_db')
+    }
+
+    expect(registration).to eq(fixture_family: true, runtime_oracle: true, pair_probe: true)
+  end
+
+  it 'accepts the closed connection-boundary probe evidence for a matrix pair' do
+    pair = RailsMatrix::Pair.new(ruby_version: '4.0.6', rails_series: '8.1')
+
+    expect do
+      RailsMatrix::ConnectionBoundaryProbeValidator.new.validate(connection_boundary_probe_payload, pair)
+    end.not_to raise_error
+  end
+
   def missing_expected_polymorphic_groups_asdf
     fake_generated_app_asdf(expected_polymorphic_groups: <<~JSON.chomp)
       [
@@ -222,11 +243,55 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     )
   end
 
+  def connection_boundary_probe_payload
+    {
+      'rails_version' => '8.1.3',
+      'reflections' => {
+        'belongs_to' => {
+          'klass' => 'P206Account', 'foreign_key' => 'account_id', 'association_primary_key' => 'id'
+        },
+        'has_many' => {
+          'klass' => 'P206Audit', 'foreign_key' => 'account_id', 'association_primary_key' => 'id'
+        }
+      },
+      'contexts' => {
+        'primary' => {
+          'name' => 'primary', 'role' => 'writing', 'shard' => 'default',
+          'database' => '/tmp/probe/primary.sqlite3'
+        },
+        'archive' => {
+          'name' => 'archive', 'role' => 'writing', 'shard' => 'default',
+          'database' => '/tmp/probe/archive.sqlite3'
+        },
+        'reading' => {
+          'name' => 'primary_replica', 'role' => 'reading', 'shard' => 'default',
+          'database' => '/tmp/probe/primary.sqlite3'
+        },
+        'primary_vs_archive_same_database' => false,
+        'primary_vs_archive_same_context' => false,
+        'primary_vs_reading_same_database' => true,
+        'primary_vs_reading_same_context' => false
+      },
+      'database_evidence' => {
+        'primary_foreign_keys_for_archive_table' => 0,
+        'archive_foreign_keys_for_owner_table' => 0
+      },
+      'identity_collision' => { 'same_table_name' => true, 'different_context_name' => true }
+    }
+  end
+
   def generic_expected_relationship
     {
       relationship_id: 'relationships/users/account', owner_safe_token: 'USER', target_safe_token: 'ACCOUNT',
       label: 'account', owner_cardinality: '0..many', target_cardinality: '1..1', metadata: { scoped: true }
     }
+  end
+
+  def generic_expected_entities
+    [
+      { entity_id: 'entities/users', entity_kind: 'physical', label: 'User', safe_token: 'USER' },
+      { entity_id: 'entities/accounts', entity_kind: 'physical', label: 'Account', safe_token: 'ACCOUNT' }
+    ]
   end
 
   def habtm_expected_relationship
@@ -248,6 +313,7 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     expected_class_mermaid: fake_class_mermaid,
     expected_diagnostics: '[]',
     expected_relationships: JSON.pretty_generate([generic_expected_relationship]),
+    expected_entities: JSON.pretty_generate(generic_expected_entities),
     expected_polymorphic_groups: '[]',
     expected_sti_entities: '[]',
     expected_inheritances: '[]',
@@ -259,6 +325,13 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     actual_composite_runtime: '[]',
     expected_specialized_options_runtime: '[]',
     actual_specialized_options_runtime: '[]',
+    expected_cross_domain_runtime: '[]',
+    actual_cross_domain_runtime: '[]',
+    connection_boundary_probe: connection_boundary_probe_payload,
+    success_extra_artifact: false,
+    collision_extra_artifact: false,
+    collision_leak: false,
+    collision_expectation_mismatch: false,
     composite_habtm_probe: {
       rails_version: '8.1.3',
       book_sql_has_full_owner_tuple: false,
@@ -266,7 +339,8 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       author_sql_has_full_owner_tuple: false,
       author_sql_uses_scalar_fallback: true
     },
-    actual_diagnostics_fixture: nil
+    actual_diagnostics_fixture:
+      'fixtures/rails_matrix/template/families/cross_domain_multi_db/rails_mmd_empty_diagnostics_fixture.json'
   )
     <<~SH
       [ "$1" = "where" ] && exit 0
@@ -284,18 +358,32 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"exec ruby bin/rails runner script/rails_mmd_specialized_options_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/specialized_options_runtime.json', actual_specialized_options_runtime)}          exit 0 ;;
+        *"exec ruby bin/rails runner script/rails_mmd_cross_domain_runtime_oracle.rb"*)
+          mkdir -p tmp/rails_mmd
+#{write_file_shell('tmp/rails_mmd/cross_domain_runtime.json', actual_cross_domain_runtime)}          exit 0 ;;
         *"composite_habtm_probe.rb"*)
           printf '%s\n' '-- create_table(:p204_books, {id: false})'
           printf '%s\n' '#{JSON.generate(composite_habtm_probe)}'
           exit 0 ;;
+        *"connection_boundary_probe.rb"*)
+          printf '%s\n' '#{JSON.generate(connection_boundary_probe)}'
+          exit 0 ;;
+        *"exec rails-mmd generate --config rails_mmd_collision.yml"*)
+          mkdir -p tmp/rails_mmd_collision
+          cp "$RAILS_MMD_TEST_ROOT/fixtures/rails_matrix/template/families/cross_domain_multi_db/rails_mmd_collision_diagnostics_fixture.json" tmp/rails_mmd_collision/collision.diagnostics.json
+          #{'touch tmp/rails_mmd_collision/collision.er.mmd' if collision_extra_artifact}
+          #{"sed -i '' 's#tmp/matrix_archive.sqlite3#/Users/secret/archive.sqlite3#' tmp/rails_mmd_collision/collision.diagnostics.json" if collision_leak}
+          #{"printf '[]\\n' > rails_mmd_expected_collision_diagnostics.json" if collision_expectation_mismatch}
+          exit 2 ;;
         *"exec rails-mmd generate"*)
-#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_specialized_options_runtime.json', expected_specialized_options_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
+#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_entities.json', expected_entities)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_specialized_options_runtime.json', expected_specialized_options_runtime)}#{write_file_shell('rails_mmd_expected_cross_domain_runtime.json', expected_cross_domain_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/#{actual_er_plan_fixture}" tmp/rails_mmd/core.er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{actual_class_plan_fixture}" tmp/rails_mmd/core.class.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{expected_er_plan_fixture}" rails_mmd_expected_core_er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{expected_class_plan_fixture}" rails_mmd_expected_core_class.render_plan.json
 #{copy_fixture_shell('tmp/rails_mmd/core.diagnostics.json', actual_diagnostics_fixture)}
-#{write_file_shell('tmp/rails_mmd/core.er.mmd', actual_er_mermaid)}#{write_file_shell('tmp/rails_mmd/core.class.mmd', actual_class_mermaid)}          exit 0 ;;
+#{write_file_shell('tmp/rails_mmd/core.er.mmd', actual_er_mermaid)}#{write_file_shell('tmp/rails_mmd/core.class.mmd', actual_class_mermaid)}          #{'touch tmp/rails_mmd/secondary.er.mmd' if success_extra_artifact}
+          exit 0 ;;
         *) exit 0 ;;
       esac
     SH
@@ -467,6 +555,106 @@ EOF
       expect(result).to include(
         success: true,
         output: include('PASS ruby-4.0.6-rails-7.2 [composite_keys]')
+      )
+    end
+  end
+
+  it 'runs the cross-domain multi-DB success and collision scenarios' do
+    with_fake_asdf(matching_fake_app_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: true,
+        output: include('PASS ruby-4.0.6-rails-8.1 [cross_domain_multi_db]')
+      )
+    end
+  end
+
+  it 'rejects cross-domain success publication beyond its closed artifact set' do
+    with_fake_asdf(fake_generated_app_asdf(success_extra_artifact: true)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('success publication did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects a mismatched cross-domain entity oracle' do
+    with_fake_asdf(fake_generated_app_asdf(expected_entities: '[]')) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(success: false, output: include('entities did not match expectation'))
+    end
+  end
+
+  it 'rejects a mismatched cross-domain runtime oracle' do
+    with_fake_asdf(fake_generated_app_asdf(expected_cross_domain_runtime: '[{"unexpected":true}]')) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('cross-domain multi-DB runtime did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects mismatched exact collision diagnostics' do
+    with_fake_asdf(fake_generated_app_asdf(collision_expectation_mismatch: true)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(success: false, output: include('collision diagnostics did not match expectation'))
+    end
+  end
+
+  it 'rejects unknown connection-boundary probe evidence' do
+    payload = connection_boundary_probe_payload.merge('unexpected' => true)
+
+    with_fake_asdf(fake_generated_app_asdf(connection_boundary_probe: payload)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('connection boundary probe did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects collision publication beyond the diagnostics artifact' do
+    with_fake_asdf(fake_generated_app_asdf(collision_extra_artifact: true)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('collision publication did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects unredacted collision connection material' do
+    with_fake_asdf(fake_generated_app_asdf(collision_leak: true)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'cross_domain_multi_db'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('collision diagnostics leaked forbidden connection material')
       )
     end
   end
