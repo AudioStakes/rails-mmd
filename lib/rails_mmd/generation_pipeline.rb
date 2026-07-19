@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rails_mmd/constant_resolver'
 require 'rails_mmd/domain_resolver'
 require 'rails_mmd/diagnostics'
 require 'rails_mmd/ir_builder'
@@ -15,9 +16,11 @@ module RailsMmd
   class GenerationPipeline
     Result = Struct.new(:diagnostics, :artifacts, keyword_init: true)
 
-    def initialize(active_record_base: nil, redactor: Redactor.new, render_plan_builder: nil,
+    def initialize(active_record_base: nil, constant_resolver: ConstantResolver.new, redactor: Redactor.new,
+                   render_plan_builder: nil,
                    mermaid_serializer: nil)
       @active_record_base = active_record_base
+      @constant_resolver = ConstantResolver.wrap(constant_resolver)
       @redactor = redactor
       @diagnostics = Diagnostics.new(redactor: redactor)
       @render_plan_builder = render_plan_builder || RenderPlanBuilder.new(redactor: redactor)
@@ -33,7 +36,8 @@ module RailsMmd
 
     private
 
-    attr_reader :active_record_base, :diagnostics, :mermaid_serializer, :redactor, :render_plan_builder
+    attr_reader :active_record_base, :constant_resolver, :diagnostics, :mermaid_serializer, :redactor,
+                :render_plan_builder
 
     def internal_payloads(config)
       resolved = resolve_domains(config)
@@ -44,17 +48,20 @@ module RailsMmd
     end
 
     def resolve_domains(config)
-      inventory = ModelInventory.new(active_record_base: resolved_active_record_base, redactor: redactor)
+      inventory = ModelInventory.new(
+        active_record_base: resolved_active_record_base, constant_resolver: constant_resolver, redactor: redactor
+      )
       DomainResolver.new(diagnostics: diagnostics).resolve(config: config, inventory_records: inventory.records)
     end
 
     def probe_domains(resolved)
-      SchemaProbe.new(model_resolver: model_resolver, diagnostics: diagnostics, redactor: redactor)
+      SchemaProbe.new(constant_resolver: constant_resolver, diagnostics: diagnostics, redactor: redactor)
                  .probe(domains: resolved.domains)
     end
 
     def build_relationships(probed)
-      RelationshipBuilder.new(model_resolver: model_resolver, diagnostics: diagnostics).build(domains: probed.domains)
+      RelationshipBuilder.new(constant_resolver: constant_resolver, diagnostics: diagnostics)
+                         .build(domains: probed.domains)
     end
 
     def build_ir(config, probed, relationships)
@@ -97,12 +104,6 @@ module RailsMmd
 
     def resolved_active_record_base
       active_record_base || Object.const_get(:ActiveRecord).const_get(:Base)
-    end
-
-    def model_resolver
-      lambda do |constant|
-        constant.split('::').reduce(Object) { |namespace, name| namespace.const_get(name, false) }
-      end
     end
   end
 end

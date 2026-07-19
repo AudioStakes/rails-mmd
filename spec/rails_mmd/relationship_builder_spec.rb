@@ -69,7 +69,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
 
     result = described_class.new(
-      model_resolver: lambda { |name|
+      constant_resolver: lambda { |name|
         { 'User' => owner, 'Account' => renderable_model('Account', 'accounts') }.fetch(name)
       }
     ).build(domains: [domain])
@@ -1105,7 +1105,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
   end
 
   def build(domain, models)
-    described_class.new(model_resolver: ->(name) { models.fetch(name) }).build(domains: [domain])
+    described_class.new(constant_resolver: ->(name) { models.fetch(name) }).build(domains: [domain])
   end
 
   def domain_result(domain_id, entities, join_tables: [])

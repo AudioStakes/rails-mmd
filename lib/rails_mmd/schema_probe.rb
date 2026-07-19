@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rails_mmd/constant_resolver'
 require 'rails_mmd/diagnostics'
 require 'rails_mmd/redactor'
 
@@ -33,8 +34,8 @@ module RailsMmd
     end
     Result = Struct.new(:domains, :diagnostics, keyword_init: true)
 
-    def initialize(model_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
-      @model_resolver = model_resolver
+    def initialize(constant_resolver:, diagnostics: Diagnostics.new, redactor: Redactor.new)
+      @constant_resolver = ConstantResolver.wrap(constant_resolver)
       @diagnostics = diagnostics
       @redactor = redactor
     end
@@ -48,7 +49,7 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics, :model_resolver, :redactor
+    attr_reader :constant_resolver, :diagnostics, :redactor
 
     def probe_domain(domain)
       connection_diagnostic = multi_db_diagnostic(domain)
@@ -105,9 +106,7 @@ module RailsMmd
     end
 
     def model_for(record)
-      model_resolver.call(record.ruby_constant)
-    rescue LoadError, SyntaxError, StandardError
-      nil
+      constant_resolver.resolve(record.ruby_constant)
     end
 
     def invalid_record(domain_id, record, kind)

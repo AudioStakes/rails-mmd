@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rails_mmd/constant_resolver'
 require 'rails_mmd/diagnostics'
 
 module RailsMmd
@@ -63,8 +64,8 @@ module RailsMmd
       end
     end
 
-    def initialize(model_resolver:, diagnostics: Diagnostics.new)
-      @model_resolver = model_resolver
+    def initialize(constant_resolver:, diagnostics: Diagnostics.new)
+      @constant_resolver = ConstantResolver.wrap(constant_resolver)
       @diagnostics = diagnostics
     end
 
@@ -76,7 +77,7 @@ module RailsMmd
 
     private
 
-    attr_reader :diagnostics, :model_resolver
+    attr_reader :constant_resolver, :diagnostics
 
     def build_domain(domain)
       context = DomainContext.new(domain)
@@ -736,17 +737,15 @@ module RailsMmd
     end
 
     def target_model_for(reflection)
-      return model_resolver.call(reflection_class_name(reflection)) unless reflection.respond_to?(:klass)
+      return constant_resolver.resolve(reflection_class_name(reflection)) unless reflection.respond_to?(:klass)
 
       reflection.klass
     rescue NameError
-      model_resolver.call(reflection_class_name(reflection))
+      constant_resolver.resolve(reflection_class_name(reflection))
     end
 
     def resolve_model(ruby_constant)
-      model_resolver.call(ruby_constant)
-    rescue LoadError, SyntaxError, StandardError
-      nil
+      constant_resolver.resolve(ruby_constant)
     end
 
     def renderable_model?(model)

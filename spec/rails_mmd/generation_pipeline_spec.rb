@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rails_mmd/config'
 require 'rails_mmd/generation_pipeline'
 
 # rubocop:disable Lint/ConstantDefinitionInBlock, Naming/MethodParameterName, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations

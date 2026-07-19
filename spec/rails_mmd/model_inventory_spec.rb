@@ -37,6 +37,29 @@ RSpec.describe RailsMmd::ModelInventory do
     expect(records.map(&:ruby_constant)).to eq(['User'])
   end
 
+  it 'ignores descendants whose constant resolution raises script errors' do
+    broken = fake_model('BrokenAutoload')
+    resolver = ->(_name) { raise NotImplementedError, 'autoload hook unavailable' }
+
+    records = described_class.new(
+      active_record_base: Struct.new(:descendants).new([broken]),
+      constant_resolver: resolver
+    ).records
+
+    expect(records).to eq([])
+  end
+
+  it 'propagates resource failures while resolving descendants' do
+    broken = fake_model('BrokenAutoload')
+    resolver = ->(_name) { raise NoMemoryError, 'resource exhausted' }
+    inventory = described_class.new(
+      active_record_base: Struct.new(:descendants).new([broken]),
+      constant_resolver: resolver
+    )
+
+    expect { inventory.records }.to raise_error(NoMemoryError, 'resource exhausted')
+  end
+
   it 'records exactly the contract inventory fields for renderable base models' do
     user = fake_model(
       'User',
@@ -158,6 +181,19 @@ RSpec.describe RailsMmd::ModelInventory do
     records = described_class.new(active_record_base: Struct.new(:descendants).new([InventorySpecModel])).records
 
     expect(records.map(&:ruby_constant)).to eq(['InventorySpecModel'])
+  end
+
+  it 'accepts resolver objects that expose the shared resolve interface' do
+    user = fake_model('User')
+    resolver = Object.new
+    resolver.define_singleton_method(:resolve) { |name| { 'User' => user }.fetch(name) }
+
+    records = described_class.new(
+      active_record_base: Struct.new(:descendants).new([user]),
+      constant_resolver: resolver
+    ).records
+
+    expect(records.map(&:ruby_constant)).to eq(['User'])
   end
 
   it 'marks abstract models and STI subclasses non-renderable when observable' do
