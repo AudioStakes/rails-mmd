@@ -643,16 +643,16 @@ RSpec.describe RailsMmd::SchemaProbe do
       'CustomKeyOwner' => delegated_owner_model(
         delegated_runtime_file,
         'entryable',
-        ['Comment'],
-        columns: [column('id', :integer, false), column('entryable_id', :integer, true),
-                  column('entryable_type', :string, true)],
+        [],
+        columns: [column('id', :integer, false), column('custom_entryable_id', :integer, true),
+                  column('custom_entryable_type', :string, true)],
         foreign_key: 'custom_entryable_id',
         foreign_type: 'custom_entryable_type'
       ),
       'PrimaryKeyOwner' => delegated_owner_model(
         delegated_runtime_file,
         'entryable',
-        ['Comment'],
+        [],
         columns: [column('id', :integer, false), column('entryable_id', :integer, true),
                   column('entryable_type', :string, true)],
         active_record_primary_key: 'slug',
@@ -697,11 +697,47 @@ RSpec.describe RailsMmd::SchemaProbe do
     end).to eq([
                  ['BadNameOwner', 'entryable::bad', 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED', []],
                  ['CompositeOwner', 'entryable', 'ASSOCIATION_KEY_COLUMN_MISSING', []],
-                 ['CustomKeyOwner', 'entryable', 'ASSOCIATION_POLYMORPHIC_OMITTED', []],
+                 ['CustomKeyOwner', 'entryable', nil, []],
                  ['MalformedOwner', 'entryable', 'ASSOCIATION_COMPOSITE_KEY_OMITTED', []],
                  ['MissingColumnOwner', 'entryable', 'ASSOCIATION_KEY_COLUMN_MISSING', []],
-                 ['PrimaryKeyOwner', 'entryable', 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', []]
+                 ['PrimaryKeyOwner', 'entryable', nil, []]
                ])
+  end
+
+  it 'accepts a specialized delegated root without reading referenced-key metadata' do
+    delegated_runtime_file = '/gems/activerecord/lib/active_record/delegated_type.rb'
+    install_delegated_type_runtime(delegated_runtime_file)
+    reflection = Object.new
+    reflection.define_singleton_method(:name) { :entryable }
+    reflection.define_singleton_method(:macro) { :belongs_to }
+    reflection.define_singleton_method(:polymorphic?) { true }
+    reflection.define_singleton_method(:foreign_key) { 'custom_entryable_id' }
+    reflection.define_singleton_method(:foreign_type) { 'custom_entryable_type' }
+    reflection.define_singleton_method(:scope) { nil }
+    reflection.define_singleton_method(:options) { { primary_key: 'slug' } }
+    reflection.define_singleton_method(:association_primary_key) { raise 'must not read association primary key' }
+    reflection.define_singleton_method(:active_record_primary_key) { raise 'must not read owner primary key' }
+    owner = model(
+      table_exists: true,
+      columns: [
+        column('id', :integer, false),
+        column('custom_entryable_id', :integer, true),
+        column('custom_entryable_type', :string, true)
+      ]
+    )
+    owner.define_singleton_method(:reflect_on_all_associations) { |_macro = nil| [reflection] }
+    define_generated_types_method(owner, :entryable_types, delegated_runtime_file, [])
+
+    result = described_class.new(model_resolver: ->(_name) { owner }).probe(
+      domains: [domain_result('core', [record('Entry')])]
+    )
+
+    family = result.domains.first.delegated_type_families.fetch(0)
+    expect(family).to have_attributes(
+      foreign_key_columns: ['custom_entryable_id'],
+      foreign_type: 'custom_entryable_type',
+      root_diagnostic_code: nil
+    )
   end
 
   it 'hands off a delegated root composite identifier tuple with its scalar type discriminator' do

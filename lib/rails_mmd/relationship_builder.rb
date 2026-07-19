@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/canonical_json'
+require 'rails_mmd/association_binding_resolver'
 require 'rails_mmd/diagnostics'
 require 'rails_mmd/key_tuple'
 require 'rails_mmd/relationship_id_codec'
@@ -43,6 +44,7 @@ module RailsMmd
     STRUCTURED_COLUMN_PATTERN = /\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/
     MACRO_PRIORITY = { belongs_to: 0, has_one: 1, has_many: 2 }.freeze
     ReflectionEntry = Struct.new(:owner, :reflection, :metadata, :referenced_key_columns, keyword_init: true)
+    ThroughPhysicalHop = Struct.new(:reflection, :target_model, :target_constant, keyword_init: true)
     DomainContext = Struct.new(:domain, keyword_init: false) do
       def domain_id = domain.domain_id
 
@@ -319,13 +321,13 @@ module RailsMmd
         return polymorphic_failure(context, owner, sanitized_name, root_diagnostic_code) if root_diagnostic_code
       end
 
-      keys = polymorphic_key_columns(reflection)
-      return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED') unless keys
-      unless supported_polymorphic_key_names?(sanitized_name, keys)
-        return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_OMITTED')
+      root_binding = polymorphic_root_binding(reflection)
+      unless root_binding
+        return polymorphic_failure(context, owner, sanitized_name,
+                                   'ASSOCIATION_COMPOSITE_KEY_OMITTED')
       end
-      unless columns_present?(owner, keys.fetch(:foreign_key_columns)) &&
-             column_names(owner).include?(keys.fetch(:foreign_type))
+      unless columns_present?(owner, root_binding.foreign_key_columns) &&
+             column_names(owner).include?(root_binding.foreign_type_column)
         return polymorphic_failure(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING')
       end
 
@@ -336,10 +338,10 @@ module RailsMmd
             root,
             inverses,
             family,
-            { association_name: sanitized_name, keys: keys }
+            { association_name: sanitized_name, root_binding: root_binding }
           )
         else
-          polymorphic_candidates(context, root, inverses, sanitized_name, keys)
+          polymorphic_candidates(context, root, inverses, sanitized_name, root_binding)
         end
       if candidates.empty?
         candidate_diagnostics << omitted(
@@ -349,7 +351,7 @@ module RailsMmd
       root_metadata = { scoped: true } if scoped?(reflection)
       relationships = candidates.map do |candidate|
         metadata = candidate.metadata || root_metadata
-        relationship = polymorphic_relationship_for(owner, candidate.owner, sanitized_name, keys, candidate)
+        relationship = polymorphic_relationship_for(owner, candidate.owner, sanitized_name, root_binding, candidate)
         relationship_with_metadata(relationship, metadata)
       end
       [relationships, candidate_diagnostics, handled]
@@ -359,33 +361,26 @@ module RailsMmd
       [[], [omitted(context, owner, association_name, code).last], []]
     end
 
-    def polymorphic_key_columns(reflection)
-      foreign_key_columns = KeyTuple.normalize(safe_reflection_value(reflection, :foreign_key))
-      foreign_type = scalar_key(safe_reflection_value(reflection, :foreign_type))
-      return unless foreign_key_columns && foreign_type
-
-      { foreign_key_columns: foreign_key_columns, foreign_type: foreign_type }
+    def polymorphic_root_binding(reflection)
+      result = AssociationBindingResolver.polymorphic_root(reflection)
+      result.binding if result.success?
     end
 
-    def supported_polymorphic_key_names?(association_name, keys)
-      return false unless keys.fetch(:foreign_type) == "#{association_name}_type"
-
-      columns = keys.fetch(:foreign_key_columns)
-      columns.length > 1 || columns == ["#{association_name}_id"]
-    end
-
-    def polymorphic_candidates(context, root, inverses, association_name, keys)
+    def polymorphic_candidates(context, root, inverses, association_name, root_binding)
       valid = []
       output_diagnostics = []
       handled = []
       inverses.each do |candidate|
         next unless inverse_interface(candidate.reflection) == association_name
 
-        target_model, target_constant = resolve_target(candidate.reflection)
-        next unless target_model && target_constant == root.owner.ruby_constant
-
         handled << candidate.reflection
-        diagnostic = polymorphic_candidate_diagnostic(context, root, candidate, keys, target_model)
+        target_model, resolution_diagnostic = delegated_inverse_target(context, root, candidate)
+        if resolution_diagnostic
+          output_diagnostics << resolution_diagnostic
+          next
+        end
+
+        diagnostic = polymorphic_candidate_diagnostic(context, root, candidate, root_binding, target_model)
         if diagnostic
           output_diagnostics << diagnostic
         else
@@ -436,7 +431,7 @@ module RailsMmd
       chosen_inverse = canonical_polymorphic_candidates(valid_inverses).first
       referenced_key_columns = chosen_inverse&.referenced_key_columns ||
                                polymorphic_referenced_key_columns(root.reflection, target_entity)
-      root_foreign_key_columns = root_details.fetch(:keys).fetch(:foreign_key_columns)
+      root_foreign_key_columns = root_details.fetch(:root_binding).foreign_key_columns
       unless KeyTuple.valid_pair?(root_foreign_key_columns, referenced_key_columns)
         diagnostic = omitted(
           context, root.owner, root_details.fetch(:association_name),
@@ -482,7 +477,7 @@ module RailsMmd
           context,
           root,
           candidate,
-          root_details.fetch(:keys),
+          root_details.fetch(:root_binding),
           target_model
         )
         if diagnostic
@@ -548,7 +543,7 @@ module RailsMmd
       end
     end
 
-    def polymorphic_candidate_diagnostic(context, root, candidate, root_keys, target_model)
+    def polymorphic_candidate_diagnostic(context, root, candidate, root_binding, target_model)
       reflection = candidate.reflection
       association_name = reflection_name(reflection)
       unless renderable_model?(target_model)
@@ -556,49 +551,45 @@ module RailsMmd
                        'ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED', target_model.name).last
       end
 
-      candidate_keys = polymorphic_inverse_key_columns(reflection)
-      unless candidate_keys == root_keys
+      candidate_binding = polymorphic_inverse_binding(reflection, candidate.owner)
+      unless candidate_binding
+        return omitted(context, candidate.owner, association_name,
+                       'ASSOCIATION_COMPOSITE_KEY_OMITTED').last
+      end
+
+      unless candidate_binding.foreign_key_columns == root_binding.foreign_key_columns &&
+             candidate_binding.foreign_type_column == root_binding.foreign_type_column
         return omitted(context, candidate.owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
       end
 
       referenced_key_columns = polymorphic_referenced_key_columns(root.reflection, candidate.owner)
-      inverse_referenced_key_columns = KeyTuple.normalize(
-        safe_reflection_value(reflection, :active_record_primary_key)
-      )
-      unless KeyTuple.valid_pair?(root_keys.fetch(:foreign_key_columns), referenced_key_columns) &&
-             inverse_referenced_key_columns
+      inverse_referenced_key_columns = candidate_binding.referenced_key_columns
+      unless KeyTuple.valid_pair?(root_binding.foreign_key_columns, referenced_key_columns)
         return omitted(context, candidate.owner, association_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED').last
+      end
+      unless columns_present?(candidate.owner, inverse_referenced_key_columns)
+        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_KEY_COLUMN_MISSING').last
       end
 
       unless inverse_referenced_key_columns == referenced_key_columns
-        if inverse_referenced_key_columns == candidate.owner.primary_key_columns &&
-           !columns_present?(candidate.owner, inverse_referenced_key_columns)
-          return omitted(context, candidate.owner, association_name, 'ASSOCIATION_KEY_COLUMN_MISSING').last
-        end
-
-        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED').last
-      end
-      unless columns_present?(candidate.owner, referenced_key_columns)
-        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_KEY_COLUMN_MISSING').last
+        return omitted(context, candidate.owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED').last
       end
 
       candidate.referenced_key_columns = referenced_key_columns
       nil
     end
 
-    def polymorphic_inverse_key_columns(reflection)
-      foreign_key_columns = KeyTuple.normalize(safe_reflection_value(reflection, :foreign_key))
-      foreign_type = scalar_key(safe_reflection_value(reflection, :type))
-      return unless foreign_key_columns && foreign_type
-
-      { foreign_key_columns: foreign_key_columns, foreign_type: foreign_type }
+    def polymorphic_inverse_binding(reflection, owner)
+      result = AssociationBindingResolver.has(reflection, owner_primary_key_columns: owner.primary_key_columns)
+      result.binding if result.success?
     end
 
     def polymorphic_referenced_key_columns(root_reflection, target_entity)
       target_model = resolve_model(target_entity.ruby_constant)
       return unless target_model
 
-      KeyTuple.normalize(association_primary_key(root_reflection, target_model))
+      result = AssociationBindingResolver.belongs_to(root_reflection, target_model: target_model)
+      result.binding&.referenced_key_columns if result.success?
     rescue LoadError, SyntaxError, StandardError
       nil
     end
@@ -672,9 +663,6 @@ module RailsMmd
 
       keys = direct_key_columns(reflection, owner)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) unless keys
-      if keys == :non_primary_key
-        return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
-      end
       unless columns_present?(target, keys.fetch(:foreign_key_columns)) &&
              columns_present?(owner, keys.fetch(:referenced_key_columns))
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
@@ -687,29 +675,21 @@ module RailsMmd
 
     def build_through_reflection(context, owner, reflection)
       association_name = reflection_name(reflection)
-      return [nil, omitted_macro(context, owner, reflection)] if explicit_through_source?(reflection)
-      if through_source_type?(reflection)
-        return omitted(context, owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED')
-      end
-
       sanitized_name = sanitize_association_name(association_name)
       return omitted(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED') unless sanitized_name
 
       through_reflection = safe_reflection_value(reflection, :through_reflection)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_THROUGH_UNRESOLVED') unless through_reflection
 
-      source_reflection = safe_reflection_value(reflection, :source_reflection)
-      return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless source_reflection
-
-      source_lineage = through_source_lineage(source_reflection)
-      return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless source_lineage
+      source_lineage, lineage_diagnostic_code, lineage_target_constant, semantic_target =
+        through_source_lineage(reflection)
+      unless source_lineage
+        return omitted(context, owner, sanitized_name, lineage_diagnostic_code,
+                       lineage_target_constant)
+      end
 
       chain = through_chain(reflection)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_SOURCE_UNRESOLVED') unless chain
-
-      chain_omission = through_chain_omission_code(chain + source_lineage + [through_reflection])
-      return [nil, omitted_macro(context, owner, reflection)] if chain_omission == 'ASSOCIATION_MACRO_OMITTED'
-      return omitted(context, owner, sanitized_name, chain_omission) if chain_omission
 
       path_names = chain.map { |hop| sanitize_association_name(reflection_name(hop)) }
       path_names[-1] = sanitize_association_name(reflection_name(source_lineage.last))
@@ -718,11 +698,13 @@ module RailsMmd
                        'ASSOCIATION_NAME_UNSUPPORTED_OMITTED')
       end
 
-      entities, diagnostic = through_entities(context, owner, sanitized_name, chain)
+      entities, diagnostic = through_entities(
+        context, owner, sanitized_name, chain, terminal_target: semantic_target
+      )
       return [nil, diagnostic] if diagnostic
 
-      key_omission = through_physical_key_omission_code(context, owner, reflection)
-      return omitted(context, owner, sanitized_name, key_omission) if key_omission
+      key_omission, key_target_constant = through_physical_key_omission_code(context, owner, reflection)
+      return omitted(context, owner, sanitized_name, key_omission, key_target_constant) if key_omission
 
       scoped = scoped?(reflection) || source_lineage.any? { |hop| scoped?(hop) } || chain.any? { |hop| scoped?(hop) }
       metadata = { scoped: true } if scoped
@@ -765,9 +747,6 @@ module RailsMmd
 
       keys = key_columns(reflection, target_model)
       return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant) if keys.nil?
-      if reflection_options(reflection).key?(:primary_key)
-        return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
-      end
       unless columns_present?(owner, keys.fetch(:foreign_key_columns)) &&
              columns_present?(target, keys.fetch(:referenced_key_columns))
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
@@ -839,9 +818,9 @@ module RailsMmd
       )
     end
 
-    def polymorphic_relationship_for(owner, target, association_name, keys, candidate)
-      foreign_key_columns = keys.fetch(:foreign_key_columns)
-      foreign_type = keys.fetch(:foreign_type)
+    def polymorphic_relationship_for(owner, target, association_name, root_binding, candidate)
+      foreign_key_columns = root_binding.foreign_key_columns
+      foreign_type = root_binding.foreign_type_column
       referenced_key_columns = candidate.referenced_key_columns
       relationship_id = RelationshipIdCodec.polymorphic(
         holder_table: owner.table_name,
@@ -1055,30 +1034,24 @@ module RailsMmd
     end
 
     def key_columns(reflection, target_model)
-      foreign_key_columns = KeyTuple.normalize(reflection_value(reflection, :foreign_key))
-      referenced_key_columns = KeyTuple.normalize(association_primary_key(reflection, target_model))
-      return unless KeyTuple.valid_pair?(foreign_key_columns, referenced_key_columns)
+      result = AssociationBindingResolver.belongs_to(reflection, target_model: target_model)
+      return unless result.success?
 
-      { foreign_key_columns: foreign_key_columns, referenced_key_columns: referenced_key_columns }
-    rescue LoadError, SyntaxError, StandardError
-      nil
+      binding_key_columns(result.binding)
     end
 
     def direct_key_columns(reflection, owner)
-      foreign_key_columns = KeyTuple.normalize(reflection_value(reflection, :foreign_key))
-      referenced_value = reflection_value(reflection, :active_record_primary_key)
-      referenced_value = owner.primary_key_columns if referenced_value.nil?
-      referenced_key_columns = KeyTuple.normalize(referenced_value)
-      return unless KeyTuple.valid_pair?(foreign_key_columns, referenced_key_columns)
-      if reflection_options(reflection).key?(:primary_key) &&
-         !(referenced_key_columns.one? && owner.primary_key_columns.one? &&
-           referenced_key_columns == owner.primary_key_columns)
-        return :non_primary_key
-      end
+      result = AssociationBindingResolver.has(reflection, owner_primary_key_columns: owner.primary_key_columns)
+      return unless result.success?
 
-      { foreign_key_columns: foreign_key_columns, referenced_key_columns: referenced_key_columns }
-    rescue LoadError, SyntaxError, StandardError
-      nil
+      binding_key_columns(result.binding)
+    end
+
+    def binding_key_columns(binding)
+      {
+        foreign_key_columns: binding.foreign_key_columns,
+        referenced_key_columns: binding.referenced_key_columns
+      }
     end
 
     def unique_owner_keys?(owner, key_columns)
@@ -1145,14 +1118,6 @@ module RailsMmd
       reflection.respond_to?(:options) ? reflection.options : {}
     end
 
-    def explicit_through_source?(reflection)
-      reflection_options(reflection).key?(:source)
-    end
-
-    def through_source_type?(reflection)
-      !reflection_options(reflection)[:source_type].nil?
-    end
-
     def through_chain(reflection)
       chain = Array(reflection.collect_join_chain).reverse
       chain unless chain.empty?
@@ -1160,91 +1125,183 @@ module RailsMmd
       nil
     end
 
-    def through_source_lineage(source_reflection)
-      lineage = []
-      seen = {}.compare_by_identity
-      current = source_reflection
-      loop do
-        return if seen.key?(current)
-
-        seen[current] = true
-        lineage << current
-        break if explicit_through_source?(current) || through_source_type?(current) || polymorphic?(current)
-        break unless through?(current)
-
-        current = safe_reflection_value(current, :source_reflection)
-        return unless current
-      end
-      lineage
-    rescue LoadError, SyntaxError, StandardError
-      nil
-    end
-
-    def through_chain_omission_code(chain)
-      return 'ASSOCIATION_MACRO_OMITTED' if chain.any? { |hop| explicit_through_source?(hop) }
-      return 'ASSOCIATION_POLYMORPHIC_OMITTED' if chain.any? { |hop| through_source_type?(hop) || polymorphic?(hop) }
-
-      nil
-    rescue LoadError, SyntaxError, StandardError
-      'ASSOCIATION_SOURCE_UNRESOLVED'
-    end
-
     def through_physical_key_omission_code(context, owner, reflection)
       current = owner
-      through_physical_reflections(reflection).each do |hop|
-        target_model, target_constant = resolve_target(hop)
-        break unless target_model
+      hops, diagnostic_code, target_constant = through_physical_hops(reflection)
+      return [diagnostic_code, target_constant] if diagnostic_code
 
-        target = context.entity_by_constant[target_constant]
-        break unless target
+      hops.each do |hop|
+        return ['ASSOCIATION_TARGET_UNRESOLVED', hop.target_constant] unless hop.target_model
 
-        code = direct_hop_key_omission_code(current, target, target_model, hop)
-        return code if code
+        target = context.entity_by_constant[hop.target_constant]
+        return ['DOMAIN_RELATIONSHIP_OMITTED', hop.target_constant] unless target
+
+        code = direct_hop_key_omission_code(current, target, hop.target_model, hop.reflection)
+        return [code, hop.target_constant] if code
 
         current = target
       end
-      nil
-    rescue LoadError, SyntaxError, StandardError
-      'ASSOCIATION_COMPOSITE_KEY_OMITTED'
+      [nil, nil]
     end
 
     def direct_hop_key_omission_code(owner, target, target_model, reflection)
       if reflection_macro(reflection) == :belongs_to
-        keys = key_columns(reflection, target_model)
-        return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless keys
-        return 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED' if reflection_options(reflection).key?(:primary_key)
+        result = AssociationBindingResolver.belongs_to(reflection, target_model: target_model)
+        return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless result.success?
 
+        binding = result.binding
         holder = owner
         referenced = target
       else
-        keys = direct_key_columns(reflection, owner)
-        return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless keys
-        return 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED' if keys == :non_primary_key
+        result = AssociationBindingResolver.has(reflection, owner_primary_key_columns: owner.primary_key_columns)
+        return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless result.success?
 
+        binding = result.binding
         holder = target
         referenced = owner
       end
-      return if columns_present?(holder, keys.fetch(:foreign_key_columns)) &&
-                columns_present?(referenced, keys.fetch(:referenced_key_columns))
+      return if columns_present?(holder, binding.foreign_key_columns) &&
+                (!binding.foreign_type_column || column_names(holder).include?(binding.foreign_type_column)) &&
+                columns_present?(referenced, binding.referenced_key_columns)
 
       'ASSOCIATION_KEY_COLUMN_MISSING'
     end
 
-    def through_physical_reflections(reflection, seen = {}.compare_by_identity)
-      return [] if seen.key?(reflection)
+    def through_source_lineage(reflection, seen = {}.compare_by_identity)
+      return [nil, 'ASSOCIATION_SOURCE_UNRESOLVED', nil, nil] if seen.key?(reflection)
+
+      seen[reflection] = true
+      source_type = safe_through_source_type(reflection)
+      return [nil, 'ASSOCIATION_SOURCE_UNRESOLVED', nil, nil] if source_type == :__unreadable__
+
+      source_reflection, diagnostic_code = resolved_through_source_reflection(reflection)
+      return [nil, diagnostic_code, nil, nil] unless source_reflection
+
+      target_model, target_constant, source_diagnostic = through_source_target(
+        reflection, source_reflection, source_type
+      )
+      return [nil, source_diagnostic, target_constant, nil] if source_diagnostic
+
+      terminal_target = if target_model
+                          physical_hop(
+                            source_reflection,
+                            target_model: target_model,
+                            target_constant: target_constant
+                          )
+                        end
+
+      return [[source_reflection], nil, nil, terminal_target] unless through?(source_reflection)
+
+      nested_lineage, nested_code, nested_target_constant, nested_terminal_target =
+        through_source_lineage(source_reflection, seen)
+      return [nil, nested_code, nested_target_constant, nil] unless nested_lineage
+
+      [[source_reflection, *nested_lineage], nil, nil, nested_terminal_target || terminal_target]
+    end
+
+    def safe_through_source_type(reflection)
+      reflection_options(reflection)[:source_type]
+    rescue LoadError, SyntaxError, StandardError
+      :__unreadable__
+    end
+
+    def resolved_through_source_reflection(reflection)
+      return [nil, 'ASSOCIATION_SOURCE_UNRESOLVED'] unless reflection.respond_to?(:source_reflection)
+
+      source_reflection = reflection.source_reflection
+      return [nil, 'ASSOCIATION_SOURCE_UNRESOLVED'] unless source_reflection
+
+      [source_reflection, nil]
+    rescue LoadError, SyntaxError, StandardError => e
+      [nil, through_source_resolution_diagnostic_code(e)]
+    end
+
+    def through_source_resolution_diagnostic_code(error)
+      class_name = error.class.name.to_s.split('::').last
+      return 'ASSOCIATION_POLYMORPHIC_OMITTED' if %w[
+        HasManyThroughAssociationPointlessSourceTypeError
+        HasManyThroughAssociationPolymorphicSourceError
+      ].include?(class_name)
+
+      'ASSOCIATION_SOURCE_UNRESOLVED'
+    end
+
+    def through_source_target(reflection, source_reflection, source_type)
+      return [nil, nil, 'ASSOCIATION_POLYMORPHIC_OMITTED'] if source_type && !polymorphic?(source_reflection)
+      return [nil, nil, nil] unless polymorphic?(source_reflection)
+      return [nil, nil, 'ASSOCIATION_POLYMORPHIC_OMITTED'] if source_type.nil?
+
+      target_model, target_constant = resolve_target(reflection)
+      return [nil, target_constant, 'ASSOCIATION_TARGET_UNRESOLVED'] unless target_model
+
+      [target_model, target_constant, nil]
+    end
+
+    def through_physical_hops(reflection, seen = {}.compare_by_identity)
+      return [[], 'ASSOCIATION_SOURCE_UNRESOLVED', nil] if seen.key?(reflection)
 
       seen[reflection] = true
       through_reflection = safe_reflection_value(reflection, :through_reflection)
-      source_reflection = safe_reflection_value(reflection, :source_reflection)
-      [through_reflection, source_reflection].compact.flat_map do |hop|
-        through?(hop) ? through_physical_reflections(hop, seen) : [hop]
-      end
+      return [[], 'ASSOCIATION_THROUGH_UNRESOLVED', nil] unless through_reflection
+
+      source_type = safe_through_source_type(reflection)
+      return [[], 'ASSOCIATION_SOURCE_UNRESOLVED', nil] if source_type == :__unreadable__
+
+      source_reflection, source_code = resolved_through_source_reflection(reflection)
+      return [[], source_code, nil] unless source_reflection
+
+      source_target_model, source_target_constant, target_code = through_source_target(
+        reflection, source_reflection, source_type
+      )
+      return [[], target_code, source_target_constant] if target_code
+
+      through_hops =
+        if through?(through_reflection)
+          nested_hops, nested_code, nested_target_constant = through_physical_hops(through_reflection, seen)
+          return [[], nested_code, nested_target_constant] if nested_code
+
+          nested_hops
+        else
+          [physical_hop(through_reflection)]
+        end
+      source_hops =
+        if through?(source_reflection)
+          nested_hops, nested_code, nested_target_constant = through_physical_hops(source_reflection, seen)
+          return [[], nested_code, nested_target_constant] if nested_code
+
+          nested_hops
+        else
+          [physical_hop(
+            source_reflection,
+            target_model: source_target_model,
+            target_constant: source_target_constant
+          )]
+        end
+
+      [through_hops + source_hops, nil, nil]
     end
 
-    def through_entities(context, owner, association_name, chain)
+    def physical_hop(reflection, target_model: nil, target_constant: nil)
+      resolved_target_model = target_model
+      resolved_target_constant = target_constant
+      resolved_target_model, resolved_target_constant = resolve_target(reflection) unless resolved_target_model
+      resolved_target_constant ||= resolved_target_model&.name || reflection_class_name(reflection)
+
+      ThroughPhysicalHop.new(
+        reflection: reflection,
+        target_model: resolved_target_model,
+        target_constant: resolved_target_constant
+      )
+    end
+
+    def through_entities(context, owner, association_name, chain, terminal_target: nil)
       entities = []
       chain.each_with_index do |hop, index|
-        model, constant = resolve_target(hop)
+        model, constant = if terminal_target && index == chain.length - 1
+                            [terminal_target.target_model, terminal_target.target_constant]
+                          else
+                            resolve_target(hop)
+                          end
         code = index.zero? ? 'ASSOCIATION_THROUGH_UNRESOLVED' : 'ASSOCIATION_SOURCE_UNRESOLVED'
         return [nil, omitted(context, owner, association_name, code, constant).last] unless model
         unless renderable_model?(model)
@@ -1294,7 +1351,10 @@ module RailsMmd
     end
 
     def inverse_polymorphic?(reflection)
-      reflection.respond_to?(:type) && !reflection.type.nil?
+      options = reflection_options(reflection)
+      options.is_a?(Hash) && options.key?(:as)
+    rescue LoadError, SyntaxError, StandardError
+      !safe_reflection_value(reflection, :type).nil?
     end
 
     def sanitize_association_name(name)

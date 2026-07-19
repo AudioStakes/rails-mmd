@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/diagnostics'
+require 'rails_mmd/association_binding_resolver'
 require 'rails_mmd/key_tuple'
 require 'rails_mmd/redactor'
 
@@ -219,8 +220,10 @@ module RailsMmd
       delegated_types = call_delegated_types_method(delegated_types_method)
       return if delegated_types.nil?
 
-      foreign_key_columns = KeyTuple.normalize(safe_reflection_value(reflection, :foreign_key))
-      foreign_type = scalar_key(safe_reflection_value(reflection, :foreign_type))
+      root_result = AssociationBindingResolver.polymorphic_root(reflection)
+      root_binding = root_result.binding
+      foreign_key_columns = root_binding&.foreign_key_columns
+      foreign_type = root_binding&.foreign_type_column
       family = DelegatedTypeFamily.new(
         owner_entity_id: entity_id_for(owner_entity.table_name),
         owner_ruby_constant: owner_entity.ruby_constant,
@@ -229,7 +232,7 @@ module RailsMmd
         foreign_type: foreign_type,
         scoped: scoped?(reflection),
         root_diagnostic_code: delegated_root_diagnostic_code(
-          reflection, owner_entity, association_name, foreign_key_columns, foreign_type
+          owner_entity, association_name, root_result
         ),
         targets: []
       )
@@ -374,14 +377,14 @@ module RailsMmd
       nil
     end
 
-    def delegated_root_diagnostic_code(reflection, owner_entity, association_name, foreign_key_columns, foreign_type)
+    def delegated_root_diagnostic_code(owner_entity, association_name, root_result)
       sanitized_name = sanitize_association_name(association_name)
       return 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED' unless sanitized_name
-      return 'ASSOCIATION_COMPOSITE_KEY_OMITTED' unless foreign_key_columns && foreign_type
-      unless default_polymorphic_keys?(sanitized_name, foreign_key_columns, foreign_type)
-        return 'ASSOCIATION_POLYMORPHIC_OMITTED'
-      end
-      return 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED' if primary_key_specialized?(reflection)
+      return root_result.diagnostic_code unless root_result.success?
+
+      root_binding = root_result.binding
+      foreign_key_columns = root_binding.foreign_key_columns
+      foreign_type = root_binding.foreign_type_column
       unless owner_has_key_columns?(owner_entity, foreign_key_columns, foreign_type)
         return 'ASSOCIATION_KEY_COLUMN_MISSING'
       end
@@ -412,10 +415,6 @@ module RailsMmd
       safe_value_from(reflection, :name).to_s
     end
 
-    def safe_reflection_value(reflection, method_name)
-      safe_value_from(reflection, method_name)
-    end
-
     def polymorphic?(reflection)
       safe_value_from(reflection, :polymorphic?) == true
     end
@@ -424,24 +423,10 @@ module RailsMmd
       !!safe_value_from(reflection, :scope)
     end
 
-    def scalar_key(value)
-      value if present_string?(value)
-    end
-
     def sanitize_association_name(name)
       return unless name.match?(ASSOCIATION_NAME_PATTERN)
 
       name.delete_suffix('?').delete_suffix('!').delete_suffix('=')
-    end
-
-    def default_polymorphic_keys?(association_name, foreign_key_columns, foreign_type)
-      identifier_matches = foreign_key_columns.length > 1 || foreign_key_columns == ["#{association_name}_id"]
-      identifier_matches && foreign_type == "#{association_name}_type"
-    end
-
-    def primary_key_specialized?(reflection)
-      reflection_options = safe_value_from(reflection, :options)
-      reflection_options.is_a?(Hash) && reflection_options.key?(:primary_key)
     end
 
     def owner_has_key_columns?(owner_entity, foreign_key_columns, foreign_type)

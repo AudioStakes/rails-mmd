@@ -356,12 +356,12 @@ non-polymorphic-owner `has_many` and `has_one`. P2-04 extends their target FK an
 `active_record_primary_key` from one column to equal-length ordered tuples and
 requires every physical member column to exist. Model-level
 `query_constraints` may widen the reflected tuple beyond the declaring owner's
-raw primary key. Preserve the existing scalar `primary_key:` case only when its
-one reflected member equals the owner's one actual primary-key member; every
-other explicit specialization remains on the P2-05 boundary. Both entities
-must be selected in the same domain. `as:` variants are handled only by the
-polymorphic path. Same-physical-tuple declarations are grouped by the P1-04 rule
-below without an additional warning.
+raw primary key. P2-05 accepts valid scalar/composite `primary_key:` bindings
+even when the referenced tuple is not the model's primary key. Every reflected
+holder and referenced member must exist. Both entities must be selected in the
+same domain. `as:` variants are handled only by the polymorphic path.
+Same-physical-tuple declarations are grouped by the P1-04 rule below without an
+additional warning.
 
 P1-04 canonicalizes every supported direct physical tuple regardless of
 explicit, automatic, absent, or disabled inverse metadata. Canonical orientation
@@ -380,15 +380,21 @@ outer declaration hop replaced by the resolved terminal source-reflection name.
 Direct physical edges remain, and one semantic edge is added per normalized path with
 ID `relationships/<owner_table>/through/<path...>/<target_table>`. Its owner
 cardinality is `0..many`; target cardinality is `0..many` for `has_many` and
-`0..1` for `has_one`. Explicit `source:`, `source_type:`, scopes, and
-polymorphic hops remain omitted for later priorities.
+`0..1` for `has_one`. P2-05 accepts explicit `source:` through Rails'
+`source_reflection`. It also accepts a polymorphic source only when
+`source_type:` resolves the owning through reflection to one concrete selected
+target. It never calls `klass` on the polymorphic source. A `source_type:` on a
+non-polymorphic source, or a polymorphic source without a concrete type, emits
+`ASSOCIATION_POLYMORPHIC_OMITTED`.
 
 P1-06 supports direct, unscoped polymorphic `belongs_to` roots when both scalar
 id/type holder columns exist. P2-04 extends the identifier to an ordered tuple
 while the type discriminator remains scalar. Selected same-domain direct
 `has_many` / `has_one ..., as:` reflections are candidates only when their
 interface, child model, identifier/type columns, and concrete target key tuple
-match the root. The root's `klass` and unresolved
+match the root. P2-05 permits custom scalar/composite identifier tuples, custom
+scalar type columns, and custom concrete referenced tuples when every physical
+member exists. The root's `klass` and unresolved
 `association_primary_key` are never read; target keys are resolved only with a
 concrete target class. One edge is emitted per unique concrete target. Scalar
 IDs retain
@@ -403,8 +409,8 @@ database uniqueness evidence. Candidate aliases are canonicalized by `has_one`,
 `has_many`, then lexical association name. No matching target emits
 `ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED`; conflicting/deferred inverse
 declarations retain `ASSOCIATION_POLYMORPHIC_OMITTED` without suppressing valid
-candidates. STI expansion, scopes, through polymorphism, and `source_type:`
-remain deferred.
+candidates. STI expansion and scope metadata compose with these bindings;
+polymorphic through paths use the typed-source rule above.
 
 P1-07 supports unscoped `has_and_belongs_to_many` declarations whose resolved
 target is renderable and selected in the same domain. The resolved scalar join
@@ -435,7 +441,7 @@ Omitted relationship diagnostics:
 | Target outside domain | `DOMAIN_RELATIONSHIP_OMITTED` |
 | Composite key | `ASSOCIATION_COMPOSITE_KEY_OMITTED` |
 | Missing owner or target key column | `ASSOCIATION_KEY_COLUMN_MISSING` |
-| Custom or non-primary target key | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` |
+| Preserved precomputed delegated-family non-primary omission | `ASSOCIATION_NON_PRIMARY_KEY_OMITTED` |
 | Unsafe association name | `ASSOCIATION_NAME_UNSUPPORTED_OMITTED` |
 | Non-`belongs_to` macro (P1-02) | `ASSOCIATION_MACRO_OMITTED` |
 

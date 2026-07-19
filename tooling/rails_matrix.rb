@@ -33,6 +33,12 @@ module RailsMatrix
       actual: 'composite_runtime.json',
       expected: 'rails_mmd_expected_composite_runtime.json',
       label: 'composite key'
+    },
+    'specialized_options' => {
+      command: %w[exec ruby bin/rails runner script/rails_mmd_specialized_options_runtime_oracle.rb],
+      actual: 'specialized_options_runtime.json',
+      expected: 'rails_mmd_expected_specialized_options_runtime.json',
+      label: 'specialized options'
     }
   }.freeze
 

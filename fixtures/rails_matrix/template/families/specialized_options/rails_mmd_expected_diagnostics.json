@@ -1,0 +1,212 @@
+[
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 12,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:OWNER_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:OWNER_LOCAL_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_LOCAL_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:OWNER_REGION_CODE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_REGION_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:P205_ACCOUNT",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "P205_ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:RESOURCE",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "RESOURCE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:TUPLE_ACCOUNT",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "TUPLE_ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 12,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:OWNER_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:OWNER_LOCAL_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_LOCAL_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:OWNER_REGION_CODE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "OWNER_REGION_CODE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:P205_ACCOUNT",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "P205_ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:RESOURCE",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "RESOURCE",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:TUPLE_ACCOUNT",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "TUPLE_ACCOUNT",
+      "collision_subject_count": 2,
+      "resolved": true
+    }
+  }
+]

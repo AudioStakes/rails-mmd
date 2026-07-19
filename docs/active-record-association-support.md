@@ -23,7 +23,7 @@ rails-mmdの対象版はRails 7.2と8.1。
 | P2-02 | STI | 対応 | ERは共有tableの基底のみ、class図はloaded concrete subtypeと継承edgeを決定的に描画する |
 | P2-03 | `delegated_type` | 対応 | Rails生成type whitelistを安全に検出し、委譲元から描画可能な宣言済み具象型へ具体edgeを描画する |
 | P2-04 | 複合primary/foreign key、`query_constraints` | 対応 | 順序付き列組を全層で保持し、完全一致するDB制約・nullability・unique根拠を照合する。複合HABTMは対応Railsで実用不可のため診断して省略する |
-| P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |
+| P2-05 | `primary_key` / `source` / `source_type` / `as` | 対応 | Railsが解決した物理bindingとtyped source targetを使い、custom scalar/composite keyを決定的に描画する |
 | P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
 | P2-07 | `dependent` / `touch` / `counter_cache` | 未対応 | 図へ載せる動作metadataを定義する |
 | P3-01 | `disable_joins` / `strict_loading` / async | 未対応 | 実行特性の表示要否を決める |
@@ -41,6 +41,7 @@ Rails 7.2/8.1で次を対応済み。
 - scalar/composite direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
 - hidden join tableを持つunscoped scalar `has_and_belongs_to_many`。複合HABTMは対応Railsのruntime probeに基づき診断して省略
 - provenance確認済み`delegated_type`の宣言済み具象型（同一connection・同一domain）
+- direct `primary_key:`、explicit through `source:`、polymorphic `source_type:`、custom `as:` binding
 
 ## 根拠
 
