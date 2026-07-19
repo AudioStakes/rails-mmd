@@ -4,7 +4,7 @@ require 'json'
 require 'json_schemer'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable Metrics/MethodLength, RSpec/DescribeClass
 RSpec.describe 'P0 contract schemas' do
   def schema_root
     Pathname(__dir__).join('../../schemas').expand_path
@@ -39,12 +39,90 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def expect_invalid_relationship_metadata(schema_name, fixture_path)
-    [nil, {}, { 'scoped' => false }, { 'scoped' => 'true' },
-     { 'scoped' => true, 'origin' => 'declaration' }].each do |metadata|
+    invalid_relationship_metadata.each do |metadata|
       payload = JSON.parse(JSON.generate(fixture(fixture_path)))
       payload.fetch('relationships').first['metadata'] = metadata
       expect(schema(schema_name)).not_to be_valid(payload)
     end
+  end
+
+  def expect_valid_relationship_metadata(schema_name, fixture_path)
+    valid_relationship_metadata.each do |metadata|
+      payload = JSON.parse(JSON.generate(fixture(fixture_path)))
+      payload.fetch('relationships').first['metadata'] = metadata
+      expect(schema(schema_name)).to be_valid(payload)
+    end
+  end
+
+  def valid_relationship_metadata
+    belongs_to = {
+      'association_name' => 'account',
+      'association_macro' => 'belongs_to',
+      'dependent' => { 'action' => 'delete', 'target' => 'associated_records' },
+      'touch' => { 'attribute' => nil },
+      'counter_cache' => { 'column' => 'members_count', 'active' => false }
+    }
+    has_many = {
+      'association_name' => 'members',
+      'association_macro' => 'has_many',
+      'dependent' => { 'action' => 'delete_all', 'target' => 'through_records' }
+    }
+    [
+      { 'scoped' => true },
+      { 'behavior' => { 'from_owner' => [belongs_to] } },
+      { 'scoped' => true, 'behavior' => { 'from_owner' => [belongs_to], 'from_target' => [has_many] } }
+    ]
+  end
+
+  def invalid_relationship_metadata
+    declaration = {
+      'association_name' => 'account',
+      'association_macro' => 'belongs_to',
+      'touch' => { 'attribute' => nil }
+    }
+    [
+      nil,
+      {},
+      { 'scoped' => false },
+      { 'scoped' => 'true' },
+      { 'scoped' => true, 'origin' => 'declaration' },
+      { 'behavior' => {} },
+      { 'behavior' => { 'from_owner' => [] } },
+      { 'behavior' => { 'from_owner' => [declaration.except('touch')] } },
+      { 'behavior' => { 'from_owner' => [declaration.merge('association_macro' => 'habtm')] } },
+      { 'behavior' => { 'from_owner' => [declaration.merge('extra' => true)] } },
+      { 'behavior' => { 'from_owner' => [declaration, declaration] } },
+      invalid_dependent_metadata(declaration),
+      invalid_touch_metadata(declaration),
+      invalid_counter_metadata(declaration),
+      invalid_has_many_touch_metadata
+    ]
+  end
+
+  def invalid_dependent_metadata(declaration)
+    invalid = declaration.merge(
+      'dependent' => { 'action' => 'delete_all', 'target' => 'through_records' }
+    ).except('touch')
+    { 'behavior' => { 'from_owner' => [invalid] } }
+  end
+
+  def invalid_touch_metadata(declaration)
+    invalid = declaration.merge('touch' => { 'attribute' => 'not a column' })
+    { 'behavior' => { 'from_owner' => [invalid] } }
+  end
+
+  def invalid_counter_metadata(declaration)
+    invalid = declaration.merge('counter_cache' => { 'column' => 'members_count', 'active' => 'false' })
+                         .except('touch')
+    { 'behavior' => { 'from_owner' => [invalid] } }
+  end
+
+  def invalid_has_many_touch_metadata
+    declaration = {
+      'association_name' => 'members', 'association_macro' => 'has_many',
+      'touch' => { 'attribute' => nil }
+    }
+    { 'behavior' => { 'from_target' => [declaration] } }
   end
 
   describe 'config.schema.json' do
@@ -91,7 +169,7 @@ RSpec.describe 'P0 contract schemas' do
 
   describe 'ir.schema.json' do
     it 'accepts Mermaid-independent IR with digest and no safe tokens' do
-      %w[ir/valid/core.json ir/valid/sti.json ir/valid/composite_key.json].each do |path|
+      %w[ir/valid/core.json ir/valid/sti.json ir/valid/composite_key.json ir/valid/behavior.json].each do |path|
         expect_valid('ir', path)
         expect(JSON.generate(fixture(path))).not_to include('safe_token')
       end
@@ -101,20 +179,24 @@ RSpec.describe 'P0 contract schemas' do
       ir_invalid_fixtures.each { |path| expect_invalid('ir', path) }
     end
 
-    it 'rejects every relationship metadata shape except scoped true' do
+    it 'accepts the closed v5 relationship behavior metadata contract' do
+      expect_valid_relationship_metadata('ir', 'ir/valid/core.json')
+    end
+
+    it 'rejects malformed v5 relationship behavior metadata' do
       expect_invalid_relationship_metadata('ir', 'ir/valid/core.json')
     end
 
-    it 'accepts the v4 combined key role' do
+    it 'accepts the v5 combined key role' do
       payload = fixture('ir/valid/core.json')
-      payload['schema_version'] = 4
+      payload['schema_version'] = 5
       payload.fetch('entities').first.fetch('attributes').first['role'] = 'primary_foreign_key'
 
       expect(schema('ir')).to be_valid(payload)
     end
 
-    it 'rejects stale v3 documents' do
-      expect_invalid('ir', 'ir/invalid/stale_v3.json')
+    it 'rejects stale v4 documents' do
+      expect_invalid('ir', 'ir/invalid/stale_v4.json')
     end
   end
 
@@ -129,20 +211,24 @@ RSpec.describe 'P0 contract schemas' do
       render_plan_invalid_fixtures.each { |path| expect_invalid('render_plan', path) }
     end
 
-    it 'rejects every relationship metadata shape except scoped true' do
+    it 'accepts the closed v5 relationship behavior metadata contract' do
+      expect_valid_relationship_metadata('render_plan', 'render_plan/valid/er.json')
+    end
+
+    it 'rejects malformed v5 relationship behavior metadata' do
       expect_invalid_relationship_metadata('render_plan', 'render_plan/valid/er.json')
     end
 
-    it 'accepts the v4 combined key marker' do
+    it 'accepts the v5 combined key marker' do
       payload = fixture('render_plan/valid/er.json')
-      payload['schema_version'] = 4
+      payload['schema_version'] = 5
       payload.fetch('entities').first.fetch('attributes').first['key_marker'] = 'PK, FK'
 
       expect(schema('render_plan')).to be_valid(payload)
     end
 
-    it 'rejects stale v3 documents' do
-      expect_invalid('render_plan', 'render_plan/invalid/stale_v3.json')
+    it 'rejects stale v4 documents' do
+      expect_invalid('render_plan', 'render_plan/invalid/stale_v4.json')
     end
   end
 
@@ -170,7 +256,7 @@ RSpec.describe 'P0 contract schemas' do
   end
 
   def ir_invalid_fixtures
-    ir_digest_and_shape_invalid_fixtures + ir_v4_invalid_fixtures + ir_sti_invalid_fixtures
+    ir_digest_and_shape_invalid_fixtures + ir_v5_invalid_fixtures + ir_sti_invalid_fixtures
   end
 
   def ir_digest_and_shape_invalid_fixtures
@@ -186,9 +272,10 @@ RSpec.describe 'P0 contract schemas' do
     ]
   end
 
-  def ir_v4_invalid_fixtures
+  def ir_v5_invalid_fixtures
     %w[
       ir/invalid/stale_v3.json
+      ir/invalid/stale_v4.json
       ir/invalid/illegal_combined_role.json
       ir/invalid/duplicate_attribute_identity.json
       ir/invalid/duplicate_attribute_identity_across_entities.json
@@ -253,6 +340,7 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/invalid/non_hex_digest.json
       render_plan/invalid/missing_digest.json
       render_plan/invalid/stale_v3.json
+      render_plan/invalid/stale_v4.json
     ]
   end
 
@@ -297,6 +385,7 @@ RSpec.describe 'P0 contract schemas' do
       render_plan/valid/class.json
       render_plan/valid/class_sti.json
       render_plan/valid/composite_key.json
+      render_plan/valid/behavior.json
     ]
   end
 
@@ -341,7 +430,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def ir_domain_id_valid?(domain_id)
     data = {
-      'schema_version' => 4,
+      'schema_version' => 5,
       'domain_id' => domain_id,
       'entities' => [],
       'relationships' => [],
@@ -362,7 +451,7 @@ RSpec.describe 'P0 contract schemas' do
 
   def render_plan_base
     {
-      'schema_version' => 4, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
+      'schema_version' => 5, 'artifact_kind' => 'er', 'domain_id' => 'core', 'direction' => 'LR',
       'entities' => [],
       'inheritances' => [],
       'relationships' => [],
@@ -381,4 +470,4 @@ RSpec.describe 'P0 contract schemas' do
     schema_json.fetch('$defs').fetch('diagnostic_code').fetch('enum')
   end
 end
-# rubocop:enable RSpec/DescribeClass
+# rubocop:enable Metrics/MethodLength, RSpec/DescribeClass

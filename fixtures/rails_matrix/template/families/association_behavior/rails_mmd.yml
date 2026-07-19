@@ -1,0 +1,21 @@
+version: 1
+domains:
+  core:
+    include_models:
+      - P207Account
+      - P207Member
+      - P207Profile
+      - P207Note
+      - P207Attachment
+      - P207Article
+      - P207Entry
+      - P207Message
+      - P207Author
+      - P207Tag
+      - P207InverseCounterAccount
+      - P207InverseCounterMember
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR

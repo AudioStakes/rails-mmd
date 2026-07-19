@@ -192,6 +192,68 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(scope_executed).to be(false)
   end
 
+  it 'merges reciprocal direct behavior under canonical owner and target directions' do
+    user_model = renderable_model('User', 'users')
+    account_model = renderable_model('Account', 'accounts')
+    account = belongs_to(
+      'account', klass: account_model, dependent: :delete, touch: :members_touched_at,
+                 counter_cache: { active: true, column: nil }, counter_cache_column: 'members_count'
+    )
+    users = association(
+      'users', :has_many, klass: user_model, foreign_key: 'account_id', dependent: :destroy
+    )
+    user_model.define_singleton_method(:reflect_on_all_associations) { |_macro = nil| [account] }
+    account_model.define_singleton_method(:reflect_on_all_associations) { |_macro = nil| [users] }
+    domain = domain_result(
+      'core',
+      [
+        entity('User', 'users', columns: [column('id', false), column('account_id', true)]),
+        entity('Account', 'accounts')
+      ]
+    )
+
+    relationship = build(domain, 'User' => user_model, 'Account' => account_model)
+                   .domains.first.relationships.fetch(0)
+
+    expect(relationship.metadata).to eq(
+      behavior: {
+        from_owner: [
+          {
+            association_name: 'account', association_macro: 'belongs_to',
+            dependent: { action: 'delete', target: 'associated_records' },
+            touch: { attribute: 'members_touched_at' },
+            counter_cache: { column: 'members_count', active: true }
+          }
+        ],
+        from_target: [
+          {
+            association_name: 'users', association_macro: 'has_many',
+            dependent: { action: 'destroy', target: 'associated_records' }
+          }
+        ]
+      }
+    )
+  end
+
+  it 'keeps an eligible edge when behavior options are unreadable' do
+    account_model = renderable_model('Account', 'accounts')
+    account = belongs_to('account', klass: account_model)
+    account.define_singleton_method(:options) { raise 'unreadable behavior options' }
+    user_model = owner_model(account)
+    domain = domain_result(
+      'core',
+      [
+        entity('User', 'users', columns: [column('id', false), column('account_id', true)]),
+        entity('Account', 'accounts')
+      ]
+    )
+
+    result = build(domain, 'User' => user_model, 'Account' => account_model)
+
+    expect(result.domains.first.relationships).to contain_exactly(have_attributes(metadata: nil))
+    expect(result.diagnostics).to eq([])
+  end
+
   it 'handles owner models without associations' do
     user_model = owner_model
     domain = domain_result('core', [entity('User', 'users')])
@@ -434,6 +496,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     scoped = association(
       'recent_tags', :has_and_belongs_to_many, klass: tag_model, join_table: 'authors_tags',
                                                scope: -> { raise 'scope executed' },
+                                               dependent: :destroy, touch: true,
+                                               counter_cache: { active: true, column: 'authors_count' },
                                                foreign_key: 'author_id', association_foreign_key: 'tag_id'
     )
     domain = domain_result(
@@ -821,6 +885,52 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     expect(relationships).to all(contain_exactly(have_attributes(metadata: { scoped: true })))
   end
 
+  it 'merges polymorphic root and concrete inverse behavior without flattening direction' do
+    comment_model = renderable_model('Comment', 'comments')
+    root = belongs_to(
+      'commentable', polymorphic: true, dependent: :destroy, touch: true,
+                     counter_cache: { active: true, column: 'comments_count' },
+                     counter_cache_column: 'comments_count'
+    )
+    inverse = association(
+      'comments', :has_many, klass: comment_model, as: :commentable,
+                             foreign_key: 'commentable_id', type: 'commentable_type',
+                             dependent: :nullify
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity(
+          'Comment', 'comments',
+          columns: [column('id', false), column('commentable_id', false), column('commentable_type', false)]
+        ),
+        entity('Post', 'posts')
+      ]
+    )
+
+    relationship = build(domain, 'Comment' => owner_model(root), 'Post' => owner_model(inverse))
+                   .domains.first.relationships.fetch(0)
+
+    expect(relationship.metadata).to eq(
+      behavior: {
+        from_owner: [
+          {
+            association_name: 'commentable', association_macro: 'belongs_to',
+            dependent: { action: 'destroy', target: 'associated_records' },
+            touch: { attribute: nil },
+            counter_cache: { column: 'comments_count', active: true }
+          }
+        ],
+        from_target: [
+          {
+            association_name: 'comments', association_macro: 'has_many',
+            dependent: { action: 'nullify', target: 'associated_records' }
+          }
+        ]
+      }
+    )
+  end
+
   it 'publishes valid polymorphic candidates while diagnosing conflicting inverses' do
     comment_model = renderable_model('Comment', 'comments')
     root = belongs_to('commentable', polymorphic: true)
@@ -1018,6 +1128,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     image_inverse = association(
       'entry', :has_one, klass: entry_model, as: :entryable,
                          foreign_key: 'entryable_id', type: 'entryable_type',
+                         dependent: :nullify,
                          scope: -> { raise 'scope executed' }
     )
     undeclared_inverse = association(
@@ -1054,7 +1165,7 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     result = build(
       domain,
-      'Entry' => owner_model(belongs_to('entryable', polymorphic: true)),
+      'Entry' => owner_model(belongs_to('entryable', polymorphic: true, dependent: :destroy, touch: true)),
       'Post' => owner_model,
       'Image' => owner_model(image_inverse),
       'Video' => owner_model(undeclared_inverse)
@@ -1070,13 +1181,38 @@ RSpec.describe RailsMmd::RelationshipBuilder do
       relationship_id: 'relationships/entries/polymorphic/entryable/entryable_id/entryable_type/posts',
       owner_cardinality: '0..many',
       target_cardinality: '0..1',
-      metadata: nil
+      metadata: {
+        behavior: {
+          from_owner: [
+            {
+              association_name: 'entryable', association_macro: 'belongs_to',
+              dependent: { action: 'destroy', target: 'associated_records' }, touch: { attribute: nil }
+            }
+          ]
+        }
+      }
     )
     expect(relationships.fetch('entities/images')).to have_attributes(
       relationship_id: 'relationships/entries/polymorphic/entryable/entryable_id/entryable_type/images',
       owner_cardinality: '0..many',
       target_cardinality: '0..1',
-      metadata: { scoped: true }
+      metadata: {
+        scoped: true,
+        behavior: {
+          from_owner: [
+            {
+              association_name: 'entryable', association_macro: 'belongs_to',
+              dependent: { action: 'destroy', target: 'associated_records' }, touch: { attribute: nil }
+            }
+          ],
+          from_target: [
+            {
+              association_name: 'entry', association_macro: 'has_one',
+              dependent: { action: 'nullify', target: 'associated_records' }
+            }
+          ]
+        }
+      }
     )
     expect(result.diagnostics.map { |diagnostic| diagnostic.fetch('code') }).to eq(
       %w[ASSOCIATION_TARGET_UNRESOLVED ASSOCIATION_POLYMORPHIC_OMITTED]
@@ -1886,6 +2022,77 @@ RSpec.describe RailsMmd::RelationshipBuilder do
 
     expect(result.diagnostics).to eq([])
     expect(through).to have_attributes(metadata: { scoped: true })
+  end
+
+  it 'publishes only effective outer through behavior from the canonical owner' do
+    membership_model = renderable_model('Membership', 'memberships')
+    team_model = renderable_model('Team', 'teams')
+    memberships = association('memberships', :has_many, klass: membership_model, foreign_key: 'author_id')
+    team_source = belongs_to('team', klass: team_model)
+    teams = through_association(
+      'teams', :has_many, through_reflection: memberships, source_reflection: team_source,
+                          klass: team_model, dependent: :delete_all
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity(
+          'Membership', 'memberships',
+          columns: [column('id', false), column('author_id', false), column('team_id', false)]
+        ),
+        entity('Team', 'teams')
+      ]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(memberships, teams))
+                   .domains.first.relationships.find { |item| item.relationship_kind == :through }
+
+    expect(relationship.metadata).to eq(
+      behavior: {
+        from_owner: [
+          {
+            association_name: 'teams', association_macro: 'has_many',
+            dependent: { action: 'delete_all', target: 'through_records' }
+          }
+        ]
+      }
+    )
+  end
+
+  it 'ignores has-one-through dependent while retaining its touch behavior' do
+    membership_model = renderable_model('Membership', 'memberships')
+    profile_model = renderable_model('Profile', 'profiles')
+    membership = association('membership', :has_one, klass: membership_model, foreign_key: 'author_id')
+    profile_source = belongs_to('profile', klass: profile_model)
+    profile = through_association(
+      'profile', :has_one, through_reflection: membership, source_reflection: profile_source,
+                           klass: profile_model, dependent: :destroy, touch: true
+    )
+    domain = domain_result(
+      'core',
+      [
+        entity('Author', 'authors'),
+        entity(
+          'Membership', 'memberships',
+          columns: [column('id', false), column('author_id', false), column('profile_id', false)]
+        ),
+        entity('Profile', 'profiles')
+      ]
+    )
+
+    relationship = build(domain, 'Author' => owner_model(membership, profile))
+                   .domains.first.relationships.find { |item| item.relationship_kind == :through }
+
+    expect(relationship.metadata).to eq(
+      behavior: {
+        from_owner: [
+          {
+            association_name: 'profile', association_macro: 'has_one', touch: { attribute: nil }
+          }
+        ]
+      }
+    )
   end
 
   it 'uses singular target cardinality for an inferred-source has-one-through edge' do
@@ -2882,6 +3089,8 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     def type = @options[:type]
 
     def class_name = @options.fetch(:class_name, name.split('_').map(&:capitalize).join)
+
+    def counter_cache_column = @options[:counter_cache_column]
 
     def klass
       value = @options.fetch(:klass) { raise KeyError }

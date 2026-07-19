@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "artifact_kind": "class",
   "domain_id": "core",
   "direction": "LR",

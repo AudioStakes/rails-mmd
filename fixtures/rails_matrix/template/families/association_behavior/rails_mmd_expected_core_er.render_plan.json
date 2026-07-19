@@ -1,0 +1,533 @@
+{
+  "schema_version": 5,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [
+    {
+      "entity_id": "entities/p207_accounts",
+      "entity_kind": "physical",
+      "safe_token": "P207_ACCOUNT",
+      "label": "P207Account",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_accounts/attributes/id",
+          "safe_token": "ID_H58112F26E528",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_articles",
+      "entity_kind": "physical",
+      "safe_token": "P207_ARTICLE",
+      "label": "P207Article",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_articles/attributes/id",
+          "safe_token": "ID_H74E4E438B839",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_attachments",
+      "entity_kind": "physical",
+      "safe_token": "P207_ATTACHMENT",
+      "label": "P207Attachment",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_attachments/attributes/id",
+          "safe_token": "ID_HAFF6E0B8FFC0",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_attachments/attributes/attachable_id",
+          "safe_token": "ATTACHABLE_ID",
+          "label": "attachable_id",
+          "type": "integer",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p207_attachments/attributes/attachable_type",
+          "safe_token": "ATTACHABLE_TYPE",
+          "label": "attachable_type",
+          "type": "string",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_authors",
+      "entity_kind": "physical",
+      "safe_token": "P207_AUTHOR",
+      "label": "P207Author",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_authors/attributes/id",
+          "safe_token": "ID_H9582BB8C6E6D",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_entries",
+      "entity_kind": "physical",
+      "safe_token": "P207_ENTRY",
+      "label": "P207Entry",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_entries/attributes/id",
+          "safe_token": "ID_H4FA5EFAC414E",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_entries/attributes/entryable_id",
+          "safe_token": "ENTRYABLE_ID",
+          "label": "entryable_id",
+          "type": "integer",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p207_entries/attributes/entryable_type",
+          "safe_token": "ENTRYABLE_TYPE",
+          "label": "entryable_type",
+          "type": "string",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_inverse_counter_accounts",
+      "entity_kind": "physical",
+      "safe_token": "P207_INVERSE_COUNTER_ACCOUNT",
+      "label": "P207InverseCounterAccount",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_inverse_counter_accounts/attributes/id",
+          "safe_token": "ID_H215FD01B0B93",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_inverse_counter_members",
+      "entity_kind": "physical",
+      "safe_token": "P207_INVERSE_COUNTER_MEMBER",
+      "label": "P207InverseCounterMember",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_inverse_counter_members/attributes/id",
+          "safe_token": "ID_HB7549A551260",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_inverse_counter_members/attributes/account_id",
+          "safe_token": "ACCOUNT_ID_H2B8F10CC11F9",
+          "label": "account_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_members",
+      "entity_kind": "physical",
+      "safe_token": "P207_MEMBER",
+      "label": "P207Member",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_members/attributes/id",
+          "safe_token": "ID_H67B458E56FED",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_members/attributes/account_id",
+          "safe_token": "ACCOUNT_ID_HFE9DFE648B1C",
+          "label": "account_id",
+          "type": "integer",
+          "key_marker": "FK"
+        },
+        {
+          "attribute_id": "entities/p207_members/attributes/custom_account_id",
+          "safe_token": "CUSTOM_ACCOUNT_ID",
+          "label": "custom_account_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_messages",
+      "entity_kind": "physical",
+      "safe_token": "P207_MESSAGE",
+      "label": "P207Message",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_messages/attributes/id",
+          "safe_token": "ID_H51889B6F29AA",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_notes",
+      "entity_kind": "physical",
+      "safe_token": "P207_NOTE",
+      "label": "P207Note",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_notes/attributes/id",
+          "safe_token": "ID_H170B92895C42",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_notes/attributes/member_id",
+          "safe_token": "MEMBER_ID",
+          "label": "member_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_profiles",
+      "entity_kind": "physical",
+      "safe_token": "P207_PROFILE",
+      "label": "P207Profile",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_profiles/attributes/id",
+          "safe_token": "ID_H07203EC5DBAC",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        },
+        {
+          "attribute_id": "entities/p207_profiles/attributes/account_id",
+          "safe_token": "ACCOUNT_ID_H869846BB6FDA",
+          "label": "account_id",
+          "type": "integer",
+          "key_marker": "FK"
+        }
+      ]
+    },
+    {
+      "entity_id": "entities/p207_tags",
+      "entity_kind": "physical",
+      "safe_token": "P207_TAG",
+      "label": "P207Tag",
+      "attributes": [
+        {
+          "attribute_id": "entities/p207_tags/attributes/id",
+          "safe_token": "ID_H88C8AF699982",
+          "label": "id",
+          "type": "integer",
+          "key_marker": "PK"
+        }
+      ]
+    }
+  ],
+  "inheritances": [],
+  "relationships": [
+    {
+      "relationship_id": "relationships/p207_accounts/through/members/notes/p207_notes",
+      "safe_token": "LATEST_NOTE",
+      "owner_safe_token": "P207_ACCOUNT",
+      "target_safe_token": "P207_NOTE",
+      "label": "latest_note",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1",
+      "metadata": {
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "notes",
+              "association_macro": "has_many",
+              "dependent": {
+                "action": "delete_all",
+                "target": "through_records"
+              }
+            },
+            {
+              "association_name": "latest_note",
+              "association_macro": "has_one",
+              "touch": {
+                "attribute": "latest_note_touched_at"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_attachments/polymorphic/attachable/attachable_id/attachable_type/p207_articles",
+      "safe_token": "ATTACHABLE",
+      "owner_safe_token": "P207_ATTACHMENT",
+      "target_safe_token": "P207_ARTICLE",
+      "label": "attachable",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1",
+      "metadata": {
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "attachable",
+              "association_macro": "belongs_to",
+              "dependent": {
+                "action": "destroy",
+                "target": "associated_records"
+              },
+              "touch": {
+                "attribute": null
+              },
+              "counter_cache": {
+                "column": "attachments_count",
+                "active": true
+              }
+            }
+          ],
+          "from_target": [
+            {
+              "association_name": "attachments",
+              "association_macro": "has_many",
+              "dependent": {
+                "action": "nullify",
+                "target": "associated_records"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_authors/habtm/p207_authors_tags/author_id/p207_tags/tag_id",
+      "safe_token": "TAGS",
+      "owner_safe_token": "P207_AUTHOR",
+      "target_safe_token": "P207_TAG",
+      "label": "tags",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..many",
+      "er_left_marker": "}o",
+      "er_right_marker": "o{",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..*"
+    },
+    {
+      "relationship_id": "relationships/p207_entries/polymorphic/entryable/entryable_id/entryable_type/p207_messages",
+      "safe_token": "ENTRYABLE",
+      "owner_safe_token": "P207_ENTRY",
+      "target_safe_token": "P207_MESSAGE",
+      "label": "entryable",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1",
+      "metadata": {
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "entryable",
+              "association_macro": "belongs_to",
+              "dependent": {
+                "action": "destroy",
+                "target": "associated_records"
+              },
+              "touch": {
+                "attribute": null
+              },
+              "counter_cache": {
+                "column": "entries_count",
+                "active": true
+              }
+            }
+          ],
+          "from_target": [
+            {
+              "association_name": "entry",
+              "association_macro": "has_one",
+              "dependent": {
+                "action": "nullify",
+                "target": "associated_records"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_inverse_counter_members/account_id/p207_inverse_counter_accounts/id",
+      "safe_token": "ACCOUNT_H11C02B45C247",
+      "owner_safe_token": "P207_INVERSE_COUNTER_MEMBER",
+      "target_safe_token": "P207_INVERSE_COUNTER_ACCOUNT",
+      "label": "account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1"
+    },
+    {
+      "relationship_id": "relationships/p207_members/account_id/p207_accounts/id",
+      "safe_token": "ACCOUNT_HCA092E3FCA55",
+      "owner_safe_token": "P207_MEMBER",
+      "target_safe_token": "P207_ACCOUNT",
+      "label": "account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1",
+      "metadata": {
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "account",
+              "association_macro": "belongs_to",
+              "dependent": {
+                "action": "delete",
+                "target": "associated_records"
+              },
+              "touch": {
+                "attribute": "members_touched_at"
+              },
+              "counter_cache": {
+                "column": "p207_members_count",
+                "active": true
+              }
+            }
+          ],
+          "from_target": [
+            {
+              "association_name": "members",
+              "association_macro": "has_many",
+              "dependent": {
+                "action": "destroy",
+                "target": "associated_records"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_members/custom_account_id/p207_accounts/id",
+      "safe_token": "CUSTOM_ACCOUNT",
+      "owner_safe_token": "P207_MEMBER",
+      "target_safe_token": "P207_ACCOUNT",
+      "label": "custom_account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "o|",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "0..1",
+      "metadata": {
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "custom_account",
+              "association_macro": "belongs_to",
+              "counter_cache": {
+                "column": "custom_members_count",
+                "active": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_notes/member_id/p207_members/id",
+      "safe_token": "MEMBER",
+      "owner_safe_token": "P207_NOTE",
+      "target_safe_token": "P207_MEMBER",
+      "label": "member",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "1..1",
+      "er_left_marker": "}o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..*",
+      "class_target_multiplicity": "1",
+      "metadata": {
+        "behavior": {
+          "from_target": [
+            {
+              "association_name": "notes",
+              "association_macro": "has_many",
+              "dependent": {
+                "action": "restrict_with_error",
+                "target": "associated_records"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "relationship_id": "relationships/p207_profiles/account_id/p207_accounts/id",
+      "safe_token": "ACCOUNT_H85C00A31231E",
+      "owner_safe_token": "P207_PROFILE",
+      "target_safe_token": "P207_ACCOUNT",
+      "label": "account",
+      "owner_cardinality": "0..1",
+      "target_cardinality": "1..1",
+      "er_left_marker": "|o",
+      "er_right_marker": "||",
+      "class_owner_multiplicity": "0..1",
+      "class_target_multiplicity": "1",
+      "metadata": {
+        "behavior": {
+          "from_target": [
+            {
+              "association_name": "profile",
+              "association_macro": "has_one",
+              "dependent": {
+                "action": "nullify",
+                "target": "associated_records"
+              },
+              "touch": {
+                "attribute": "profile_touched_at"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "1ed5e54e1b36cb64fbfda148df29aff589efbfd27477bb6f1928d4ad33ff33d9"
+}

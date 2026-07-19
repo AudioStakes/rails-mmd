@@ -24,7 +24,17 @@ RSpec.describe RailsMmd::IrBuilder do
       ],
       diagnostics: [diagnostic('d_relationship_warning')]
     )
-    relationships.relationships.first.metadata = { scoped: true }
+    relationships.relationships.first.metadata = {
+      scoped: true,
+      behavior: {
+        from_owner: [
+          {
+            association_name: 'account', association_macro: 'belongs_to',
+            touch: { attribute: nil }
+          }
+        ]
+      }
+    }
 
     payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
 
@@ -42,9 +52,19 @@ RSpec.describe RailsMmd::IrBuilder do
       'association_name' => 'account',
       'owner_cardinality' => '0..many',
       'target_cardinality' => '1..1',
-      'metadata' => { 'scoped' => true }
+      'metadata' => {
+        'scoped' => true,
+        'behavior' => {
+          'from_owner' => [
+            {
+              'association_name' => 'account', 'association_macro' => 'belongs_to',
+              'touch' => { 'attribute' => nil }
+            }
+          ]
+        }
+      }
     )
-    expect(payload.fetch('schema_version')).to eq(4)
+    expect(payload.fetch('schema_version')).to eq(5)
     expect(JSON.generate(payload)).not_to include('safe_token', 'owner_foreign_key_column', 'target_primary_key_column')
     expect(payload.fetch('diagnostic_ids')).to eq(%w[d_db_metadata_degraded d_relationship_warning])
     expect(schema_valid_ir?(payload)).to be(true)
@@ -71,7 +91,7 @@ RSpec.describe RailsMmd::IrBuilder do
     end.to raise_error(ArgumentError, %r{duplicate physical entity_id: entities/users})
   end
 
-  it 'emits schema v4 STI base and subtype entity metadata' do
+  it 'emits schema v5 STI base and subtype entity metadata' do
     domain = domain_with_sti(
       domain_id: 'core',
       entities: [entity('Vehicle', 'vehicles', columns: [column('id')]), entity('Part', 'parts')],
@@ -99,7 +119,7 @@ RSpec.describe RailsMmd::IrBuilder do
     payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
     entities = payload.fetch('entities').to_h { |entity_payload| [entity_payload.fetch('entity_id'), entity_payload] }
 
-    expect(payload.fetch('schema_version')).to eq(4)
+    expect(payload.fetch('schema_version')).to eq(5)
     expect(entities.fetch('entities/vehicles').fetch('metadata')).to eq(
       'kind' => 'sti_base',
       'inheritance_column' => 'type'

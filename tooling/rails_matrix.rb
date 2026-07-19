@@ -40,6 +40,12 @@ module RailsMatrix
       expected: 'rails_mmd_expected_specialized_options_runtime.json',
       label: 'specialized options'
     },
+    'association_behavior' => {
+      command: %w[exec ruby bin/rails runner script/rails_mmd_association_behavior_runtime_oracle.rb],
+      actual: 'association_behavior_runtime.json',
+      expected: 'rails_mmd_expected_association_behavior_runtime.json',
+      label: 'association behavior'
+    },
     'cross_domain_multi_db' => {
       command: %w[exec ruby bin/rails runner script/rails_mmd_cross_domain_runtime_oracle.rb],
       actual: 'cross_domain_runtime.json',
@@ -52,6 +58,10 @@ module RailsMatrix
     'composite_keys' => {
       script: 'docs/p2/04-composite-keys/probes/composite_habtm_probe.rb',
       label: 'composite HABTM'
+    },
+    'association_behavior' => {
+      script: 'docs/p2/07-association-behavior-metadata/probes/behavior_options_probe.rb',
+      label: 'association behavior options'
     },
     'cross_domain_multi_db' => {
       script: 'docs/p2/06-cross-domain-multi-db/probes/connection_boundary_probe.rb',
@@ -70,6 +80,91 @@ module RailsMatrix
     'author_sql_has_full_owner_tuple' => false,
     'author_sql_uses_scalar_fallback' => true
   }.freeze
+
+  # Validates the P2-07 probe against a closed semantic projection.
+  class AssociationBehaviorProbeValidator
+    EXPECTATIONS = {
+      'direct.belongs_to.proposed_public_declaration.association_name' => 'account',
+      'direct.belongs_to.proposed_public_declaration.association_macro' => 'belongs_to',
+      'direct.belongs_to.proposed_public_declaration.dependent.action' => 'delete',
+      'direct.belongs_to.proposed_public_declaration.dependent.target' => 'associated_records',
+      'direct.belongs_to.proposed_public_declaration.touch.attribute' => 'members_touched_at',
+      'direct.belongs_to.proposed_public_declaration.counter_cache.column' => 'p207_members_count',
+      'direct.belongs_to.proposed_public_declaration.counter_cache.active' => true,
+      'direct.belongs_to_inactive_custom_counter.proposed_public_declaration.counter_cache.column' =>
+      'custom_members_count',
+      'direct.belongs_to_inactive_custom_counter.proposed_public_declaration.counter_cache.active' => false,
+      'direct.belongs_to_inactive_custom_counter.proposed_public_declaration.association_name' => 'custom_account',
+      'direct.belongs_to_inactive_custom_counter.proposed_public_declaration.association_macro' => 'belongs_to',
+      'direct.has_many.proposed_public_declaration.association_name' => 'members',
+      'direct.has_many.proposed_public_declaration.association_macro' => 'has_many',
+      'direct.has_many.proposed_public_declaration.dependent.action' => 'destroy',
+      'direct.has_many.proposed_public_declaration.dependent.target' => 'associated_records',
+      'direct.has_one.proposed_public_declaration.association_name' => 'profile',
+      'direct.has_one.proposed_public_declaration.association_macro' => 'has_one',
+      'direct.has_one.proposed_public_declaration.dependent.action' => 'nullify',
+      'direct.has_one.proposed_public_declaration.dependent.target' => 'associated_records',
+      'direct.has_one.proposed_public_declaration.touch.attribute' => 'profile_touched_at',
+      'through.has_many.proposed_public_declaration.association_name' => 'notes',
+      'through.has_many.proposed_public_declaration.association_macro' => 'has_many',
+      'through.has_many.proposed_public_declaration.dependent.action' => 'delete_all',
+      'through.has_many.proposed_public_declaration.dependent.target' => 'through_records',
+      'through.has_one.proposed_public_declaration.association_name' => 'latest_note',
+      'through.has_one.proposed_public_declaration.association_macro' => 'has_one',
+      'through.has_one.proposed_public_declaration.touch.attribute' => 'latest_note_touched_at',
+      'polymorphic.root.proposed_public_declaration.association_name' => 'attachable',
+      'polymorphic.root.proposed_public_declaration.association_macro' => 'belongs_to',
+      'polymorphic.root.proposed_public_declaration.dependent.action' => 'destroy',
+      'polymorphic.root.proposed_public_declaration.dependent.target' => 'associated_records',
+      'polymorphic.root.proposed_public_declaration.touch.attribute' => nil,
+      'polymorphic.root.proposed_public_declaration.counter_cache.column' => 'attachments_count',
+      'polymorphic.root.proposed_public_declaration.counter_cache.active' => true,
+      'polymorphic.inverse.proposed_public_declaration.association_name' => 'attachments',
+      'polymorphic.inverse.proposed_public_declaration.association_macro' => 'has_many',
+      'polymorphic.inverse.proposed_public_declaration.dependent.action' => 'nullify',
+      'polymorphic.inverse.proposed_public_declaration.dependent.target' => 'associated_records',
+      'delegated_type.root.proposed_public_declaration.association_name' => 'entryable',
+      'delegated_type.root.proposed_public_declaration.association_macro' => 'belongs_to',
+      'delegated_type.root.proposed_public_declaration.dependent.action' => 'destroy',
+      'delegated_type.root.proposed_public_declaration.dependent.target' => 'associated_records',
+      'delegated_type.root.proposed_public_declaration.touch.attribute' => nil,
+      'delegated_type.root.proposed_public_declaration.counter_cache.column' => 'entries_count',
+      'delegated_type.root.proposed_public_declaration.counter_cache.active' => true,
+      'delegated_type.inverse.proposed_public_declaration.association_name' => 'entry',
+      'delegated_type.inverse.proposed_public_declaration.association_macro' => 'has_one',
+      'delegated_type.inverse.proposed_public_declaration.dependent.action' => 'nullify',
+      'delegated_type.inverse.proposed_public_declaration.dependent.target' => 'associated_records',
+      'inverse_counter_naming_only.has_many.proposed_public_declaration' => nil,
+      'inverse_counter_naming_only.belongs_to.proposed_public_declaration' => nil,
+      'inverse_counter_naming_only.belongs_to.options.counter_cache' => nil,
+      'habtm.proposed_public_declaration' => nil
+    }.freeze
+
+    def validate(payload, pair)
+      validate_rails_version(payload, pair)
+      actual = projection(payload)
+      return if actual == EXPECTATIONS
+
+      raise VerificationError,
+            "#{pair.name} association behavior options probe did not match expectation\n" \
+            "expected: #{JSON.generate(EXPECTATIONS)}\nactual: #{JSON.generate(actual)}"
+    rescue KeyError, TypeError, NoMethodError
+      raise VerificationError, "#{pair.name} association behavior options probe did not match expectation"
+    end
+
+    private
+
+    def validate_rails_version(payload, pair)
+      expected = LOCKED_RAILS_VERSIONS.fetch(pair.rails_series)
+      return if payload.fetch('rails_version') == expected
+
+      raise VerificationError, "#{pair.name} association behavior probe did not match expectation"
+    end
+
+    def projection(payload)
+      EXPECTATIONS.to_h { |key, _value| [key, payload.dig(*key.split('.'))] }
+    end
+  end
 
   # Validates the checked-in P2-06 probe without snapshotting temporary paths.
   class ConnectionBoundaryProbeValidator
@@ -258,7 +353,9 @@ module RailsMatrix
       output = app_root.join('tmp/rails_mmd')
       validate_cross_domain_publication_set(output, pair) if fixture_family == 'cross_domain_multi_db'
       plans = ARTIFACT_KINDS.to_h { |kind| [kind, validate_artifact(output, kind, pair)] }
-      validate_expected_render_plans(app_root, plans, pair) if fixture_family == 'composite_keys'
+      if %w[association_behavior composite_keys].include?(fixture_family)
+        validate_expected_render_plans(app_root, plans, pair)
+      end
       validate_expected_mermaid(app_root, output.join('core.er.mmd'), 'ER', 'rails_mmd_expected_core_er.mmd', pair)
       validate_expected_mermaid(
         app_root,
@@ -668,11 +765,10 @@ module RailsMatrix
     end
 
     def validate_pair_probe(payload, pair, family)
-      if family == 'cross_domain_multi_db'
-        ConnectionBoundaryProbeValidator.new.validate(payload, pair)
-      else
-        validate_composite_habtm_probe(payload, pair)
-      end
+      return ConnectionBoundaryProbeValidator.new.validate(payload, pair) if family == 'cross_domain_multi_db'
+      return AssociationBehaviorProbeValidator.new.validate(payload, pair) if family == 'association_behavior'
+
+      validate_composite_habtm_probe(payload, pair)
     end
 
     def json_object(output)

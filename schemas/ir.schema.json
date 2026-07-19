@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "domain_id", "entities", "relationships", "diagnostic_ids", "digest_sha256"],
   "properties": {
-    "schema_version": { "const": 4 },
+    "schema_version": { "const": 5 },
     "domain_id": { "$ref": "#/$defs/domain_id" },
     "entities": {
       "type": "array",
@@ -108,9 +108,171 @@
     "relationship_metadata": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scoped"],
       "properties": {
-        "scoped": { "const": true }
+        "scoped": { "const": true },
+        "behavior": { "$ref": "#/$defs/relationship_behavior" }
+      },
+      "anyOf": [
+        { "required": ["scoped"] },
+        { "required": ["behavior"] }
+      ]
+    },
+    "relationship_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from_owner": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/behavior_declaration" }
+        },
+        "from_target": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/behavior_declaration" }
+        }
+      },
+      "anyOf": [
+        { "required": ["from_owner"] },
+        { "required": ["from_target"] }
+      ]
+    },
+    "behavior_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["association_name", "association_macro"],
+      "properties": {
+        "association_name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        "association_macro": { "enum": ["belongs_to", "has_one", "has_many"] },
+        "dependent": { "$ref": "#/$defs/dependent_behavior" },
+        "touch": { "$ref": "#/$defs/touch_behavior" },
+        "counter_cache": { "$ref": "#/$defs/counter_cache_behavior" }
+      },
+      "anyOf": [
+        { "required": ["dependent"] },
+        { "required": ["touch"] },
+        { "required": ["counter_cache"] }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "association_macro": { "const": "belongs_to" } },
+            "required": ["association_macro"]
+          },
+          "then": {
+            "properties": {
+              "dependent": {
+                "type": "object",
+                "properties": {
+                  "action": { "enum": ["destroy", "delete", "destroy_async"] },
+                  "target": { "const": "associated_records" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "association_macro": { "const": "has_one" } },
+            "required": ["association_macro"]
+          },
+          "then": {
+            "not": { "required": ["counter_cache"] },
+            "properties": {
+              "dependent": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "destroy",
+                      "destroy_async",
+                      "delete",
+                      "nullify",
+                      "restrict_with_error",
+                      "restrict_with_exception"
+                    ]
+                  },
+                  "target": { "const": "associated_records" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "association_macro": { "const": "has_many" } },
+            "required": ["association_macro"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["touch"] },
+                { "required": ["counter_cache"] }
+              ]
+            },
+            "properties": {
+              "dependent": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "destroy",
+                      "destroy_async",
+                      "delete_all",
+                      "nullify",
+                      "restrict_with_error",
+                      "restrict_with_exception"
+                    ]
+                  },
+                  "target": { "enum": ["associated_records", "through_records"] }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dependent_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "target"],
+      "properties": {
+        "action": {
+          "enum": [
+            "destroy",
+            "delete",
+            "destroy_async",
+            "delete_all",
+            "nullify",
+            "restrict_with_error",
+            "restrict_with_exception"
+          ]
+        },
+        "target": { "enum": ["associated_records", "through_records"] }
+      }
+    },
+    "touch_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute"],
+      "properties": {
+        "attribute": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" }
+          ]
+        }
+      }
+    },
+    "counter_cache_behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["column", "active"],
+      "properties": {
+        "column": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$" },
+        "active": { "type": "boolean" }
       }
     },
     "sti_base_metadata": {

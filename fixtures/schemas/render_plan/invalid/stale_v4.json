@@ -1,0 +1,12 @@
+{
+  "schema_version": 4,
+  "artifact_kind": "er",
+  "domain_id": "core",
+  "direction": "LR",
+  "entities": [],
+  "inheritances": [],
+  "relationships": [],
+  "comments": [],
+  "diagnostic_ids": [],
+  "digest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+}

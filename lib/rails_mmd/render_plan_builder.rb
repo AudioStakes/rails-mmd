@@ -84,7 +84,7 @@ module RailsMmd
                          'render relationship_id')
       inheritances = inheritances_payload(entities, artifact_kind, token_sets)
       payload = {
-        'schema_version' => 4,
+        'schema_version' => 5,
         'artifact_kind' => artifact_kind,
         'domain_id' => ir.fetch('domain_id'),
         'direction' => direction,
@@ -184,7 +184,7 @@ module RailsMmd
         'class_owner_multiplicity' => CLASS_MULTIPLICITIES.fetch(relationship.fetch('owner_cardinality')),
         'class_target_multiplicity' => CLASS_MULTIPLICITIES.fetch(relationship.fetch('target_cardinality'))
       }
-      payload['metadata'] = { 'scoped' => true } if relationship.dig('metadata', 'scoped') == true
+      payload['metadata'] = relationship.fetch('metadata') if relationship.key?('metadata')
       payload
     end
 

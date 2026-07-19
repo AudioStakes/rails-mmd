@@ -1,0 +1,26 @@
+[
+  {
+    "group_id": "relationships/p207_attachments/polymorphic/attachable/attachable_id/attachable_type",
+    "holder_safe_token": "P207_ATTACHMENT",
+    "root_label": "attachable",
+    "candidate_target_safe_tokens": [
+      "P207_ARTICLE"
+    ],
+    "foreign_key_attributes": [
+      "attachable_id",
+      "attachable_type"
+    ]
+  },
+  {
+    "group_id": "relationships/p207_entries/polymorphic/entryable/entryable_id/entryable_type",
+    "holder_safe_token": "P207_ENTRY",
+    "root_label": "entryable",
+    "candidate_target_safe_tokens": [
+      "P207_MESSAGE"
+    ],
+    "foreign_key_attributes": [
+      "entryable_id",
+      "entryable_type"
+    ]
+  }
+]

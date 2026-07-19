@@ -1,0 +1,51 @@
+{
+  "schema_version": 5,
+  "domain_id": "core",
+  "entities": [
+    {
+      "entity_id": "entities/users",
+      "ruby_constant": "User",
+      "table_name": "users",
+      "attributes": []
+    },
+    {
+      "entity_id": "entities/accounts",
+      "ruby_constant": "Account",
+      "table_name": "accounts",
+      "attributes": []
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "relationships/users/account",
+      "owner_entity_id": "entities/users",
+      "target_entity_id": "entities/accounts",
+      "association_name": "account",
+      "owner_cardinality": "0..many",
+      "target_cardinality": "0..1",
+      "metadata": {
+        "scoped": true,
+        "behavior": {
+          "from_owner": [
+            {
+              "association_name": "account",
+              "association_macro": "belongs_to",
+              "dependent": { "action": "delete", "target": "associated_records" },
+              "touch": { "attribute": null },
+              "counter_cache": { "column": "members_count", "active": false }
+            }
+          ],
+          "from_target": [
+            {
+              "association_name": "users",
+              "association_macro": "has_many",
+              "dependent": { "action": "destroy", "target": "associated_records" }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "diagnostic_ids": [],
+  "digest_sha256": "abababababababababababababababababababababababababababababababab"
+}

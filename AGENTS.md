@@ -125,3 +125,17 @@ from Rails/ActiveRecord applications. Runtime implementation is not present yet.
 - Treat `source:` syntax as input to Rails reflection resolution, not public
   identity. Through IDs use the resolved semantic path and selected target; do
   not append `source` or `source_type` option values.
+- Normalize public relationship annotations in one dedicated module and merge
+  declaration-owned fragments by canonical endpoint direction before winner
+  selection. Do not let label/identity winner selection discard reciprocal,
+  polymorphic, delegated, or alias metadata.
+- Keep matrix-family runtime oracles shared across Rails pairs free of version
+  fields and temporary paths. Put exact locked-version assertions in
+  `PAIR_PROBES`, then exact-compare the version-independent runtime payload on
+  every pair.
+- A matrix family schema replaces the shared template schema during overlay.
+  Extend the shared schema rather than defining only family tables, because the
+  common STI runtime oracle loads every template model before domain filtering.
+- When a public IR/render-plan schema version changes, regenerate exact real-app
+  render-plan oracles and their digests; changing only the version constant can
+  hide newly required relationship payloads.

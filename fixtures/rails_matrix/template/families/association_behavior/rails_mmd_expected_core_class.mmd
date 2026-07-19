@@ -1,0 +1,56 @@
+classDiagram
+  direction LR
+  class P207_ACCOUNT {
+    +integer id
+  }
+  class P207_ARTICLE {
+    +integer id
+  }
+  class P207_ATTACHMENT {
+    +integer id
+    +integer attachable_id
+    +string attachable_type
+  }
+  class P207_AUTHOR {
+    +integer id
+  }
+  class P207_ENTRY {
+    +integer id
+    +integer entryable_id
+    +string entryable_type
+  }
+  class P207_INVERSE_COUNTER_ACCOUNT {
+    +integer id
+  }
+  class P207_INVERSE_COUNTER_MEMBER {
+    +integer id
+    +integer account_id
+  }
+  class P207_MEMBER {
+    +integer id
+    +integer account_id
+    +integer custom_account_id
+  }
+  class P207_MESSAGE {
+    +integer id
+  }
+  class P207_NOTE {
+    +integer id
+    +integer member_id
+  }
+  class P207_PROFILE {
+    +integer id
+    +integer account_id
+  }
+  class P207_TAG {
+    +integer id
+  }
+  P207_ACCOUNT "0..*" --> "0..1" P207_NOTE : latest_note
+  P207_ATTACHMENT "0..*" --> "0..1" P207_ARTICLE : attachable
+  P207_AUTHOR "0..*" --> "0..*" P207_TAG : tags
+  P207_ENTRY "0..*" --> "0..1" P207_MESSAGE : entryable
+  P207_INVERSE_COUNTER_MEMBER "0..*" --> "1" P207_INVERSE_COUNTER_ACCOUNT : account
+  P207_MEMBER "0..*" --> "1" P207_ACCOUNT : account
+  P207_MEMBER "0..*" --> "0..1" P207_ACCOUNT : custom_account
+  P207_NOTE "0..*" --> "1" P207_MEMBER : member
+  P207_PROFILE "0..1" --> "1" P207_ACCOUNT : account

@@ -5,7 +5,7 @@ require 'json'
 require 'rails_mmd/cli'
 require 'yaml'
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength
 RSpec.describe 'repository drift guards' do
   def allowed_node_typescript_files
     []
@@ -134,6 +134,17 @@ RSpec.describe 'repository drift guards' do
 
     expect(readme).to include('docs/usage.md', 'docs/active-record-association-support.md',
                               'docs/p0-blocking-fixture-matrix.md')
+  end
+
+  it 'keeps the atomic v5 artifact migration guidance in the README' do
+    readme = repository_text('README.md').gsub(/\s+/, ' ')
+
+    expect(readme).to include(
+      'behavior metadata moves both artifacts from version 4 to version 5',
+      'There is no dual-version output mode',
+      'schemas shipped by the same `rails-mmd` release',
+      'Configuration and diagnostics artifacts remain at schema version 1'
+    )
   end
 
   it 'keeps the P0 blocking fixture matrix aligned with blocking diagnostics' do
@@ -273,4 +284,4 @@ RSpec.describe 'repository drift guards' do
     text.scan(/#(\d+)\b/).flatten.map(&:to_i).grep(1..6).uniq.sort
   end
 end
-# rubocop:enable RSpec/DescribeClass
+# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength

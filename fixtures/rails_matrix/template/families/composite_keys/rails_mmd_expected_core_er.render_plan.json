@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "artifact_kind": "er",
   "domain_id": "core",
   "direction": "LR",
@@ -464,5 +464,5 @@
     "diag_07ba21616d67118c",
     "diag_f64edb304b4ebd59"
   ],
-  "digest_sha256": "dcd42ab57353949d2a960b546e7c289811da821fa399ee8211b2975c8763adbb"
+  "digest_sha256": "c68460d09e533eae812f3f64ea7c5690aa5ccbedf4afd84ddc14d5c7efee4a65"
 }
