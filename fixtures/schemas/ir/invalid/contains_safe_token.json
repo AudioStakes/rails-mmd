@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "domain_id": "core",
   "safe_token": "CORE",
   "entities": [],

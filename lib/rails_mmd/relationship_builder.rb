@@ -5,6 +5,7 @@ require 'rails_mmd/association_binding_resolver'
 require 'rails_mmd/diagnostics'
 require 'rails_mmd/key_tuple'
 require 'rails_mmd/relationship_id_codec'
+require 'rails_mmd/relationship_metadata'
 
 module RailsMmd
   # Builds selected-domain direct and through relationship records.
@@ -212,7 +213,7 @@ module RailsMmd
         )
       end
 
-      metadata = { scoped: true } if scoped?(reflection)
+      metadata = RelationshipMetadata.scoped(scoped?(reflection))
       [habtm_relationship_for(owner, target, sanitized_name, keys, metadata: metadata), nil]
     end
 
@@ -385,9 +386,16 @@ module RailsMmd
           context, owner, sanitized_name, 'ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED'
         ).last
       end
-      root_metadata = { scoped: true } if scoped?(reflection)
+      root_metadata = RelationshipMetadata.for_declaration(
+        reflection: reflection,
+        association_name: sanitized_name,
+        association_macro: :belongs_to,
+        through: false,
+        direction: :from_owner,
+        scoped: scoped?(reflection)
+      )
       relationships = candidates.map do |candidate|
-        metadata = candidate.metadata || root_metadata
+        metadata = RelationshipMetadata.merge(root_metadata, candidate.metadata)
         relationship = polymorphic_relationship_for(owner, candidate.owner, sanitized_name, root_binding, candidate)
         relationship_with_metadata(relationship, metadata)
       end
@@ -563,10 +571,21 @@ module RailsMmd
       [targeted, []]
     end
 
-    def delegated_relationship_metadata(root_reflection, family, valid_inverses)
-      scoped = scoped?(root_reflection) || delegated_family_scoped?(family) ||
-               valid_inverses.any? { |candidate| scoped?(candidate.reflection) }
-      { scoped: true } if scoped
+    def delegated_relationship_metadata(_root_reflection, family, valid_inverses)
+      fragments = valid_inverses.filter_map do |candidate|
+        name = sanitize_association_name(reflection_name(candidate.reflection))
+        next unless name
+
+        RelationshipMetadata.for_declaration(
+          reflection: candidate.reflection,
+          association_name: name,
+          association_macro: reflection_macro(candidate.reflection),
+          through: false,
+          direction: :from_target,
+          scoped: scoped?(candidate.reflection)
+        )
+      end
+      RelationshipMetadata.merge(RelationshipMetadata.scoped(delegated_family_scoped?(family)), *fragments)
     end
 
     def canonical_polymorphic_candidates(candidates)
@@ -575,7 +594,20 @@ module RailsMmd
           [MACRO_PRIORITY.fetch(reflection_macro(candidate.reflection)), reflection_name(candidate.reflection)]
         end
         winner.dup.tap do |candidate|
-          candidate.metadata = { scoped: true } if duplicates.any? { |entry| scoped?(entry.reflection) }
+          fragments = duplicates.filter_map do |entry|
+            name = sanitize_association_name(reflection_name(entry.reflection))
+            next unless name
+
+            RelationshipMetadata.for_declaration(
+              reflection: entry.reflection,
+              association_name: name,
+              association_macro: reflection_macro(entry.reflection),
+              through: false,
+              direction: :from_target,
+              scoped: scoped?(entry.reflection)
+            )
+          end
+          candidate.metadata = RelationshipMetadata.merge(*fragments)
         end
       end
     end
@@ -724,7 +756,14 @@ module RailsMmd
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
       end
 
-      metadata = { scoped: true } if scoped?(reflection)
+      metadata = RelationshipMetadata.for_declaration(
+        reflection: reflection,
+        association_name: sanitized_name,
+        association_macro: reflection_macro(reflection),
+        through: false,
+        direction: :from_target,
+        scoped: scoped?(reflection)
+      )
       relationship = direct_relationship_for(owner, target, sanitized_name, reflection_macro(reflection), keys)
       [relationship_with_metadata(relationship, metadata), nil]
     end
@@ -763,7 +802,14 @@ module RailsMmd
       return omitted(context, owner, sanitized_name, key_omission, key_target_constant) if key_omission
 
       scoped = scoped?(reflection) || source_lineage.any? { |hop| scoped?(hop) } || chain.any? { |hop| scoped?(hop) }
-      metadata = { scoped: true } if scoped
+      metadata = RelationshipMetadata.for_declaration(
+        reflection: reflection,
+        association_name: sanitized_name,
+        association_macro: reflection_macro(reflection),
+        through: true,
+        direction: :from_owner,
+        scoped: scoped
+      )
       relationship = through_relationship_for(owner, entities.last, sanitized_name, reflection_macro(reflection),
                                               path_names)
       [relationship_with_metadata(relationship, metadata), nil]
@@ -812,7 +858,14 @@ module RailsMmd
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_KEY_COLUMN_MISSING', target_constant)
       end
 
-      metadata = { scoped: true } if scoped?(reflection)
+      metadata = RelationshipMetadata.for_declaration(
+        reflection: reflection,
+        association_name: sanitized_name,
+        association_macro: reflection_macro(reflection),
+        through: false,
+        direction: :from_owner,
+        scoped: scoped?(reflection)
+      )
       [relationship_for(owner, target, sanitized_name, keys, metadata: metadata), nil]
     end
 
@@ -993,9 +1046,7 @@ module RailsMmd
     end
 
     def merged_relationship_metadata(candidates)
-      return { scoped: true } if candidates.any? { |candidate| candidate.metadata&.fetch(:scoped, false) }
-
-      nil
+      RelationshipMetadata.merge(*candidates.map(&:metadata))
     end
 
     def referenced_entity_id(relationship)

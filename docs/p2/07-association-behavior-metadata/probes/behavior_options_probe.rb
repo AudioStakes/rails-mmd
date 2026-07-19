@@ -9,7 +9,8 @@ class P207Account < ActiveRecord::Base
            class_name: 'P207Member', dependent: :destroy
   has_one :profile, class_name: 'P207Profile', dependent: :nullify, touch: :profile_touched_at
   has_many :notes, through: :members, source: :notes, dependent: :delete_all
-  has_one :latest_note, through: :members, source: :notes, dependent: :destroy
+  has_one :latest_note, through: :members, source: :notes,
+                        dependent: :destroy, touch: :latest_note_touched_at
 end
 
 class P207Member < ActiveRecord::Base

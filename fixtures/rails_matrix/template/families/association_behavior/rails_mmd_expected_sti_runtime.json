@@ -1,0 +1,137 @@
+[
+  {
+    "ruby_constant": "Admin::Dog",
+    "base_class": "Animal",
+    "table_name": "animals",
+    "inheritance_column": "type",
+    "sti_name": "Dog",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "Animal",
+    "base_class": "Animal",
+    "table_name": "animals",
+    "inheritance_column": "type",
+    "sti_name": "Animal",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "Appliance",
+    "base_class": "Appliance",
+    "table_name": "appliances",
+    "inheritance_column": "type",
+    "sti_name": "Appliance",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "Car",
+    "base_class": "Vehicle",
+    "table_name": "vehicles",
+    "inheritance_column": "type",
+    "sti_name": "Car",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "Device",
+    "base_class": "Device",
+    "table_name": "devices",
+    "inheritance_column": "_type_disabled",
+    "sti_name": "Device",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "ElectricCar",
+    "base_class": "ElectricVehicle",
+    "table_name": "electric_vehicles",
+    "inheritance_column": "type",
+    "sti_name": "ElectricCar",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "ElectricVehicle",
+    "base_class": "ElectricVehicle",
+    "table_name": "electric_vehicles",
+    "inheritance_column": "type",
+    "sti_name": "ElectricVehicle",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "EmailMessage",
+    "base_class": "Message",
+    "table_name": "messages",
+    "inheritance_column": "kind",
+    "sti_name": "EmailMessage",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "Message",
+    "base_class": "Message",
+    "table_name": "messages",
+    "inheritance_column": "kind",
+    "sti_name": "Message",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "Phone",
+    "base_class": "Device",
+    "table_name": "devices",
+    "inheritance_column": "_type_disabled",
+    "sti_name": "Phone",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "PoweredVehicle",
+    "base_class": "Vehicle",
+    "table_name": "vehicles",
+    "inheritance_column": "type",
+    "sti_name": "PoweredVehicle",
+    "abstract_class": true,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "SportsCar",
+    "base_class": "Vehicle",
+    "table_name": "vehicles",
+    "inheritance_column": "type",
+    "sti_name": "SportsCar",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "Storefront::Dog",
+    "base_class": "Animal",
+    "table_name": "animals",
+    "inheritance_column": "type",
+    "sti_name": "Dog",
+    "abstract_class": false,
+    "descends_from_active_record": false
+  },
+  {
+    "ruby_constant": "Toaster",
+    "base_class": "Appliance",
+    "table_name": "appliances",
+    "inheritance_column": "type",
+    "sti_name": "Toaster",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  },
+  {
+    "ruby_constant": "Vehicle",
+    "base_class": "Vehicle",
+    "table_name": "vehicles",
+    "inheritance_column": "type",
+    "sti_name": "Vehicle",
+    "abstract_class": false,
+    "descends_from_active_record": true
+  }
+]

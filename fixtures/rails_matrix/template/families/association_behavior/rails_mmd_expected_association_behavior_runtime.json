@@ -1,0 +1,166 @@
+{
+  "direct": {
+    "belongs_to": {
+      "macro": "belongs_to",
+      "class_name": "P207Account",
+      "name": "account",
+      "polymorphic": false,
+      "options": {
+        "dependent": "delete",
+        "touch": "members_touched_at",
+        "counter_cache": {
+          "active": true,
+          "column": null
+        }
+      }
+    },
+    "belongs_to_inactive_custom_counter": {
+      "macro": "belongs_to",
+      "class_name": "P207Account",
+      "name": "custom_account",
+      "polymorphic": false,
+      "options": {
+        "counter_cache": {
+          "active": false,
+          "column": "custom_members_count"
+        }
+      }
+    },
+    "has_many": {
+      "macro": "has_many",
+      "class_name": "P207Member",
+      "name": "members",
+      "polymorphic": false,
+      "options": {
+        "dependent": "destroy"
+      }
+    },
+    "has_one": {
+      "macro": "has_one",
+      "class_name": "P207Profile",
+      "name": "profile",
+      "polymorphic": false,
+      "options": {
+        "dependent": "nullify",
+        "touch": "profile_touched_at"
+      }
+    },
+    "has_many_restrict": {
+      "macro": "has_many",
+      "class_name": "P207Note",
+      "name": "notes",
+      "polymorphic": false,
+      "options": {
+        "dependent": "restrict_with_error"
+      }
+    }
+  },
+  "through": {
+    "has_many": {
+      "macro": "has_many",
+      "class_name": "P207Note",
+      "name": "notes",
+      "polymorphic": false,
+      "options": {
+        "dependent": "delete_all"
+      }
+    },
+    "has_one": {
+      "macro": "has_one",
+      "class_name": "P207Note",
+      "name": "latest_note",
+      "polymorphic": false,
+      "options": {
+        "dependent": "destroy",
+        "touch": "latest_note_touched_at"
+      }
+    }
+  },
+  "polymorphic": {
+    "root": {
+      "macro": "belongs_to",
+      "class_name": "Attachable",
+      "name": "attachable",
+      "polymorphic": true,
+      "options": {
+        "dependent": "destroy",
+        "touch": true,
+        "counter_cache": {
+          "active": true,
+          "column": "attachments_count"
+        }
+      }
+    },
+    "inverse": {
+      "macro": "has_many",
+      "class_name": "P207Attachment",
+      "name": "attachments",
+      "polymorphic": false,
+      "options": {
+        "dependent": "nullify"
+      }
+    }
+  },
+  "delegated_type": {
+    "root": {
+      "macro": "belongs_to",
+      "class_name": "Entryable",
+      "name": "entryable",
+      "polymorphic": true,
+      "options": {
+        "dependent": "destroy",
+        "touch": true,
+        "counter_cache": {
+          "active": true,
+          "column": "entries_count"
+        }
+      }
+    },
+    "inverse": {
+      "macro": "has_one",
+      "class_name": "P207Entry",
+      "name": "entry",
+      "polymorphic": false,
+      "options": {
+        "dependent": "nullify"
+      }
+    }
+  },
+  "inverse_counter_naming_only": {
+    "has_many": {
+      "macro": "has_many",
+      "class_name": "P207InverseCounterMember",
+      "name": "members",
+      "polymorphic": false,
+      "options": {
+        "counter_cache": {
+          "active": true,
+          "column": "inverse_named_members_count"
+        }
+      }
+    },
+    "belongs_to": {
+      "macro": "belongs_to",
+      "class_name": "P207InverseCounterAccount",
+      "name": "account",
+      "polymorphic": false,
+      "options": {}
+    }
+  },
+  "habtm": {
+    "tags": {
+      "macro": "has_and_belongs_to_many",
+      "class_name": "P207Tag",
+      "name": "tags",
+      "polymorphic": false,
+      "options": {
+        "dependent": "destroy",
+        "touch": true,
+        "counter_cache": {
+          "active": true,
+          "column": "authors_count"
+        }
+      }
+    }
+  }
+}

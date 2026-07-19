@@ -87,12 +87,44 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     expect(registration).to eq(fixture_family: true, runtime_oracle: true, pair_probe: true)
   end
 
+  it 'registers the association-behavior family, runtime oracle, and pair probe' do
+    manifest = RailsMatrix::Manifest.new(
+      Pathname(__dir__).join('../../fixtures/rails_matrix/matrix.yml').expand_path
+    )
+    registration = {
+      fixture_family: manifest.fixture_families.include?('association_behavior'),
+      runtime_oracle: RailsMatrix::FAMILY_RUNTIME_ORACLES.key?('association_behavior'),
+      pair_probe: RailsMatrix::PAIR_PROBES.key?('association_behavior')
+    }
+
+    expect(registration).to eq(fixture_family: true, runtime_oracle: true, pair_probe: true)
+  end
+
   it 'accepts the closed connection-boundary probe evidence for a matrix pair' do
     pair = RailsMatrix::Pair.new(ruby_version: '4.0.6', rails_series: '8.1')
 
     expect do
       RailsMatrix::ConnectionBoundaryProbeValidator.new.validate(connection_boundary_probe_payload, pair)
     end.not_to raise_error
+  end
+
+  it 'accepts has-one-through touch evidence from the association-behavior probe' do
+    pair = RailsMatrix::Pair.new(ruby_version: '4.0.6', rails_series: '8.1')
+
+    expect do
+      RailsMatrix::AssociationBehaviorProbeValidator.new.validate(association_behavior_probe_payload, pair)
+    end.not_to raise_error
+  end
+
+  it 'rejects polymorphic identity drift in the association-behavior probe' do
+    pair = RailsMatrix::Pair.new(ruby_version: '4.0.6', rails_series: '8.1')
+    payload = association_behavior_probe_payload
+    payload['through']['has_one']['proposed_public_declaration'] = nil
+    payload['polymorphic']['root']['proposed_public_declaration']['association_name'] = 'wrong'
+
+    expect do
+      RailsMatrix::AssociationBehaviorProbeValidator.new.validate(payload, pair)
+    end.to raise_error(RailsMatrix::VerificationError, /did not match expectation/)
   end
 
   def missing_expected_polymorphic_groups_asdf
@@ -231,6 +263,128 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     fake_generated_app_asdf(expected_specialized_options_runtime: '[{"binding":"wrong"}]')
   end
 
+  def missing_expected_association_behavior_runtime_asdf
+    fake_generated_app_asdf(expected_association_behavior_runtime: nil)
+  end
+
+  def malformed_association_behavior_runtime_asdf
+    fake_generated_app_asdf(actual_association_behavior_runtime: '{not-json')
+  end
+
+  def mismatched_expected_association_behavior_runtime_asdf
+    fake_generated_app_asdf(expected_association_behavior_runtime: '[{"ruby_constant":"Wrong"}]')
+  end
+
+  def malformed_association_behavior_probe_asdf
+    fake_generated_app_asdf(actual_association_behavior_probe: '{not-json')
+  end
+
+  def association_behavior_probe_payload(rails_version: '8.1.3')
+    {
+      'rails_version' => rails_version,
+      'direct' => {
+        'belongs_to' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'account',
+            'association_macro' => 'belongs_to',
+            'dependent' => { 'action' => 'delete', 'target' => 'associated_records' },
+            'touch' => { 'attribute' => 'members_touched_at' },
+            'counter_cache' => { 'column' => 'p207_members_count', 'active' => true }
+          }
+        },
+        'belongs_to_inactive_custom_counter' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'custom_account',
+            'association_macro' => 'belongs_to',
+            'counter_cache' => { 'column' => 'custom_members_count', 'active' => false }
+          }
+        },
+        'has_many' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'members',
+            'association_macro' => 'has_many',
+            'dependent' => { 'action' => 'destroy', 'target' => 'associated_records' }
+          }
+        },
+        'has_one' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'profile',
+            'association_macro' => 'has_one',
+            'dependent' => { 'action' => 'nullify', 'target' => 'associated_records' },
+            'touch' => { 'attribute' => 'profile_touched_at' }
+          }
+        }
+      },
+      'through' => {
+        'has_many' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'notes',
+            'association_macro' => 'has_many',
+            'dependent' => { 'action' => 'delete_all', 'target' => 'through_records' }
+          }
+        },
+        'has_one' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'latest_note',
+            'association_macro' => 'has_one',
+            'touch' => { 'attribute' => 'latest_note_touched_at' }
+          }
+        }
+      },
+      'polymorphic' => {
+        'root' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'attachable',
+            'association_macro' => 'belongs_to',
+            'dependent' => { 'action' => 'destroy', 'target' => 'associated_records' },
+            'touch' => { 'attribute' => nil },
+            'counter_cache' => { 'column' => 'attachments_count', 'active' => true }
+          }
+        },
+        'inverse' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'attachments',
+            'association_macro' => 'has_many',
+            'dependent' => { 'action' => 'nullify', 'target' => 'associated_records' }
+          }
+        }
+      },
+      'delegated_type' => {
+        'root' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'entryable',
+            'association_macro' => 'belongs_to',
+            'dependent' => { 'action' => 'destroy', 'target' => 'associated_records' },
+            'touch' => { 'attribute' => nil },
+            'counter_cache' => { 'column' => 'entries_count', 'active' => true }
+          }
+        },
+        'inverse' => {
+          'proposed_public_declaration' => {
+            'association_name' => 'entry',
+            'association_macro' => 'has_one',
+            'dependent' => { 'action' => 'nullify', 'target' => 'associated_records' }
+          }
+        }
+      },
+      'inverse_counter_naming_only' => {
+        'has_many' => { 'proposed_public_declaration' => nil },
+        'belongs_to' => { 'proposed_public_declaration' => nil }
+      },
+      'habtm' => { 'proposed_public_declaration' => nil }
+    }
+  end
+
+  def failing_association_behavior_probe_asdf
+    payload = association_behavior_probe_payload
+    payload['direct']['belongs_to']['proposed_public_declaration'] = nil
+    fake_generated_app_asdf(actual_association_behavior_probe: payload)
+  end
+
+  def association_behavior_probe_json(payload)
+    payload.is_a?(String) ? payload : JSON.generate(payload)
+  end
+
   def failing_composite_habtm_probe_asdf
     fake_generated_app_asdf(
       composite_habtm_probe: {
@@ -307,6 +461,7 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     actual_class_plan_fixture: 'fixtures/schemas/render_plan/valid/class.json',
     expected_er_plan_fixture: actual_er_plan_fixture,
     expected_class_plan_fixture: actual_class_plan_fixture,
+    malformed_expected_er_plan: false,
     actual_er_mermaid: fake_er_mermaid,
     actual_class_mermaid: fake_class_mermaid,
     expected_er_mermaid: fake_er_mermaid,
@@ -325,6 +480,9 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     actual_composite_runtime: '[]',
     expected_specialized_options_runtime: '[]',
     actual_specialized_options_runtime: '[]',
+    expected_association_behavior_runtime: '[]',
+    actual_association_behavior_runtime: '[]',
+    actual_association_behavior_probe: association_behavior_probe_payload,
     expected_cross_domain_runtime: '[]',
     actual_cross_domain_runtime: '[]',
     connection_boundary_probe: connection_boundary_probe_payload,
@@ -358,6 +516,9 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"exec ruby bin/rails runner script/rails_mmd_specialized_options_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/specialized_options_runtime.json', actual_specialized_options_runtime)}          exit 0 ;;
+        *"exec ruby bin/rails runner script/rails_mmd_association_behavior_runtime_oracle.rb"*)
+          mkdir -p tmp/rails_mmd
+#{write_file_shell('tmp/rails_mmd/association_behavior_runtime.json', actual_association_behavior_runtime)}          exit 0 ;;
         *"exec ruby bin/rails runner script/rails_mmd_cross_domain_runtime_oracle.rb"*)
           mkdir -p tmp/rails_mmd
 #{write_file_shell('tmp/rails_mmd/cross_domain_runtime.json', actual_cross_domain_runtime)}          exit 0 ;;
@@ -368,6 +529,9 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
         *"connection_boundary_probe.rb"*)
           printf '%s\n' '#{JSON.generate(connection_boundary_probe)}'
           exit 0 ;;
+        *"behavior_options_probe.rb"*)
+          printf '%s\n' '#{association_behavior_probe_json(actual_association_behavior_probe)}'
+          exit 0 ;;
         *"exec rails-mmd generate --config rails_mmd_collision.yml"*)
           mkdir -p tmp/rails_mmd_collision
           cp "$RAILS_MMD_TEST_ROOT/fixtures/rails_matrix/template/families/cross_domain_multi_db/rails_mmd_collision_diagnostics_fixture.json" tmp/rails_mmd_collision/collision.diagnostics.json
@@ -376,11 +540,10 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
           #{"printf '[]\\n' > rails_mmd_expected_collision_diagnostics.json" if collision_expectation_mismatch}
           exit 2 ;;
         *"exec rails-mmd generate"*)
-#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_entities.json', expected_entities)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_specialized_options_runtime.json', expected_specialized_options_runtime)}#{write_file_shell('rails_mmd_expected_cross_domain_runtime.json', expected_cross_domain_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
+#{write_file_shell('rails_mmd_expected_diagnostics.json', expected_diagnostics)}#{write_file_shell('rails_mmd_expected_relationships.json', expected_relationships)}#{write_file_shell('rails_mmd_expected_entities.json', expected_entities)}#{write_file_shell('rails_mmd_expected_polymorphic_groups.json', expected_polymorphic_groups)}#{write_file_shell('rails_mmd_expected_sti_entities.json', expected_sti_entities)}#{write_file_shell('rails_mmd_expected_inheritances.json', expected_inheritances)}#{write_file_shell('rails_mmd_expected_sti_runtime.json', expected_runtime)}#{write_file_shell('rails_mmd_expected_delegated_type_runtime.json', expected_delegated_runtime)}#{write_file_shell('rails_mmd_expected_composite_runtime.json', expected_composite_runtime)}#{write_file_shell('rails_mmd_expected_specialized_options_runtime.json', expected_specialized_options_runtime)}#{write_file_shell('rails_mmd_expected_association_behavior_runtime.json', expected_association_behavior_runtime)}#{write_file_shell('rails_mmd_expected_cross_domain_runtime.json', expected_cross_domain_runtime)}#{write_file_shell('rails_mmd_expected_core_er.mmd', expected_er_mermaid)}#{write_file_shell('rails_mmd_expected_core_class.mmd', expected_class_mermaid)}          mkdir -p tmp/rails_mmd
           cp "$RAILS_MMD_TEST_ROOT/#{actual_er_plan_fixture}" tmp/rails_mmd/core.er.render_plan.json
           cp "$RAILS_MMD_TEST_ROOT/#{actual_class_plan_fixture}" tmp/rails_mmd/core.class.render_plan.json
-          cp "$RAILS_MMD_TEST_ROOT/#{expected_er_plan_fixture}" rails_mmd_expected_core_er.render_plan.json
-          cp "$RAILS_MMD_TEST_ROOT/#{expected_class_plan_fixture}" rails_mmd_expected_core_class.render_plan.json
+#{copy_expected_fixture_shell('rails_mmd_expected_core_er.render_plan.json', expected_er_plan_fixture)}#{copy_expected_fixture_shell('rails_mmd_expected_core_class.render_plan.json', expected_class_plan_fixture)}#{write_file_shell('rails_mmd_expected_core_er.render_plan.json', '{not-json') if malformed_expected_er_plan}
 #{copy_fixture_shell('tmp/rails_mmd/core.diagnostics.json', actual_diagnostics_fixture)}
 #{write_file_shell('tmp/rails_mmd/core.er.mmd', actual_er_mermaid)}#{write_file_shell('tmp/rails_mmd/core.class.mmd', actual_class_mermaid)}          #{'touch tmp/rails_mmd/secondary.er.mmd' if success_extra_artifact}
           exit 0 ;;
@@ -405,6 +568,12 @@ EOF
     return '' unless fixture
 
     %(cp "$RAILS_MMD_TEST_ROOT/#{fixture}" #{path}\n)
+  end
+
+  def copy_expected_fixture_shell(path, fixture)
+    return "rm -f #{path}\n" unless fixture
+
+    copy_fixture_shell(path, fixture)
   end
 
   def fake_er_mermaid
@@ -559,6 +728,23 @@ EOF
     end
   end
 
+  it 'runs the association-behavior family and Rails 7.2 probe branch' do
+    asdf = fake_generated_app_asdf(
+      actual_association_behavior_probe: association_behavior_probe_payload(rails_version: '7.2.3.1')
+    )
+
+    with_fake_asdf(asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-7.2', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: true,
+        output: include('PASS ruby-4.0.6-rails-7.2 [association_behavior]')
+      )
+    end
+  end
+
   it 'runs the cross-domain multi-DB success and collision scenarios' do
     with_fake_asdf(matching_fake_app_asdf) do |path|
       result = run_matrix(
@@ -701,6 +887,145 @@ EOF
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'composite_keys')
 
       expect(result).to include(success: false, output: include('ER render plan did not match expectation'))
+    end
+  end
+
+  it 'rejects a missing association-behavior runtime expectation' do
+    with_fake_asdf(missing_expected_association_behavior_runtime_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_association_behavior_runtime.json')
+      )
+    end
+  end
+
+  it 'rejects malformed association-behavior runtime output' do
+    with_fake_asdf(malformed_association_behavior_runtime_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('published invalid association_behavior_runtime.json')
+      )
+    end
+  end
+
+  it 'rejects mismatched association-behavior runtime output' do
+    with_fake_asdf(mismatched_expected_association_behavior_runtime_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('association behavior runtime did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects association-behavior probe semantic drift' do
+    with_fake_asdf(failing_association_behavior_probe_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('association behavior options probe did not match expectation')
+      )
+    end
+  end
+
+  it 'rejects malformed association-behavior probe JSON' do
+    with_fake_asdf(malformed_association_behavior_probe_asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('published invalid association behavior options probe')
+      )
+    end
+  end
+
+  it 'rejects an association-behavior render plan that differs from its exact oracle' do
+    asdf = fake_generated_app_asdf(expected_er_plan_fixture: 'fixtures/schemas/render_plan/valid/class.json')
+
+    with_fake_asdf(asdf) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(success: false, output: include('ER render plan did not match expectation'))
+    end
+  end
+
+  it 'rejects a missing association-behavior relationship expectation' do
+    with_fake_asdf(fake_generated_app_asdf(expected_relationships: nil)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_relationships.json')
+      )
+    end
+  end
+
+  it 'rejects a malformed association-behavior relationship expectation' do
+    with_fake_asdf(fake_generated_app_asdf(expected_relationships: '{not-json')) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_relationships.json')
+      )
+    end
+  end
+
+  it 'rejects a mismatched association-behavior relationship expectation' do
+    with_fake_asdf(fake_generated_app_asdf(expected_relationships: '[]')) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(success: false, output: include('relationships did not match expectation'))
+    end
+  end
+
+  it 'rejects a missing association-behavior full render-plan expectation' do
+    with_fake_asdf(fake_generated_app_asdf(expected_er_plan_fixture: nil)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_core_er.render_plan.json')
+      )
+    end
+  end
+
+  it 'rejects a malformed association-behavior full render-plan expectation' do
+    with_fake_asdf(fake_generated_app_asdf(malformed_expected_er_plan: true)) do |path|
+      result = run_matrix(
+        path: path, pair: 'ruby-4.0.6-rails-8.1', fixture_family: 'association_behavior'
+      )
+
+      expect(result).to include(
+        success: false,
+        output: include('missing or invalid expected rails_mmd_expected_core_er.render_plan.json')
+      )
     end
   end
 

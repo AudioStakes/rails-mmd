@@ -10,4 +10,5 @@ fixture_families:
   - delegated_type
   - composite_keys
   - specialized_options
+  - association_behavior
   - cross_domain_multi_db

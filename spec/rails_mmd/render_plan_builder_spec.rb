@@ -34,9 +34,19 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
       'er_right_marker' => '||',
       'class_owner_multiplicity' => '0..*',
       'class_target_multiplicity' => '1',
-      'metadata' => { 'scoped' => true }
+      'metadata' => {
+        'scoped' => true,
+        'behavior' => {
+          'from_owner' => [
+            {
+              'association_name' => 'account', 'association_macro' => 'belongs_to',
+              'touch' => { 'attribute' => nil }
+            }
+          ]
+        }
+      }
     )
-    expect(payload.fetch('schema_version')).to eq(4)
+    expect(payload.fetch('schema_version')).to eq(5)
     expect(payload.fetch('comments').first.fetch('text')).not_to include('/tmp', 'token=', 'pid=')
     expect(payload.fetch('comments').first.fetch('safe_token')).not_to include('TMP', 'SECRET123', 'PID')
     expect(payload.fetch('diagnostic_ids')).to eq(['d_db_metadata_degraded'])
@@ -47,8 +57,9 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
   end
 
   it 'uses IR cardinalities directly for class plans and supports attributes none' do
+    ir = ir_payload(owner_cardinality: '0..1', target_cardinality: '0..many')
     result = described_class.new.build(
-      ir: ir_payload(owner_cardinality: '0..1', target_cardinality: '0..many'),
+      ir: ir,
       artifact_kind: 'class',
       direction: 'BT',
       attributes: :none
@@ -60,8 +71,8 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     expect(relationship.fetch('class_target_multiplicity')).to eq('0..*')
     expect(relationship.fetch('er_left_marker')).to eq('|o')
     expect(relationship.fetch('er_right_marker')).to eq('o{')
-    expect(relationship.fetch('metadata')).to eq('scoped' => true)
-    expect(result.payload.fetch('schema_version')).to eq(4)
+    expect(relationship.fetch('metadata')).to eq(ir.fetch('relationships').first.fetch('metadata'))
+    expect(result.payload.fetch('schema_version')).to eq(5)
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end
 
@@ -86,7 +97,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     payload = result.payload
     entities = payload.fetch('entities').to_h { |entity| [entity.fetch('entity_id'), entity] }
 
-    expect(payload.fetch('schema_version')).to eq(4)
+    expect(payload.fetch('schema_version')).to eq(5)
     expect(entities.fetch('entities/admin_cars')).to include(
       'entity_kind' => 'physical',
       'label' => 'AdminCar',
@@ -460,7 +471,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
   def ir_payload(owner_cardinality: '0..many', target_cardinality: '1..1')
     {
-      'schema_version' => 4,
+      'schema_version' => 5,
       'domain_id' => 'core',
       'entities' => [
         {
@@ -492,7 +503,18 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
           'association_name' => 'account',
           'owner_cardinality' => owner_cardinality,
           'target_cardinality' => target_cardinality,
-          'metadata' => { 'scoped' => true }
+          'metadata' => {
+            'scoped' => true,
+            'behavior' => {
+              'from_owner' => [
+                {
+                  'association_name' => 'account',
+                  'association_macro' => 'belongs_to',
+                  'touch' => { 'attribute' => nil }
+                }
+              ]
+            }
+          }
         }
       ],
       'diagnostic_ids' => %w[d_db_metadata_degraded d_missing],
@@ -502,7 +524,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
   def sti_ir_payload
     {
-      'schema_version' => 4,
+      'schema_version' => 5,
       'domain_id' => 'core',
       'entities' => [
         {

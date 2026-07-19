@@ -70,14 +70,18 @@ renderer entities carry a kind discriminator and class plans expose explicit
 inheritance edges. P2 composite-key support moves both artifacts to version 4:
 ordered primary/foreign-key members are emitted once per physical column, and a
 column serving both roles is represented as `primary_foreign_key` in IR and
-`PK, FK` in render plans. Consumers must validate generated artifacts with the
-schemas shipped by the same `rails-mmd` release. Configuration and diagnostics
-artifacts remain at schema version 1.
+`PK, FK` in render plans. P2 association behavior metadata moves both artifacts from version 4 to version 5:
+relationships can carry closed, directional
+declaration metadata for effective `dependent`, `touch`, and `counter_cache`
+behavior. Consumers must validate generated artifacts with the schemas shipped
+by the same `rails-mmd` release. Configuration and diagnostics artifacts remain
+at schema version 1.
 
-There is no dual-version output mode. Consumers of v1-v3 IR or render plans must
-update before consuming v4 artifacts. Association relationship objects retain
-their public shape, including scalar relationship IDs; composite key tuples use
-an unambiguous encoded ID segment. Mermaid artifact filenames are unchanged.
+There is no dual-version output mode. Consumers of v1-v4 IR or render plans must
+update before consuming v5 artifacts, and v4 consumers must accept the expanded
+closed relationship metadata contract. Relationship identity and cardinality
+remain unchanged; composite key tuples continue to use an unambiguous encoded
+ID segment. Mermaid artifact filenames and edge text are unchanged.
 
 P2 `delegated_type` support does not change the public schema version. Selecting
 a delegator may add its declared, renderable concrete delegate tables to the

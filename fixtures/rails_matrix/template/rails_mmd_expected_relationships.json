@@ -176,7 +176,19 @@
     "owner_cardinality": "0..many",
     "target_cardinality": "1..1",
     "metadata": {
-      "scoped": true
+      "scoped": true,
+      "behavior": {
+        "from_target": [
+          {
+            "association_name": "posts",
+            "association_macro": "has_many",
+            "dependent": {
+              "action": "destroy",
+              "target": "associated_records"
+            }
+          }
+        ]
+      }
     }
   },
   {

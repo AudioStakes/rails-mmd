@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails_mmd/canonical_json'
+require 'rails_mmd/relationship_metadata'
 
 module RailsMmd
   # Normalizes selected schema entities and relationships into closed IR payloads.
@@ -39,7 +40,7 @@ module RailsMmd
       base_metadata = base_metadata_by_entity_id(subtype_entities)
 
       {
-        'schema_version' => 4,
+        'schema_version' => 5,
         'domain_id' => domain.domain_id,
         'entities' => entities_payload(domain, relationship_domain, subtype_entities, base_metadata),
         'relationships' => relationships_payload(relationship_domain, physical_entity_ids),
@@ -147,7 +148,8 @@ module RailsMmd
         'owner_cardinality' => relationship.owner_cardinality,
         'target_cardinality' => relationship.target_cardinality
       }
-      payload['metadata'] = { 'scoped' => true } if relationship.metadata&.fetch(:scoped, false)
+      metadata = RelationshipMetadata.public_payload(relationship.metadata)
+      payload['metadata'] = metadata if metadata
       payload
     end
 

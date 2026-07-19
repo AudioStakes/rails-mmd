@@ -1,0 +1,233 @@
+[
+  {
+    "relationship_id": "relationships/p207_accounts/through/members/notes/p207_notes",
+    "owner_safe_token": "P207_ACCOUNT",
+    "target_safe_token": "P207_NOTE",
+    "label": "latest_note",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1",
+    "metadata": {
+      "behavior": {
+        "from_owner": [
+          {
+            "association_name": "notes",
+            "association_macro": "has_many",
+            "dependent": {
+              "action": "delete_all",
+              "target": "through_records"
+            }
+          },
+          {
+            "association_name": "latest_note",
+            "association_macro": "has_one",
+            "touch": {
+              "attribute": "latest_note_touched_at"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_attachments/polymorphic/attachable/attachable_id/attachable_type/p207_articles",
+    "owner_safe_token": "P207_ATTACHMENT",
+    "target_safe_token": "P207_ARTICLE",
+    "label": "attachable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1",
+    "metadata": {
+      "behavior": {
+        "from_owner": [
+          {
+            "association_name": "attachable",
+            "association_macro": "belongs_to",
+            "dependent": {
+              "action": "destroy",
+              "target": "associated_records"
+            },
+            "touch": {
+              "attribute": null
+            },
+            "counter_cache": {
+              "column": "attachments_count",
+              "active": true
+            }
+          }
+        ],
+        "from_target": [
+          {
+            "association_name": "attachments",
+            "association_macro": "has_many",
+            "dependent": {
+              "action": "nullify",
+              "target": "associated_records"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_authors/habtm/p207_authors_tags/author_id/p207_tags/tag_id",
+    "owner_safe_token": "P207_AUTHOR",
+    "target_safe_token": "P207_TAG",
+    "label": "tags",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..many"
+  },
+  {
+    "relationship_id": "relationships/p207_entries/polymorphic/entryable/entryable_id/entryable_type/p207_messages",
+    "owner_safe_token": "P207_ENTRY",
+    "target_safe_token": "P207_MESSAGE",
+    "label": "entryable",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1",
+    "metadata": {
+      "behavior": {
+        "from_owner": [
+          {
+            "association_name": "entryable",
+            "association_macro": "belongs_to",
+            "dependent": {
+              "action": "destroy",
+              "target": "associated_records"
+            },
+            "touch": {
+              "attribute": null
+            },
+            "counter_cache": {
+              "column": "entries_count",
+              "active": true
+            }
+          }
+        ],
+        "from_target": [
+          {
+            "association_name": "entry",
+            "association_macro": "has_one",
+            "dependent": {
+              "action": "nullify",
+              "target": "associated_records"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_inverse_counter_members/account_id/p207_inverse_counter_accounts/id",
+    "owner_safe_token": "P207_INVERSE_COUNTER_MEMBER",
+    "target_safe_token": "P207_INVERSE_COUNTER_ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1"
+  },
+  {
+    "relationship_id": "relationships/p207_members/account_id/p207_accounts/id",
+    "owner_safe_token": "P207_MEMBER",
+    "target_safe_token": "P207_ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1",
+    "metadata": {
+      "behavior": {
+        "from_owner": [
+          {
+            "association_name": "account",
+            "association_macro": "belongs_to",
+            "dependent": {
+              "action": "delete",
+              "target": "associated_records"
+            },
+            "touch": {
+              "attribute": "members_touched_at"
+            },
+            "counter_cache": {
+              "column": "p207_members_count",
+              "active": true
+            }
+          }
+        ],
+        "from_target": [
+          {
+            "association_name": "members",
+            "association_macro": "has_many",
+            "dependent": {
+              "action": "destroy",
+              "target": "associated_records"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_members/custom_account_id/p207_accounts/id",
+    "owner_safe_token": "P207_MEMBER",
+    "target_safe_token": "P207_ACCOUNT",
+    "label": "custom_account",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "0..1",
+    "metadata": {
+      "behavior": {
+        "from_owner": [
+          {
+            "association_name": "custom_account",
+            "association_macro": "belongs_to",
+            "counter_cache": {
+              "column": "custom_members_count",
+              "active": false
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_notes/member_id/p207_members/id",
+    "owner_safe_token": "P207_NOTE",
+    "target_safe_token": "P207_MEMBER",
+    "label": "member",
+    "owner_cardinality": "0..many",
+    "target_cardinality": "1..1",
+    "metadata": {
+      "behavior": {
+        "from_target": [
+          {
+            "association_name": "notes",
+            "association_macro": "has_many",
+            "dependent": {
+              "action": "restrict_with_error",
+              "target": "associated_records"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "relationship_id": "relationships/p207_profiles/account_id/p207_accounts/id",
+    "owner_safe_token": "P207_PROFILE",
+    "target_safe_token": "P207_ACCOUNT",
+    "label": "account",
+    "owner_cardinality": "0..1",
+    "target_cardinality": "1..1",
+    "metadata": {
+      "behavior": {
+        "from_target": [
+          {
+            "association_name": "profile",
+            "association_macro": "has_one",
+            "dependent": {
+              "action": "nullify",
+              "target": "associated_records"
+            },
+            "touch": {
+              "attribute": "profile_touched_at"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

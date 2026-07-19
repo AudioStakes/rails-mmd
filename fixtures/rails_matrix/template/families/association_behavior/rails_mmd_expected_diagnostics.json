@@ -1,0 +1,92 @@
+[
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ACCOUNT_ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ACCOUNT_ID",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 12,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "class:core:relationship:ACCOUNT",
+    "metadata": {
+      "artifact_kind": "class",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ACCOUNT",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ACCOUNT_ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ACCOUNT_ID",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:attribute:ID",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "attribute",
+      "base_safe_token": "ID",
+      "collision_subject_count": 12,
+      "resolved": true
+    }
+  },
+  {
+    "code": "SAFE_TOKEN_COLLISION",
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact",
+    "subject_id": "er:core:relationship:ACCOUNT",
+    "metadata": {
+      "artifact_kind": "er",
+      "domain_id": "core",
+      "token_kind": "relationship",
+      "base_safe_token": "ACCOUNT",
+      "collision_subject_count": 3,
+      "resolved": true
+    }
+  }
+]
