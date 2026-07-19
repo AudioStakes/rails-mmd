@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'digest'
 require 'fileutils'
 require 'json'
 require 'open3'
@@ -131,9 +132,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     }
   end
 
-  def run_matrix(path: ENV.fetch('PATH'), pair: nil)
+  def run_matrix(path: ENV.fetch('PATH'), pair: nil, environment: {})
     stdout, stderr, status = Open3.capture3(
-      { 'PATH' => path, 'RAILS_MMD_MATRIX_PAIR' => pair, 'RAILS_MMD_TEST_ROOT' => Dir.pwd },
+      {
+        'PATH' => path,
+        'RAILS_MMD_MATRIX_PAIR' => pair,
+        'RAILS_MMD_TEST_ROOT' => Dir.pwd,
+        **environment
+      },
       'bundle', 'exec', 'rake', 'verify:rails_matrix'
     )
     { success: status.success?, stdout: stdout, stderr: stderr, output: stdout + stderr }
@@ -142,6 +148,35 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
   def rake_prerequisites
     stdout, = Open3.capture3('bundle', 'exec', 'rake', '--prereqs')
     stdout
+  end
+
+  def recording_cache_asdf
+    <<~SH
+      [ "$1" = "where" ] && exit 0
+      case "$*" in
+        *--version*) exit 0 ;;
+        *" check"*)
+          printf '%s' "$BUNDLE_PATH" > "$RAILS_MMD_MATRIX_CACHE_ROOT/recorded_bundle_path"
+          exit 0 ;;
+        *) exit 0 ;;
+      esac
+    SH
+  end
+
+  def recorded_bundle_path(cache_root)
+    with_fake_asdf(recording_cache_asdf) do |path|
+      run_matrix(
+        path:,
+        pair: 'ruby-4.0.6-rails-8.1',
+        environment: { 'RAILS_MMD_MATRIX_CACHE_ROOT' => cache_root }
+      )
+    end
+    File.read(File.join(cache_root, 'recorded_bundle_path'))
+  end
+
+  def expected_bundle_path(cache_root)
+    lock = File.binread('fixtures/rails_matrix/bundles/8.1/Gemfile.lock')
+    File.join(cache_root, 'gems', '4.0.6', "8.1-#{Digest::SHA256.hexdigest(lock)}")
   end
 
   def with_fake_asdf(script)
@@ -170,6 +205,12 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result[:output]).not_to include('Missing matrix Ruby 3.3.12')
+    end
+  end
+
+  it 'passes the shared lock-keyed cache path to matrix bundle subprocesses' do
+    Dir.mktmpdir('rails-matrix-shared-cache') do |cache_root|
+      expect(recorded_bundle_path(cache_root)).to eq(expected_bundle_path(cache_root))
     end
   end
 

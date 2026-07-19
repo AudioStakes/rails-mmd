@@ -50,9 +50,14 @@ but is not a separate matrix axis.
 - Matrix Bundler runs use frozen mode. The Ruby 4.0.6 pass must consume the
   floor-generated lock without modifying it; incompatibility is a matrix failure,
   not an opportunity to re-resolve.
-- Bundler installs into `.bundle/rails-matrix/gems/<ruby-version>/`; this cache is
-  ignored by Git. Frozen lock validation and `bundle check` make the shared cache
-  correctness-neutral.
+- Bundler installs into
+  `.bundle/rails-matrix/gems/<ruby-version>/<rails-series>-<lock-sha256>/`;
+  this cache is ignored by Git. The lock digest makes invalidation deterministic,
+  and separate series paths prevent concurrent pairs from mutating one shared
+  Ruby directory. `RAILS_MMD_MATRIX_CACHE_ROOT` may replace the
+  `.bundle/rails-matrix` prefix when separate worktrees or an external CI
+  cache restore to one stable, owner-controlled path. Shared caches are
+  restore-only and single-writer; concurrent jobs use separate writable roots.
 - SQLite constraints match the corresponding Rails generator metadata: Rails
   7.2 uses `>= 1.4`, and Rails 8.1 uses `>= 2.1`. Checked-in locks select exact
   versions.
