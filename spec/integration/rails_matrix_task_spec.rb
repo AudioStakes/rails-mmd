@@ -100,6 +100,13 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     )
   end
 
+  def invalid_diagnostics_asdf
+    missing_expected_relationships_asdf.sub(
+      'mkdir -p tmp/rails_mmd',
+      "mkdir -p tmp/rails_mmd\n          printf '{}\\n' > tmp/rails_mmd/core.diagnostics.json"
+    )
+  end
+
   def missing_expected_polymorphic_groups_asdf
     relationships = JSON.generate([generic_expected_relationship])
     missing_expected_relationships_asdf.sub(
@@ -219,6 +226,14 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
       result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
 
       expect(result).to include(success: false, output: include('schema-invalid core.er.render_plan.json'))
+    end
+  end
+
+  it 'rejects parseable diagnostics that violate the public artifact schema' do
+    with_fake_asdf(invalid_diagnostics_asdf) do |path|
+      result = run_matrix(path: path, pair: 'ruby-4.0.6-rails-8.1')
+
+      expect(result).to include(success: false, output: include('schema-invalid core.diagnostics.json'))
     end
   end
 

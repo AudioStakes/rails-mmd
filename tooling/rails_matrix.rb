@@ -179,8 +179,9 @@ module RailsMatrix
 
     def validate_json(path, pair, schema_name)
       payload = JSON.parse(path.read)
-      return payload if schema_validator.valid?(schema_name, payload)
-
+      schema_validator.validate!(schema_name, payload)
+      payload
+    rescue RailsMmd::SchemaValidator::InvalidPayload
       raise VerificationError, "#{pair.name} published schema-invalid #{path.basename}"
     rescue Errno::ENOENT, JSON::ParserError => e
       raise VerificationError, "#{pair.name} published invalid #{path.basename}: #{e.message}"

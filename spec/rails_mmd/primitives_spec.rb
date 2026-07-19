@@ -41,6 +41,70 @@ RSpec.describe 'runtime primitives' do
       expect(validator.valid?(:diagnostics, fixture('diagnostics/invalid/unknown_code.json'))).to be(false)
       expect(validator.errors(:diagnostics, fixture('diagnostics/invalid/unknown_code.json'))).not_to be_empty
     end
+
+    it 'raises one contract error for schema-invalid payloads' do
+      validator = described_class.new
+      valid_payload = fixture('diagnostics/valid/catalog.json')
+      invalid_payload = fixture('diagnostics/invalid/unknown_code.json')
+
+      expect(validator.validate!(:diagnostics, valid_payload)).to equal(valid_payload)
+      expect do
+        validator.validate!(:diagnostics, invalid_payload)
+      end.to raise_error(RailsMmd::SchemaValidator::InvalidPayload, 'diagnostics schema invalid')
+    end
+
+    it 'validates publication payloads and diagnostic references through one interface' do
+      validator = described_class.new
+      catalog = fixture('diagnostics/valid/catalog.json').fetch('diagnostics')
+      global_diagnostic = catalog.find { |item| item.fetch('diagnostic_id') == 'd_config_not_found' }
+      core_diagnostic = catalog.find { |item| item.fetch('diagnostic_id') == 'd_db_metadata_degraded' }
+      billing_diagnostic = JSON.parse(JSON.generate(core_diagnostic)).merge(
+        'diagnostic_id' => 'd_billing_metadata_degraded',
+        'subject_id' => 'billing'
+      )
+      billing_diagnostic.fetch('metadata')['domain_id'] = 'billing'
+      diagnostics = [global_diagnostic, core_diagnostic, billing_diagnostic]
+
+      core_er = fixture('render_plan/valid/er.json').merge(
+        'diagnostic_ids' => %w[d_config_not_found d_db_metadata_degraded]
+      )
+      core_class = fixture('render_plan/valid/class.json').merge('diagnostic_ids' => ['d_config_not_found'])
+      billing_er = fixture('render_plan/valid/er.json').merge(
+        'domain_id' => 'billing',
+        'diagnostic_ids' => ['d_billing_metadata_degraded']
+      )
+      artifacts = {
+        'core' => { 'er' => { render_plan: core_er }, 'class' => { render_plan: core_class } },
+        'billing' => { 'er' => { render_plan: billing_er } }
+      }
+
+      documents = validator.validate_publication!(diagnostics: diagnostics, artifacts: artifacts)
+
+      expect(documents.map { |document| [document.fetch('scope'), document.fetch('domain_id')] }).to contain_exactly(
+        ['global', nil], %w[domain core], %w[domain billing]
+      )
+
+      core_class['diagnostic_ids'] = ['d_billing_metadata_degraded']
+      expect do
+        validator.validate_publication!(diagnostics: diagnostics, artifacts: artifacts)
+      end.to raise_error(RailsMmd::SchemaValidator::InvalidPayload, 'render plan diagnostic_ids unresolved')
+    end
+
+    it 'validates all pre-output diagnostics as one global document' do
+      validator = described_class.new
+      catalog = fixture('diagnostics/valid/catalog.json').fetch('diagnostics')
+      diagnostic_ids = %w[d_config_schema_invalid d_config_domain_not_found]
+      diagnostics = catalog.select do |item|
+        diagnostic_ids.include?(item.fetch('diagnostic_id'))
+      end
+
+      document = validator.validate_pre_output!(diagnostics)
+
+      expect(document).to include('scope' => 'global', 'domain_id' => nil)
+      expect(document.fetch('diagnostics').map { |item| item.fetch('diagnostic_id') }).to contain_exactly(
+        'd_config_schema_invalid', 'd_config_domain_not_found'
+      )
+    end
   end
 
   describe RailsMmd::Diagnostics do

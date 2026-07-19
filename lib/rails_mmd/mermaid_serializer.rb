@@ -18,7 +18,7 @@ module RailsMmd
     end
 
     def serialize(render_plan:)
-      ensure_valid_render_plan!(render_plan)
+      schema_validator.validate_render_plan!(render_plan)
       Result.new(text: text_for(render_plan), diagnostics: [])
     rescue StandardError => e
       Result.new(text: nil, diagnostics: [serialization_diagnostic(render_plan, e)])
@@ -27,12 +27,6 @@ module RailsMmd
     private
 
     attr_reader :diagnostics, :schema_validator
-
-    def ensure_valid_render_plan!(render_plan)
-      return if schema_validator.valid?(:render_plan, render_plan)
-
-      raise ArgumentError, 'render plan schema invalid'
-    end
 
     def text_for(render_plan)
       return er_text(render_plan) if render_plan.fetch('artifact_kind') == 'er'
