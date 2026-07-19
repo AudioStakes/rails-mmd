@@ -70,6 +70,17 @@ RSpec.describe RailsMmd::Publisher do
     expect(project_root.join('out')).not_to exist
   end
 
+  it 'serializes mixed-scope pre-output diagnostics as one global stderr document' do
+    domain_not_found = diagnostic('CONFIG_DOMAIN_NOT_FOUND', 'error', 'domain', { domain_id: 'missing' })
+
+    document = JSON.parse(publisher.pre_output_stderr([domain_not_found, invocation_error]))
+
+    expect(document).to include('scope' => 'global', 'domain_id' => nil)
+    expect(document.fetch('diagnostics').map { |item| item.fetch('code') }).to contain_exactly(
+      'CONFIG_DOMAIN_NOT_FOUND', 'CONFIG_SCHEMA_INVALID'
+    )
+  end
+
   it 'blocks only the domain with domain errors and leaves unrelated user files untouched' do
     output = project_root.join('out')
     output.mkpath
@@ -168,6 +179,53 @@ RSpec.describe RailsMmd::Publisher do
 
     expect(result).to be_success
     expect(project_root.join('out/admin.diagnostics.json')).not_to exist
+  end
+
+  it 'rejects schema-invalid selected artifacts without partial writes' do
+    result = publisher.publish(
+      output_dir: 'out',
+      selected_domain_ids: ['core'],
+      diagnostics: [],
+      artifacts: { 'core' => { 'er' => { render_plan: { 'bad' => true }, mermaid: 'bad' } } }
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first.fetch('code')).to eq('OUTPUT_WRITE_FAILED')
+    expect(project_root.join('out').children).to be_empty
+  end
+
+  it 'rejects schema-invalid diagnostic documents without partial writes' do
+    result = publisher.publish(
+      output_dir: 'out',
+      selected_domain_ids: ['core'],
+      diagnostics: [warning_diagnostic.merge('secret' => 'raw')],
+      artifacts: {}
+    )
+
+    expect(result).not_to be_success
+    expect(result.diagnostics.first.fetch('code')).to eq('OUTPUT_WRITE_FAILED')
+    expect(project_root.join('out').children).to be_empty
+  end
+
+  it 'removes stale diagnostics files when a selected domain republishes without diagnostics' do
+    publisher.publish(
+      output_dir: 'out',
+      selected_domain_ids: ['core'],
+      diagnostics: [warning_diagnostic],
+      artifacts: {}
+    )
+
+    result = publisher.publish(
+      output_dir: 'out',
+      selected_domain_ids: ['core'],
+      diagnostics: [],
+      artifacts: { 'core' => { 'er' => er_artifact_without_diagnostics } }
+    )
+
+    expect(result).to be_success
+    expect(project_root.join('out/core.diagnostics.json')).not_to exist
+    expect(project_root.join('out/global.diagnostics.json')).not_to exist
+    expect(project_root.join('out/core.er.mmd')).to exist
   end
 
   it 'rejects render plans with diagnostic references outside global or matching domain diagnostics' do

@@ -3,9 +3,7 @@
 require 'fileutils'
 require 'json'
 require 'tmpdir'
-require 'rails_mmd/canonical_json'
 require 'rails_mmd/diagnostics'
-require 'rails_mmd/ordering'
 require 'rails_mmd/output_directory'
 require 'rails_mmd/schema_validator'
 
@@ -37,7 +35,8 @@ module RailsMmd
     end
 
     def pre_output_stderr(diagnostics)
-      "#{JSON.pretty_generate(diagnostics_document(scope: 'global', domain_id: nil, diagnostics: diagnostics))}\n"
+      document = schema_validator.validate_pre_output!(diagnostics)
+      "#{JSON.pretty_generate(document)}\n"
     end
 
     def publish(output_dir:, selected_domain_ids:, diagnostics:, artifacts:)
@@ -59,9 +58,9 @@ module RailsMmd
       prepare_output_directory(result.path)
       diagnostics = scoped_diagnostics(diagnostics, selected_domain_ids)
       artifacts = scoped_artifacts(artifacts, selected_domain_ids)
-      validate_payloads!(diagnostics, artifacts)
+      diagnostic_documents = validate_payloads!(diagnostics, artifacts)
       blocked_domains = blocked_domains(selected_domain_ids, diagnostics)
-      plan = publish_plan(selected_domain_ids, diagnostics, artifacts, blocked_domains)
+      plan = publish_plan(selected_domain_ids, diagnostic_documents, artifacts, blocked_domains)
       write_plan(result.path, plan, selected_domain_ids)
       Result.new(success: true, diagnostics: diagnostics, written_paths: plan.keys.sort, stderr: nil)
     end
@@ -72,13 +71,10 @@ module RailsMmd
     end
 
     def validate_payloads!(diagnostics, artifacts)
-      validate_diagnostics_documents!(diagnostics)
-      artifacts.each_value do |domain_artifacts|
-        domain_artifacts.each_value do |artifact|
-          validate_render_plan!(artifact.fetch(:render_plan))
-        end
-      end
-      validate_render_plan_diagnostic_refs!(diagnostics, artifacts)
+      schema_validator.validate_publication!(
+        diagnostics: diagnostics,
+        artifacts: artifacts
+      )
     end
 
     def scoped_diagnostics(diagnostics, selected_domain_ids)
@@ -91,44 +87,8 @@ module RailsMmd
       artifacts.slice(*selected_domain_ids)
     end
 
-    def validate_diagnostics_documents!(diagnostics)
-      grouped_diagnostics(diagnostics).each do |(scope, domain_id), items|
-        document = diagnostics_document(scope: scope, domain_id: domain_id, diagnostics: items)
-        raise ArgumentError, 'diagnostics schema invalid' unless schema_validator.valid?(:diagnostics, document)
-      end
-    end
-
-    def validate_render_plan!(render_plan)
-      raise ArgumentError, 'render plan schema invalid' unless schema_validator.valid?(:render_plan, render_plan)
-    end
-
-    def validate_render_plan_diagnostic_refs!(diagnostics, artifacts)
-      global_ids = global_diagnostic_ids(diagnostics)
-      domain_ids = domain_diagnostic_ids(diagnostics)
-      artifacts.each do |domain_id, domain_artifacts|
-        validate_domain_diagnostic_refs!(domain_artifacts, global_ids + domain_ids.fetch(domain_id, []))
-      end
-    end
-
-    def global_diagnostic_ids(diagnostics)
-      diagnostics.select { |item| item.fetch('scope') == 'invocation' }.map { |item| item.fetch('diagnostic_id') }
-    end
-
-    def domain_diagnostic_ids(diagnostics)
-      diagnostics.reject { |item| item.fetch('scope') == 'invocation' }
-                 .group_by { |item| diagnostic_domain_id(item) }
-                 .transform_values { |items| items.map { |item| item.fetch('diagnostic_id') } }
-    end
-
-    def validate_domain_diagnostic_refs!(domain_artifacts, allowed_ids)
-      domain_artifacts.each_value do |artifact|
-        unresolved = artifact.fetch(:render_plan).fetch('diagnostic_ids') - allowed_ids
-        raise ArgumentError, 'render plan diagnostic_ids unresolved' unless unresolved.empty?
-      end
-    end
-
-    def publish_plan(selected_domain_ids, diagnostics, artifacts, blocked_domains)
-      plan = diagnostics_plan(diagnostics)
+    def publish_plan(selected_domain_ids, diagnostic_documents, artifacts, blocked_domains)
+      plan = diagnostics_plan(diagnostic_documents)
       selected_domain_ids.each do |domain_id|
         next if blocked_domains.include?(domain_id)
 
@@ -147,18 +107,14 @@ module RailsMmd
       end
     end
 
-    def diagnostics_plan(diagnostics)
-      grouped_diagnostics(diagnostics).each_with_object({}) do |((scope, domain_id), items), plan|
-        next if items.empty?
-
-        name = scope == 'global' ? 'global.diagnostics.json' : "#{domain_id}.diagnostics.json"
-        plan[name] = json_document(diagnostics_document(scope: scope, domain_id: domain_id, diagnostics: items))
-      end
-    end
-
-    def grouped_diagnostics(diagnostics)
-      diagnostics.group_by do |diagnostic|
-        diagnostic.fetch('scope') == 'invocation' ? ['global', nil] : ['domain', diagnostic_domain_id(diagnostic)]
+    def diagnostics_plan(diagnostic_documents)
+      diagnostic_documents.each_with_object({}) do |document, plan|
+        name = if document.fetch('scope') == 'global'
+                 'global.diagnostics.json'
+               else
+                 "#{document.fetch('domain_id')}.diagnostics.json"
+               end
+        plan[name] = json_document(document)
       end
     end
 
@@ -270,17 +226,6 @@ module RailsMmd
     def ensure_inside_project_root!(path)
       relative = path.realpath.relative_path_from(project_root.realpath).to_s
       raise ArgumentError, 'output path escapes project root' if relative.start_with?('..')
-    end
-
-    def diagnostics_document(scope:, domain_id:, diagnostics:)
-      payload = {
-        'schema_version' => 1,
-        'scope' => scope,
-        'domain_id' => domain_id,
-        'diagnostics' => Ordering.diagnostics(diagnostics),
-        'digest_sha256' => nil
-      }
-      payload.merge('digest_sha256' => CanonicalJson.digest_sha256(payload))
     end
 
     def json_document(payload)
