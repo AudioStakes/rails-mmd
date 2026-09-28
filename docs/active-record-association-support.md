@@ -1,48 +1,37 @@
-# Active Record 関連機能対応マトリクス（Rails 7.2 / 8.1）
+# Active Record association support (Rails 7.2 / 8.1)
 
-rails-mmdの対象版はRails 7.2と8.1。
-状態は「対応」「条件付き」「未対応」。次は番号が最小の未完了P1を実装する。
+The target Rails series are 7.2 and 8.1. "Supported" describes behavior covered by the current implementation and tests; it does not imply support for every option of that association. The real-app matrix currently uses SQLite. PostgreSQL and MySQL have not been verified in a real-app run.
 
-## 優先対応
+## Implemented features
 
-| 優先順位 | Active Record機能 | rails-mmd | 現在の不足 | 完了条件 |
-|---|---|---|---|---|
-| P1-01 | Rails 7.2/8.1実行互換 | 対応 | 3組のRuby/Rails境界matrixがpre-pushでPASS | 3組のRuby/Rails境界matrixをpre-pushで通す |
-| P1-02 | 全関連macroの検出 | 対応 | 全reflectionを分類し、未対応macroを診断済み | 全reflectionを分類し、未対応macroを診断する |
-| P1-03 | `has_many` / `has_one` | 対応 | direct関連・self join・暫定重複抑止を検証済み | direct関連とself joinの多重度を検証する |
-| P1-04 | `inverse_of` | 対応 | inverse有無に依存せず物理関連をcanonical edgeへ統合済み | 同じ論理関連を1本のcanonical edgeへ統合する |
-| P1-05 | `has_many :through` / `has_one :through` | 対応 | 推論sourceの1段・nested経路をsemantic edgeとして描画済み | 中間modelと到達先を重複なく描画する |
-| P1-06 | polymorphic | 対応 | 選択済みinverse候補を対象別edgeへ正規化済み | 型列と対象候補を重複なく描画する |
-| P1-07 | `has_and_belongs_to_many` | 対応 | hidden join tableを検証し、正規化した単一の多対多関連として描画済み | join tableを検証し、単一の多対多関連として描画する |
-
-## 後続候補
-
-| 優先順位 | Active Record機能 | rails-mmd | 完了条件 |
+| Priority | Active Record feature | Status | Implemented behavior |
 |---|---|---|---|
-| P2-01 | scoped関連 | 未対応 | scopeの存在をmetadataとして保持する |
-| P2-02 | STI | 未対応 | 基底・派生classの表示規則を定める |
-| P2-03 | `delegated_type` | 未対応 | 委譲元と具象型を描画する |
-| P2-04 | 複合primary/foreign key、`query_constraints` | 未対応 | 対応する列組を保持・照合する |
-| P2-05 | `primary_key` / `source` / `source_type` / `as` | 未対応 | option別に対象とkeyを解決する |
-| P2-06 | cross-domain / multi-DB | 未対応 | 境界を外部nodeまたは診断で表現する |
-| P2-07 | `dependent` / `touch` / `counter_cache` | 未対応 | 図へ載せる動作metadataを定義する |
-| P3-01 | `disable_joins` / `strict_loading` / async | 未対応 | 実行特性の表示要否を決める |
-| P3-02 | association extension | 未対応 | 構造と無関係な拡張を診断またはmetadata化する |
+| P1-01 | Rails 7.2 / 8.1 runtime compatibility | Supported | Three Ruby/Rails pairs run through the local real-app matrix. |
+| P1-02 | Association macro detection | Supported | Reflections are classified; unsupported macros produce diagnostics. |
+| P1-03 | Direct `has_many` / `has_one` | Supported | Direct associations and self joins have verified cardinalities. |
+| P1-04 | `inverse_of` | Supported | Physical relationships are merged into a canonical edge independently of an inverse declaration. |
+| P1-05 | `has_many :through` / `has_one :through` | Supported | Inferred-source one-step and nested paths are rendered as semantic edges without duplicate endpoints. |
+| P1-06 | Polymorphic associations | Supported | Selected matching inverse candidates produce one normalized edge per concrete target. |
+| P1-07 | `has_and_belongs_to_many` | Supported | A hidden join table is verified and rendered as one normalized many-to-many relationship. |
 
-## 対応済み基盤
+## Not yet supported
 
-Rails 7.2/8.1で次を対応済み。
+| Priority | Active Record feature | Needed for support |
+|---|---|---|
+| P2-01 | Scoped associations | Retain scope presence as metadata. |
+| P2-02 | STI | Define how base and derived classes appear. |
+| P2-03 | `delegated_type` | Render the delegator and concrete types. |
+| P2-04 | Composite primary/foreign keys and `query_constraints` | Preserve and match key tuples. |
+| P2-05 | Non-default `primary_key`, `source`, `source_type`, and `as` options | Resolve the target and key for each option. The supported polymorphic inverse case already uses `as:`. |
+| P2-06 | Cross-domain and multi-database relationships | Represent external nodes or emit diagnostics. |
+| P2-07 | `dependent`, `touch`, and `counter_cache` | Decide which behavior belongs in the diagram metadata. |
+| P3-01 | `disable_joins`, `strict_loading`, and async | Decide whether execution properties belong in the diagram. |
+| P3-02 | Association extensions | Represent or diagnose structural extensions. |
 
-- 非polymorphic・unscoped・scalar direct `belongs_to`
-- scalar `foreign_key`と`class_name`
-- FK、nullability、unique indexによる保守的な多重度
-- same-domain限定のER/Class出力
-- 対応範囲内の`belongs_to`除外診断
-- direct polymorphic `belongs_to`と`has_many` / `has_one ..., as:`候補
-- hidden join tableを持つunscoped scalar `has_and_belongs_to_many`
+The supported baseline covers non-polymorphic, unscoped, scalar direct `belongs_to`; scalar `foreign_key` and `class_name`; conservative cardinalities from foreign keys, nullability, and unique indexes; same-domain ER/class output; diagnostics for excluded supported `belongs_to`; direct polymorphic `belongs_to` with selected `has_many` / `has_one ..., as:` inverse candidates; and unscoped scalar HABTM with a verified hidden join table.
 
-## 根拠
+## References
 
-- 現行契約: [P0 contract](p0-contract.md)
-- 実装: [relationship builder](../lib/rails_mmd/relationship_builder.rb)、[render plan builder](../lib/rails_mmd/render_plan_builder.rb)
-- Rails仕様: [Association Basics](https://guides.rubyonrails.org/association_basics.html)、[Rails 7.2 API](https://api.rubyonrails.org/v7.2/classes/ActiveRecord/Associations/ClassMethods.html)、[Rails 8.1 API](https://api.rubyonrails.org/v8.1/classes/ActiveRecord/Associations/ClassMethods.html)
+- [P0 contract](p0-contract.md)
+- [Relationship builder](../lib/rails_mmd/relationship_builder.rb) and [render plan builder](../lib/rails_mmd/render_plan_builder.rb)
+- [Rails Association Basics](https://guides.rubyonrails.org/association_basics.html), [Rails 7.2 API](https://api.rubyonrails.org/v7.2/classes/ActiveRecord/Associations/ClassMethods.html), [Rails 8.1 API](https://api.rubyonrails.org/v8.1/classes/ActiveRecord/Associations/ClassMethods.html)

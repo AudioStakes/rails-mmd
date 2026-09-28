@@ -1,71 +1,68 @@
 # rails-mmd
 
-`rails-mmd` is a standalone Ruby CLI/gem for generating Mermaid diagrams from
-Rails and ActiveRecord applications.
+Generate Mermaid ER and class diagrams from the models and database schema of a Rails application. `rails-mmd` runs in the application's bundle, loads its models, and writes local `.mmd` files that you can preview in a Mermaid-compatible Markdown viewer.
 
-The repository contains the P0 Ruby pipeline for loading a Rails app, producing
-render plans, serializing Mermaid, and publishing local artifacts.
-
-## Project Model
-
-- Ruby-only project at the repository root.
-- No Node, TypeScript, pnpm, npm, yarn, Nx, or monorepo workspace setup.
-- No `packages/rails-mmd/` nesting.
-- Serena is local development tooling only and is not a runtime dependency.
-
-## Ruby And CLI
-
-This repository develops on MRI Ruby `4.0.6` and supports maintained Ruby
-versions `>= 3.3, < 4.1`. The local Rails matrix verifies three selected pairs:
-Rails 7.2 on Ruby 4.0.6, and Rails 8.1 on Ruby 3.3.12 and 4.0.6.
-
-The CLI supports help, version, and P0 generation:
-
-```sh
-asdf install ruby 4.0.6
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle install
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd --help
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd --version
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec exe/rails-mmd generate --help
+```mermaid
+erDiagram
+  direction LR
+  USER }o..|| ACCOUNT : account
+  USER {
+    bigint id PK
+    bigint account_id FK
+  }
+  ACCOUNT {
+    bigint id PK
+  }
 ```
 
-If your shell does not already resolve `ruby` and `bundle` through the pinned
-toolchain, prefix commands with `ASDF_RUBY_VERSION=4.0.6 asdf exec`.
+The diagram above is illustrative. The actual output depends on your models, associations, and database metadata.
 
-`rails-mmd generate` exposes only P0 options: `--config`, `--output-dir`,
-`--domain`, `--format`, and `--fail-on-warning`.
+## Try it in a Rails app
 
-User-facing command behavior, artifact names, and exit codes are documented in
-[`docs/usage.md`](docs/usage.md).
+In the **target Rails application's** `Gemfile`, install this repository directly from GitHub:
 
-Dependency classifications are documented in
-[`docs/development/dependencies.md`](docs/development/dependencies.md).
-Ruby tooling commands are documented in
-[`docs/development/tooling.md`](docs/development/tooling.md).
-Local Git hooks are documented in
-[`docs/development/hooks.md`](docs/development/hooks.md).
-The no-hosted-CI local verification policy is documented in
-[`docs/development/ci.md`](docs/development/ci.md).
-P0 schema and Mermaid fixture scaffolding is documented in
-[`docs/development/contract-fixtures.md`](docs/development/contract-fixtures.md).
-The P0 blocking fixture matrix is documented in
-[`docs/p0-blocking-fixture-matrix.md`](docs/p0-blocking-fixture-matrix.md).
-Repository drift guards and setup-mode release conditions are documented in
-[`docs/development/setup-guards.md`](docs/development/setup-guards.md).
+```ruby
+gem 'rails-mmd', git: 'https://github.com/AudioStakes/rails-mmd.git', require: false
+```
 
-## P0 Contract
+Run `bundle install`. The application's `Gemfile.lock` records the selected Git revision. At the application root, create `rails_mmd.yml` and replace the model names with real models in your app:
 
-The P0 implementation contract is documented in
-[`docs/p0-contract.md`](docs/p0-contract.md). Future implementation work should
-read that file instead of relying on chat history or local design attachments.
-Rails Active Record support and implementation priorities are tracked in
-[`docs/active-record-association-support.md`](docs/active-record-association-support.md).
+```yaml
+version: 1
+domains:
+  core:
+    include_models:
+      - User
+      - Post
+output:
+  directory: tmp/rails_mmd
+  format: both
+  attributes: keys
+  direction: LR
+```
 
-## Serena Setup
+Then run:
 
-Local setup for Codex and Serena MCP is documented in
-[`docs/development/serena-mcp.md`](docs/development/serena-mcp.md).
+```sh
+RAILS_ENV=development bundle exec rails-mmd generate
+```
 
-The versioned Serena project configuration is `.serena/project.yml`. Local
-overrides, logs, caches, language-server installs, and Codex user config remain
-unversioned user-local state.
+Inspect `tmp/rails_mmd/core.er.mmd` and `tmp/rails_mmd/core.class.mmd`. The selected environment must be able to boot and read its database schema. The command eager-loads the Rails application; run it only with an application and configuration you trust.
+
+The configuration selects models explicitly for each domain. Relationships are drawn between supported models selected in the same domain. To see all options, output files, diagnostics, and exit codes, read [the usage guide](docs/usage.md).
+
+## Compatibility and limits
+
+The gem declares Ruby `>= 3.3, < 4.1`. The local real-app matrix verifies Rails 7.2 on Ruby 4.0.6, and Rails 8.1 on Ruby 3.3.12 and 4.0.6. Other combinations within the Ruby range have not been verified by that matrix. The real-app matrix uses SQLite; PostgreSQL and MySQL have not been verified in a real-app run.
+
+Supported associations and current limits are listed in the [Active Record support matrix](docs/active-record-association-support.md). In particular, a domain spanning multiple database connection contexts is unsupported, as are composite keys and several association options. Check diagnostics when a diagram omits a relationship.
+
+Generated diagrams and JSON artifacts can reveal model names, table names, columns, relationships, and connection identifiers in diagnostics. Review them before committing or sharing them. For private application schemas, keep the output directory out of the application's Git repository or add it to its `.gitignore`.
+
+## Contributing and development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](docs/p0-contract.md); the [development notes](docs/development/tooling.md) cover the Rake tasks. Serena is optional local development tooling, not a runtime dependency.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
