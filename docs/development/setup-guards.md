@@ -26,9 +26,9 @@ The guard must fail if `rails-mmd generate` routes to a stub, returns success
 without valid input, writes artifacts for pre-output fatal diagnostics, or
 exposes non-P0 behavior.
 
-## Future P0 Sequence
+## P0 Implementation Sequence
 
-The future implementation sequence from `docs/p0-contract.md` is:
+The implementation was delivered in this sequence from `docs/p0-contract.md`:
 
 1. Config loader and schema validation.
 2. Rails boot and eager load.

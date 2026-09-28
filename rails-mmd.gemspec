@@ -21,6 +21,8 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir[
     'README.md',
+    'LICENSE',
+    'docs/usage.md',
     'exe/rails-mmd',
     'fixtures/schemas/diagnostics/valid/catalog.json',
     'lib/**/*.rb',
