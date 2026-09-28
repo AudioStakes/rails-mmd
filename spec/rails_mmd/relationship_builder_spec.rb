@@ -6,7 +6,7 @@ require 'rails_mmd/relationship_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable Lint/ConstantDefinitionInBlock, Metrics/ParameterLists, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
+# rubocop:disable-next Lint/ConstantDefinitionInBlock, Metrics/ParameterLists, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::RelationshipBuilder do
   it 'builds eligible belongs_to relationships with conservative cardinality evidence' do
     user_model = owner_model(belongs_to('account'))
@@ -1316,4 +1316,3 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     RailsMmd::SchemaValidator.new.valid?(:diagnostics, envelope)
   end
 end
-# rubocop:enable Lint/ConstantDefinitionInBlock, Metrics/ParameterLists, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations

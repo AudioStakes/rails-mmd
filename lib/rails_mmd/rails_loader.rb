@@ -4,7 +4,7 @@ require 'rails_mmd/diagnostic_factory'
 
 module RailsMmd
   # Boots a host Rails app and eager-loads it through explicit, testable paths.
-  # rubocop:disable Metrics/MethodLength
+  # rubocop:disable-next Metrics/MethodLength
   class RailsLoader
     Result = Struct.new(:application, :diagnostics, :exit_code, keyword_init: true) do
       def success?
@@ -91,5 +91,4 @@ module RailsMmd
       )
     end
   end
-  # rubocop:enable Metrics/MethodLength
 end

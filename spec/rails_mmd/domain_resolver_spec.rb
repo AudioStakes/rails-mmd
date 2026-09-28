@@ -6,7 +6,7 @@ require 'rails_mmd/domain_resolver'
 require 'rails_mmd/model_inventory'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::DomainResolver do
   it 'selects configured domains exactly and subtracts excludes before schema probing' do
     user = record('User')
@@ -123,4 +123,3 @@ RSpec.describe RailsMmd::DomainResolver do
     RailsMmd::SchemaValidator.new.valid?(:diagnostics, envelope)
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

@@ -6,7 +6,7 @@ require 'rails_mmd/relationship_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::IrBuilder do
   it 'normalizes selected entities and relationships into schema-valid deterministic IR' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
@@ -190,4 +190,3 @@ RSpec.describe RailsMmd::IrBuilder do
     RailsMmd::SchemaValidator.new.valid?(:ir, payload)
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

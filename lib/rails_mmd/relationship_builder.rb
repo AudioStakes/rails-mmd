@@ -5,7 +5,7 @@ require 'rails_mmd/diagnostic_factory'
 
 module RailsMmd
   # Builds selected-domain direct and through relationship records.
-  # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+  # rubocop:disable-next Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
   class RelationshipBuilder
     DomainResult = Struct.new(:domain_id, :relationships, :diagnostics, keyword_init: true)
     Relationship = Struct.new(
@@ -971,5 +971,4 @@ module RailsMmd
       "entities/#{entity.table_name}"
     end
   end
-  # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 end

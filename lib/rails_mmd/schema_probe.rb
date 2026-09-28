@@ -6,7 +6,7 @@ require 'rails_mmd/redactor'
 
 module RailsMmd
   # Reads selected-domain-only schema metadata for resolved renderable records.
-  # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
+  # rubocop:disable-next Metrics/ClassLength, Metrics/MethodLength
   class SchemaProbe
     DomainResult = Struct.new(:domain_id, :entities, :join_tables, :diagnostics, keyword_init: true)
     Entity = Struct.new(
@@ -373,5 +373,4 @@ module RailsMmd
       )
     end
   end
-  # rubocop:enable Metrics/ClassLength, Metrics/MethodLength
 end

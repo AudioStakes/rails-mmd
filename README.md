@@ -63,6 +63,8 @@ Generated diagrams and JSON artifacts can reveal model names, table names, colum
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](docs/p0-contract.md); the [development notes](docs/development/tooling.md) cover the Rake tasks. Serena is optional local development tooling, not a runtime dependency.
 
+The [P0 blocking fixture matrix](docs/p0-blocking-fixture-matrix.md) records the required verification cases.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

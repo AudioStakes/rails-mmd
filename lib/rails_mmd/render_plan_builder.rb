@@ -7,7 +7,7 @@ require 'rails_mmd/safe_token_assigner'
 
 module RailsMmd
   # Projects normalized IR into renderer-only ER or class render plans.
-  # rubocop:disable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
+  # rubocop:disable-next Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
   class RenderPlanBuilder
     DomainResult = Struct.new(:domain_id, :payload, :diagnostics, keyword_init: true)
 
@@ -189,5 +189,4 @@ module RailsMmd
       { 'primary_key' => 'PK', 'foreign_key' => 'FK' }.fetch(role)
     end
   end
-  # rubocop:enable Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
 end

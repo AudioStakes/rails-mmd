@@ -8,7 +8,7 @@ require 'rails_mmd/schema_validator'
 
 module RailsMmd
   # Loads and resolves the P0 YAML configuration contract without exposing CLI routing.
-  # rubocop:disable Metrics/ClassLength, Metrics/AbcSize, Metrics/MethodLength
+  # rubocop:disable-next Metrics/ClassLength, Metrics/AbcSize, Metrics/MethodLength
   class Config
     DEFAULT_CONFIG_PATH = 'rails_mmd.yml'
     DEFAULT_OUTPUT = {
@@ -246,5 +246,4 @@ module RailsMmd
       end
     end
   end
-  # rubocop:enable Metrics/ClassLength, Metrics/AbcSize, Metrics/MethodLength
 end

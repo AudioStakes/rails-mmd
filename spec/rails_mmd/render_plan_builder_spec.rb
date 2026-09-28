@@ -6,7 +6,7 @@ require 'rails_mmd/render_plan_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::RenderPlanBuilder do
   it 'projects IR into schema-valid ER render plans with safe tokens, markers, attributes, comments, and digest' do
     result = described_class.new.build(
@@ -281,8 +281,8 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
     result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
     attribute = result.payload.fetch('entities').find { |entity| entity.fetch('entity_id') == 'entities/users' }
-                                                .fetch('attributes')
-                                                .find { |candidate| candidate.fetch('key_marker') == 'PK' }
+                      .fetch('attributes')
+                      .find { |candidate| candidate.fetch('key_marker') == 'PK' }
 
     expect(attribute.fetch('label')).to eq('X')
     expect(attribute.fetch('safe_token')).not_to include('USERS', 'ALICE', 'ABC123')
@@ -296,8 +296,8 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
 
     result = described_class.new.build(ir: ir, artifact_kind: 'er', direction: 'LR')
     attribute = result.payload.fetch('entities').find { |entity| entity.fetch('entity_id') == 'entities/users' }
-                                                .fetch('attributes')
-                                                .find { |candidate| candidate.fetch('key_marker') == 'PK' }
+                      .fetch('attributes')
+                      .find { |candidate| candidate.fetch('key_marker') == 'PK' }
     relationship = result.payload.fetch('relationships').first
 
     expect(attribute.fetch('label')).to eq('X')
@@ -408,4 +408,3 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     RailsMmd::SchemaValidator.new.valid?(:render_plan, payload)
   end
 end
-# rubocop:enable Metrics/MethodLength, RSpec/ExampleLength, RSpec/MultipleExpectations

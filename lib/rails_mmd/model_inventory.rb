@@ -6,7 +6,7 @@ require 'rails_mmd/redactor'
 
 module RailsMmd
   # Builds schema-free ActiveRecord model inventory records.
-  # rubocop:disable Metrics/ClassLength, Metrics/MethodLength
+  # rubocop:disable-next Metrics/ClassLength, Metrics/MethodLength
   class ModelInventory
     Record = Struct.new(
       :ruby_constant,
@@ -141,5 +141,4 @@ module RailsMmd
       sanitize_context_value(context_value)
     end
   end
-  # rubocop:enable Metrics/ClassLength, Metrics/MethodLength
 end

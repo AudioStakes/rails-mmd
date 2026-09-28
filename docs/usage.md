@@ -61,12 +61,12 @@ The artifacts include application schema information and can include connection 
 
 | Exit | Meaning |
 |---:|---|
-| 0 | Success, including warning diagnostics when `--fail-on-warning` is absent |
-| 1 | Warning diagnostics were present and `--fail-on-warning` was set |
-| 2 | Config, output setup, Rails boot, domain, or schema probe error |
+| 0 | success, including warning diagnostics when `--fail-on-warning` is absent |
+| 1 | warning diagnostics were present and `--fail-on-warning` was set |
+| 2 | config, output setup, Rails boot, domain, or schema probe error |
 | 3 | Mermaid serialization failure or unresolved safe-token collision |
-| 4 | Output write or atomic publish failure |
-| 99 | Internal error |
+| 4 | output write or atomic publish failure |
+| 99 | internal error |
 
 If the command reports a Rails load failure, check that you ran it from the application's root, in its bundle, and that the selected Rails environment can boot. If a model is missing, check its constant name and whether it was loaded by Rails. Domain and association limits are described in the [support matrix](active-record-association-support.md).
 

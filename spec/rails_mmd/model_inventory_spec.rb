@@ -2,7 +2,7 @@
 
 require 'rails_mmd/model_inventory'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::ModelInventory do
   it 'inventories only named descendants whose constants resolve to the same class' do
     user = fake_model('User')
@@ -274,7 +274,7 @@ RSpec.describe RailsMmd::ModelInventory do
     )
   end
 
-  # rubocop:disable Metrics/ParameterLists
+  # rubocop:disable-next Metrics/ParameterLists
   def fake_model(name, table_name: default_table_name(name), base_class: nil, abstract: false,
                  connection_context: { name: 'primary' }, connection_error: nil, table_error: nil)
     model = Class.new
@@ -285,7 +285,6 @@ RSpec.describe RailsMmd::ModelInventory do
     define_table_name(model, table_name, table_error)
     model
   end
-  # rubocop:enable Metrics/ParameterLists
 
   def define_connection_context(model, connection_context, connection_error)
     model.define_singleton_method(:connection_context) do
@@ -318,4 +317,3 @@ RSpec.describe RailsMmd::ModelInventory do
     "#{name.downcase}s"
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

@@ -6,7 +6,7 @@ require 'rails_mmd/canonical_json'
 require 'rails_mmd/config'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::Config do
   around do |example|
     Dir.mktmpdir do |root|
@@ -352,4 +352,3 @@ RSpec.describe RailsMmd::Config do
     load_config.success?
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations

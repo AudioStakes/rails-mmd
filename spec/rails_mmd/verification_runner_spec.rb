@@ -5,7 +5,7 @@ require 'stringio'
 require 'tmpdir'
 require 'yaml'
 
-# rubocop:disable Lint/ConstantDefinitionInBlock, Metrics/MethodLength, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
+# rubocop:disable-next Lint/ConstantDefinitionInBlock, Metrics/MethodLength, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::VerificationRunner do
   Status = Struct.new(:success?)
 
@@ -286,4 +286,3 @@ RSpec.describe RailsMmd::VerificationRunner do
     system!('git', 'add', 'example.rb')
   end
 end
-# rubocop:enable Lint/ConstantDefinitionInBlock, Metrics/MethodLength, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations

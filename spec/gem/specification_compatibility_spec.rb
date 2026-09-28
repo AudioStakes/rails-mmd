@@ -7,8 +7,11 @@ RSpec.describe Gem::Specification do
     expect(specification.required_ruby_version).to eq(Gem::Requirement.new('>= 3.3', '< 4.1'))
   end
 
-  it 'packages the license and user guide with the gem' do
+  it 'declares the MIT license' do
     expect(specification.license).to eq('MIT')
+  end
+
+  it 'packages the license and user guide with the gem' do
     expect(specification.files).to include('LICENSE', 'README.md', 'docs/usage.md')
   end
 

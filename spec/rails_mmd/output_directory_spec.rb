@@ -4,7 +4,7 @@ require 'fileutils'
 require 'tmpdir'
 require 'rails_mmd/output_directory'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::OutputDirectory do
   around do |example|
     Dir.mktmpdir do |root|
@@ -161,4 +161,3 @@ RSpec.describe RailsMmd::OutputDirectory do
     end
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
