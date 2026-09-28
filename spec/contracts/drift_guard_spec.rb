@@ -5,7 +5,7 @@ require 'json'
 require 'rails_mmd/cli'
 require 'yaml'
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable-next RSpec/DescribeClass
 RSpec.describe 'repository drift guards' do
   def allowed_node_typescript_files
     []
@@ -273,4 +273,3 @@ RSpec.describe 'repository drift guards' do
     text.scan(/#(\d+)\b/).flatten.map(&:to_i).grep(1..6).uniq.sort
   end
 end
-# rubocop:enable RSpec/DescribeClass

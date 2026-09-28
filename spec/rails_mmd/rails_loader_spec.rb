@@ -5,7 +5,7 @@ require 'rails_mmd/canonical_json'
 require 'rails_mmd/rails_loader'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::RailsLoader do
   around do |example|
     Dir.mktmpdir do |root|
@@ -210,4 +210,3 @@ RSpec.describe RailsMmd::RailsLoader do
     expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, envelope)).to be(true)
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations

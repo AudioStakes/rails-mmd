@@ -6,7 +6,7 @@ require 'json'
 require 'open3'
 require 'tmpdir'
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable-next RSpec/DescribeClass
 RSpec.describe 'the Rails compatibility matrix Rake command' do
   let(:invalid_artifact_asdf) do
     <<~'SH'
@@ -281,4 +281,3 @@ RSpec.describe 'the Rails compatibility matrix Rake command' do
     expect(rake_prerequisites).to match(/rake default\n(?: {4}.+\n)* {4}verify:rails_matrix/)
   end
 end
-# rubocop:enable RSpec/DescribeClass

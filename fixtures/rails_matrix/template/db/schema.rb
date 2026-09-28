@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# rubocop:disable Metrics/BlockLength
+# rubocop:disable-next Metrics/BlockLength
 ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
   create_table 'authors', force: :cascade do |t|
     t.string 'name', null: false
@@ -101,4 +101,3 @@ ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
     t.integer 'manager_id'
   end
 end
-# rubocop:enable Metrics/BlockLength

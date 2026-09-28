@@ -5,7 +5,7 @@ require 'uri'
 
 module RailsMmd
   # Sanitizes free-form text before it can leave the process.
-  # rubocop:disable Metrics/ClassLength
+  # rubocop:disable-next Metrics/ClassLength
   class Redactor
     SECRET_KEY_PATTERN = /
       (?:password|passwd|secret|api[_-]?key|credential|database_url|(?:access|auth|refresh)[_-]?token)
@@ -130,5 +130,4 @@ module RailsMmd
       '[REDACTED_PATH]'
     end
   end
-  # rubocop:enable Metrics/ClassLength
 end

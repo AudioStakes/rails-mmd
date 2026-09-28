@@ -7,7 +7,7 @@ require 'rails_mmd/redactor'
 require 'rails_mmd/safe_token_assigner'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe 'runtime primitives' do
   describe RailsMmd::CanonicalJson do
     it 'canonicalizes object keys and computes lowercase SHA-256 digests' do
@@ -487,4 +487,3 @@ RSpec.describe 'runtime primitives' do
     }
   end
 end
-# rubocop:enable RSpec/DescribeClass, RSpec/ExampleLength, RSpec/MultipleExpectations

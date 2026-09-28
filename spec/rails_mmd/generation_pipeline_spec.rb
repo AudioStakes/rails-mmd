@@ -3,7 +3,7 @@
 require 'rails_mmd/config'
 require 'rails_mmd/generation_pipeline'
 
-# rubocop:disable Lint/ConstantDefinitionInBlock, Naming/MethodParameterName, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
+# rubocop:disable-next Lint/ConstantDefinitionInBlock, Naming/MethodParameterName, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::GenerationPipeline do
   StageResult = Struct.new(:payload, :diagnostics)
   SerializationResult = Struct.new(:text, :diagnostics)
@@ -102,4 +102,3 @@ RSpec.describe RailsMmd::GenerationPipeline do
     ).fetch('diagnostics')
   end
 end
-# rubocop:enable Lint/ConstantDefinitionInBlock, Naming/MethodParameterName, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations

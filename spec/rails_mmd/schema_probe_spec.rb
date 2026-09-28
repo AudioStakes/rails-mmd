@@ -7,7 +7,7 @@ require 'rails_mmd/relationship_builder'
 require 'rails_mmd/schema_probe'
 require 'rails_mmd/schema_validator'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::SchemaProbe do
   it 'reads table, column, primary-key, foreign-key, and unique-index metadata for selected entities only' do
     user = model(
@@ -578,4 +578,3 @@ RSpec.describe RailsMmd::SchemaProbe do
     RailsMmd::SchemaValidator.new.valid?(:diagnostics, envelope)
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

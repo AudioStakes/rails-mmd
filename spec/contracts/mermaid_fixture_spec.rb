@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable-next RSpec/DescribeClass
 RSpec.describe 'P0 Mermaid golden fixtures' do
   def fixture_root
     Pathname(__dir__).join('../../fixtures/mermaid').expand_path
@@ -86,4 +86,3 @@ RSpec.describe 'P0 Mermaid golden fixtures' do
     MMD
   end
 end
-# rubocop:enable RSpec/DescribeClass

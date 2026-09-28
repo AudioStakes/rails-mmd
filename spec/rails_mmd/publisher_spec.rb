@@ -4,7 +4,7 @@ require 'json'
 require 'tmpdir'
 require 'rails_mmd/publisher'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::Publisher do
   around do |example|
     Dir.mktmpdir do |root|
@@ -360,4 +360,3 @@ RSpec.describe RailsMmd::Publisher do
     Pathname("fixtures/mermaid/#{name}").read
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/MultipleExpectations

@@ -1,8 +1,8 @@
 # Repository Instructions
 
 This repository is a standalone Ruby CLI/gem project named `rails-mmd`.
-The intended product is a Ruby command-line tool that generates Mermaid diagrams
-from Rails/ActiveRecord applications. Runtime implementation is not present yet.
+The product is a Ruby command-line tool that generates Mermaid diagrams
+from Rails/ActiveRecord applications. The P0 runtime and selected P1 association support are implemented.
 
 ## Project Model
 

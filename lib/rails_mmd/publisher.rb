@@ -7,7 +7,7 @@ require 'rails_mmd/schema_validator'
 
 module RailsMmd
   # Atomically publishes diagnostics, render plans, and Mermaid artifacts.
-  # rubocop:disable Metrics/ClassLength
+  # rubocop:disable-next Metrics/ClassLength
   class Publisher
     Result = Struct.new(:success, :diagnostics, :written_paths, :stderr, keyword_init: true) do
       def success?
@@ -160,5 +160,4 @@ module RailsMmd
       )
     end
   end
-  # rubocop:enable Metrics/ClassLength
 end

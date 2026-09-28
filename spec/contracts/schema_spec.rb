@@ -3,7 +3,7 @@
 require 'json'
 require 'json_schemer'
 
-# rubocop:disable RSpec/DescribeClass
+# rubocop:disable-next RSpec/DescribeClass
 RSpec.describe 'P0 contract schemas' do
   def schema_root
     Pathname(__dir__).join('../../schemas').expand_path
@@ -276,4 +276,3 @@ RSpec.describe 'P0 contract schemas' do
     schema_json.fetch('$defs').fetch('diagnostic_code').fetch('enum')
   end
 end
-# rubocop:enable RSpec/DescribeClass

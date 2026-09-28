@@ -2,7 +2,7 @@
 
 require 'rails_mmd/constant_resolver'
 
-# rubocop:disable RSpec/ExampleLength, RSpec/MultipleExpectations
+# rubocop:disable-next RSpec/ExampleLength, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::ConstantResolver do
   it 'resolves nested constants without inheriting constants from ancestors' do
     namespace = Module.new
@@ -67,4 +67,3 @@ RSpec.describe RailsMmd::ConstantResolver do
       .to raise_error(ArgumentError, 'constant resolver must respond to resolve or call')
   end
 end
-# rubocop:enable RSpec/ExampleLength, RSpec/MultipleExpectations

@@ -3,7 +3,7 @@
 require 'rails_mmd/generate_command'
 require 'tmpdir'
 
-# rubocop:disable Lint/ConstantDefinitionInBlock, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
+# rubocop:disable-next Lint/ConstantDefinitionInBlock, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::GenerateCommand do
   LoaderResult = Struct.new(:success?, :application, :diagnostics, :exit_code)
 
@@ -241,4 +241,3 @@ RSpec.describe RailsMmd::GenerateCommand do
     YAML
   end
 end
-# rubocop:enable Lint/ConstantDefinitionInBlock, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations

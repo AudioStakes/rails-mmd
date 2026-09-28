@@ -6,7 +6,7 @@ require 'tmpdir'
 
 module RailsMmd
   # Validates and resolves project-root-relative output directories.
-  # rubocop:disable Metrics/ClassLength
+  # rubocop:disable-next Metrics/ClassLength
   class OutputDirectory
     Resolution = Struct.new(:path, :relative_path, :reason, keyword_init: true) do
       def valid?
@@ -188,5 +188,4 @@ module RailsMmd
       Resolution.new(reason: reason)
     end
   end
-  # rubocop:enable Metrics/ClassLength
 end
