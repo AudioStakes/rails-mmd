@@ -53,7 +53,7 @@ The configuration selects models explicitly for each domain. Relationships are d
 
 ## Compatibility and limits
 
-The gem declares Ruby `>= 3.3, < 4.1`. The local real-app matrix verifies Rails 7.2 on Ruby 4.0.6, and Rails 8.1 on Ruby 3.3.12 and 4.0.6. Other combinations within the Ruby range have not been verified by that matrix.
+The gem declares Ruby `>= 3.3, < 4.1`. The local real-app matrix verifies Rails 7.2 on Ruby 4.0.6, and Rails 8.1 on Ruby 3.3.12 and 4.0.6. Other combinations within the Ruby range have not been verified by that matrix. The real-app matrix uses SQLite; PostgreSQL and MySQL have not been verified in a real-app run.
 
 Supported associations and current limits are listed in the [Active Record support matrix](docs/active-record-association-support.md). In particular, a domain spanning multiple database connection contexts is unsupported, as are composite keys and several association options. Check diagnostics when a diagram omits a relationship.
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve rails-mmd. Please open an issue with a small reproduction before proposing a change to an output contract or a new association type. Include the Ruby and Rails versions, the relevant model declarations and schema, the command, expected output, and actual output. Remove credentials and private application details from reports and generated artifacts.
+Thanks for helping improve rails-mmd. Please open an issue with a small reproduction before proposing a change to an output contract or a new association type. Include the Ruby and Rails versions, the database adapter, the relevant model declarations and schema, the command, expected output, and actual output. Remove credentials and private application details from reports and generated artifacts.
 
 ## Local setup
 
