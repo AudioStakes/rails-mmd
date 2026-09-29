@@ -21,9 +21,12 @@ namespace :rubocop do
 end
 
 namespace :bundle do
-  desc 'Audit Gemfile.lock for vulnerable dependencies and insecure sources'
+  desc 'Audit root and Rails fixture lockfiles for vulnerable dependencies and insecure sources'
   task :audit do
-    sh(*RailsMmd::ToolingTasks::BUNDLE_AUDIT_COMMAND)
+    lockfiles = ['Gemfile.lock', *Dir.glob('fixtures/rails_matrix/bundles/*/Gemfile.lock')]
+    lockfiles.each do |lockfile|
+      sh(*RailsMmd::ToolingTasks::BUNDLE_AUDIT_COMMAND, '--gemfile-lock', lockfile)
+    end
   end
 
   namespace :audit do

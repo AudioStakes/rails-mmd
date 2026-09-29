@@ -16,6 +16,15 @@ RSpec.describe RailsMmd::OutputDirectory do
   let(:project_root) { @project_root }
   let(:output_directory) { described_class.new(project_root: project_root) }
 
+  it 'publishes into a root-contained name beginning with two dots' do
+    result = output_directory.resolve('..diagrams')
+
+    output_directory.publish!(result, selected_domain_ids: ['core']) { { 'core.er.mmd' => 'new mermaid' } }
+
+    expect(project_root.join('..diagrams/core.er.mmd').read).to eq('new mermaid')
+    expect(output_directory.resolve('..diagrams')).to be_valid
+  end
+
   it 'reconciles only the selected managed publication set' do
     output = project_root.join('out')
     output.mkpath

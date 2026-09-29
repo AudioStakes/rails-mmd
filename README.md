@@ -1,6 +1,6 @@
 # rails-mmd
 
-Generate Mermaid ER and class diagrams from the models and database schema of a Rails application. `rails-mmd` runs in the application's bundle, loads its models, and writes local `.mmd` files that you can preview in a Mermaid-compatible Markdown viewer.
+Generate Mermaid ER and class diagrams from the models and database schema of a Rails application. `rails-mmd` runs in the application's bundle, loads its models, and writes local `.mmd` source files. Preview them with a Mermaid viewer or embed their contents in a Markdown `mermaid` code block.
 
 ```mermaid
 erDiagram
@@ -18,6 +18,8 @@ erDiagram
 The diagram above is illustrative. The actual output depends on your models, associations, and database metadata.
 
 ## Try it in a Rails app
+
+You need an existing Rails application with Active Record models and a prepared database. Check the [tested Ruby/Rails combinations](#compatibility-and-limits) below before installing. All commands in this section run from that application's root, not this repository.
 
 In the **target Rails application's** `Gemfile`, install this repository directly from GitHub:
 
@@ -47,7 +49,7 @@ Then run:
 RAILS_ENV=development bundle exec rails-mmd generate
 ```
 
-Inspect `tmp/rails_mmd/core.er.mmd` and `tmp/rails_mmd/core.class.mmd`. The selected environment must be able to boot and read its database schema. The command eager-loads the Rails application; run it only with an application and configuration you trust.
+Inspect `tmp/rails_mmd/core.er.mmd` and `tmp/rails_mmd/core.class.mmd`. A successful run can be silent; these generated files are the result. To view the diagrams, follow [Viewing a generated diagram](docs/usage.md#viewing-a-generated-diagram). The selected environment must be able to boot and read its database schema. The command eager-loads the Rails application; run it only with an application and configuration you trust.
 
 The configuration selects models explicitly for each domain. Relationships are drawn between supported models selected in the same domain. To see all options, output files, diagnostics, and exit codes, read [the usage guide](docs/usage.md).
 
@@ -57,13 +59,13 @@ The gem declares Ruby `>= 3.3, < 4.1`. The local real-app matrix verifies Rails 
 
 Supported associations and current limits are listed in the [Active Record support matrix](docs/active-record-association-support.md). In particular, a domain spanning multiple database connection contexts is unsupported, as are composite keys and several association options. Check diagnostics when a diagram omits a relationship.
 
-Generated diagrams and JSON artifacts can reveal model names, table names, columns, relationships, and connection identifiers in diagnostics. Review them before committing or sharing them. For private application schemas, keep the output directory out of the application's Git repository or add it to its `.gitignore`.
+Generated diagrams and JSON artifacts can reveal model names, table names, columns, relationships, and connection identifiers in diagnostics. Review them before committing or sharing them. Output must stay inside the application's root; for private schemas, add the output directory to the application's `.gitignore` (for this example, `/tmp/rails_mmd/`).
 
 ## Contributing and development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](docs/p0-contract.md); the [development notes](docs/development/tooling.md) cover the Rake tasks. Serena is optional local development tooling, not a runtime dependency.
+See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. These contributor resources are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.
 
-The [P0 blocking fixture matrix](docs/p0-blocking-fixture-matrix.md) records the required verification cases.
+The [P0 blocking fixture matrix](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-blocking-fixture-matrix.md) records the required verification cases.
 
 ## License
 

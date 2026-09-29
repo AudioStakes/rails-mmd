@@ -11,8 +11,10 @@ RSpec.describe Gem::Specification do
     expect(specification.license).to eq('MIT')
   end
 
-  it 'packages the license and user guide with the gem' do
-    expect(specification.files).to include('LICENSE', 'README.md', 'docs/usage.md')
+  it 'packages the license and user guides with the gem' do
+    expect(specification.files).to include(
+      'LICENSE', 'README.md', 'docs/usage.md', 'docs/active-record-association-support.md'
+    )
   end
 
   it 'does not force the target Rails application to use a specific Active Support series' do

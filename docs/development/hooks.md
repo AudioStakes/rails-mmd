@@ -46,8 +46,11 @@ restaging.
 The `pre-push` hook runs the CI-equivalent default Rake task:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook run pre-push
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook run pre-push --force
 ```
+
+Use `--force` for manual verification so the hook executes even when there are
+no commits to push. A manual invocation without it can be skipped by Lefthook.
 
 Hosted GitHub Actions CI is intentionally disabled. Treat local `pre-push`
 output as the final CI-equivalent evidence path for PR readiness.

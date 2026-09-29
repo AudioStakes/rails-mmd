@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
     'README.md',
     'LICENSE',
     'docs/usage.md',
+    'docs/active-record-association-support.md',
     'exe/rails-mmd',
     'fixtures/schemas/diagnostics/valid/catalog.json',
     'lib/**/*.rb',

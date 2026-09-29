@@ -104,6 +104,29 @@ RSpec.describe RailsMmd::CLI do
   end
 
   describe 'generate' do
+    %w[config output-dir domain format].each do |option|
+      it "rejects --#{option} without a value before generation" do
+        generator = stub_generator
+
+        expect_rejected_arguments(["--#{option}"], generator)
+      end
+    end
+
+    it 'accepts an explicit output directory matching the option name' do
+      generator = stub_generator
+
+      expect { described_class.start(%w[generate --output-dir output_dir]) }.to raise_error(SystemExit)
+      expect_generator_output_directory(generator)
+    end
+
+    [%w[--fomat er], %w[unexpected], %w[--fail-on-warning=treu]].each do |arguments|
+      it "rejects invalid arguments #{arguments.inspect} before generation" do
+        generator = stub_generator
+
+        expect_rejected_arguments(arguments, generator)
+      end
+    end
+
     it 'prints P0 options in command help' do
       stdout, stderr, status = run_cli('generate', '--help')
 
@@ -115,6 +138,24 @@ RSpec.describe RailsMmd::CLI do
 
       expect_config_not_found(stdout, stderr, status)
     end
+  end
+
+  def expect_rejected_arguments(arguments, generator)
+    aggregate_failures do
+      expect do
+        expect { described_class.start(['generate', *arguments]) }.to raise_error(SystemExit) do |error|
+          expect(error).to have_attributes(status: 1)
+        end
+      end.to output(/Unknown switches|Unexpected arguments|must be true or false|No value provided/).to_stderr
+      expect(generator).not_to have_received(:run)
+    end
+  end
+
+  def expect_generator_output_directory(generator)
+    expect(generator).to have_received(:run).with(
+      cli_options: have_attributes(output_dir: 'output_dir'),
+      fail_on_warning: false
+    )
   end
 
   def expect_generate_help(stdout, stderr, status)

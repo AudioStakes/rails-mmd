@@ -41,6 +41,32 @@ RSpec.describe Rake::Task do
     expect(RailsMmd::ToolingTasks::BUNDLE_AUDIT_COMMAND).to eq(%w[bundle exec bundler-audit check --no-update])
   end
 
+  describe 'bundle:audit' do
+    let(:task) { described_class['bundle:audit'] }
+    let(:command_runner) { task.actions.first.binding.receiver }
+    let(:audit_command) { RailsMmd::ToolingTasks::BUNDLE_AUDIT_COMMAND }
+    let(:lockfiles) do
+      %w[Gemfile.lock fixtures/rails_matrix/bundles/7.2/Gemfile.lock
+         fixtures/rails_matrix/bundles/8.1/Gemfile.lock]
+    end
+
+    before { allow(command_runner).to receive(:sh) }
+
+    it 'audits the root and every Rails fixture lockfile' do
+      task.invoke
+      lockfiles.each do |lockfile|
+        expect(command_runner).to have_received(:sh).with(*audit_command, '--gemfile-lock', lockfile).ordered
+      end
+    end
+
+    it 'fails when a Rails fixture audit fails' do
+      allow(command_runner).to receive(:sh)
+        .with(*audit_command, '--gemfile-lock', lockfiles[1]).and_raise(RuntimeError, 'fixture audit failed')
+
+      expect { task.invoke }.to raise_error(RuntimeError, 'fixture audit failed')
+    end
+  end
+
   it 'defines explicit advisory data refresh' do
     expect(described_class.task_defined?('bundle:audit:update')).to be(true)
   end
