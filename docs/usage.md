@@ -41,6 +41,37 @@ output:
 
 Replace `User` with a named Active Record model in your app. `include_models` is required and must be nonempty. A model must be loaded and have usable table metadata. The command does not search for models automatically or install Mermaid CLI.
 
+## Configuration reference
+
+Unknown keys are rejected. The [configuration schema](../schemas/config.schema.json) is the machine-readable reference.
+
+| Key | Default | Allowed values / meaning |
+|---|---|---|
+| `version` | Required | Integer `1` |
+| `domains` | Required | One or more named model groups |
+| `domains.<id>.include_models` | Required | Nonempty list of exact Ruby constant names, such as `User` or `Billing::Invoice` |
+| `domains.<id>.exclude_models` | `[]` | Exact model names to remove from that domain's included set |
+| `output.directory` | `docs/rails_mmd` | Relative path inside the application root |
+| `output.format` | `both` | `er`, `class`, or `both` |
+| `output.attributes` | `keys` | `keys` shows primary and foreign keys; `none` hides attributes |
+| `output.direction` | `LR` | `LR` left to right, `RL` right to left, `TB` top to bottom, `BT` bottom to top |
+
+Domain IDs use lowercase letters and digits, start with a letter, and may contain single underscores between nonempty segments: `core` and `billing_v2` are valid; `Core`, `billing-v2`, and `billing__v2` are not. Model names are case-sensitive; wildcards and regular expressions are not supported. Each domain renders independently. Include both endpoints of a relationship in the same domain to display it.
+
+CLI values for `--output-dir` and `--format` override their YAML equivalents. `--domain` selects one configured domain; omitting it renders all domains. `attributes` and `direction` are YAML settings only.
+
+## Viewing a generated diagram
+
+The `.mmd` files contain Mermaid source, not an image or an HTML page. Open them in a local viewer with Mermaid support, or copy the contents of one file into a Markdown file between these fences:
+
+````markdown
+```mermaid
+<paste the contents of core.er.mmd here, replacing this line>
+```
+````
+
+Open that Markdown file in a viewer that renders Mermaid code blocks. An ordinary text editor displays the source only. The illustrative diagram in the [README](../README.md) demonstrates this embedding. Keep private application diagrams in a local viewer; copying them to a hosted editor shares their schema content with that service.
+
 ## Artifacts
 
 Successful domains can publish:
@@ -68,6 +99,23 @@ The artifacts include application schema information and can include connection 
 | 4 | output write or atomic publish failure |
 | 99 | internal error |
 
+CLI argument errors also return exit `1` before generation starts. These include unknown options, unexpected positional arguments, missing option values, and invalid boolean values. Check stderr for the argument error.
+
 If the command reports a Rails load failure, check that you ran it from the application's root, in its bundle, and that the selected Rails environment can boot. If a model is missing, check its constant name and whether it was loaded by Rails. Domain and association limits are described in the [support matrix](active-record-association-support.md).
+
+## Troubleshooting
+
+Start with `bundle exec rails-mmd generate --help` to verify that the executable is available in the application's bundle. After generation, inspect `<domain>.diagnostics.json` in the output directory, along with stderr. A warning can omit an unsupported relationship while still returning exit `0`; use `--fail-on-warning` when omissions should fail a check.
+
+| Symptom | What to check |
+|---|---|
+| Bundler cannot find `rails-mmd` | Add the gem to the target application's Gemfile and run `bundle install` there. |
+| Unknown option, unexpected argument, or invalid boolean | Compare the command with `bundle exec rails-mmd generate --help`. Pass model names through YAML, not positional arguments. Use `--fail-on-warning` as a flag, or set it explicitly to `true` or `false`. |
+| Configuration file not found or invalid | Create `rails_mmd.yml` in the application root; compare keys and values with the configuration reference above. |
+| Rails boot or database metadata error | Use the application's usual setup instructions to prepare its dependencies, environment, and database. Run `RAILS_ENV=development bundle exec rails runner 'puts Rails.env'` to isolate boot failures. |
+| Model not found | Use its full constant name, including namespace, and ensure Rails eager loading can load it. |
+| Expected relationship is missing | Include both models in the same domain, inspect warning diagnostics, and check the support matrix for unsupported options. |
+| Output directory rejected | Use an application-root-relative path such as `tmp/rails_mmd`; paths escaping the root are rejected. |
+| Diagram appears as text | Use a Mermaid-capable viewer or the Markdown embedding instructions above. |
 
 `rails-mmd generate` does not invoke Mermaid CLI or any hosted service.

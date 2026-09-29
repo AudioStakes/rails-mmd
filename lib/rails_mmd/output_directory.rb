@@ -77,7 +77,7 @@ module RailsMmd
     def inside_project_root?(absolute_path)
       existing = closest_existing_path(absolute_path)
       relative = existing.realpath.relative_path_from(project_root_real).to_s
-      relative == '.' || !relative.start_with?('..')
+      relative != '..' && !relative.start_with?('../')
     rescue Errno::ENOENT
       false
     end
@@ -181,7 +181,7 @@ module RailsMmd
 
     def ensure_inside_project_root!(path)
       relative = path.realpath.relative_path_from(project_root_real).to_s
-      raise ArgumentError, 'output path escapes project root' if relative.start_with?('..')
+      raise ArgumentError, 'output path escapes project root' if relative == '..' || relative.start_with?('../')
     end
 
     def invalid_resolution(reason)

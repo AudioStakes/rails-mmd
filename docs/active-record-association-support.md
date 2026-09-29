@@ -32,6 +32,6 @@ The supported baseline covers non-polymorphic, unscoped, scalar direct `belongs_
 
 ## References
 
-- [P0 contract](p0-contract.md)
+- [P0 contract](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md)
 - [Relationship builder](../lib/rails_mmd/relationship_builder.rb) and [render plan builder](../lib/rails_mmd/render_plan_builder.rb)
 - [Rails Association Basics](https://guides.rubyonrails.org/association_basics.html), [Rails 7.2 API](https://api.rubyonrails.org/v7.2/classes/ActiveRecord/Associations/ClassMethods.html), [Rails 8.1 API](https://api.rubyonrails.org/v8.1/classes/ActiveRecord/Associations/ClassMethods.html)

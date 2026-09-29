@@ -22,9 +22,14 @@ version declarations.
 
 | Rails | Ruby | Signal |
 |---:|---:|---|
-| 7.2.3.1 | 4.0.6 | oldest Rails with newest Ruby |
-| 8.1.3 | 3.3.12 | newest Rails with oldest Ruby |
-| 8.1.3 | 4.0.6 | current baseline |
+| 7.2.3.2 | 4.0.6 | oldest Rails with newest Ruby |
+| 8.1.3.1 | 3.3.12 | newest Rails with oldest Ruby |
+| 8.1.3.1 | 4.0.6 | current baseline |
+
+The Rails patches above were refreshed during the public-readiness security
+review. Earlier research and implementation records retain the versions used
+for their original evidence. The per-series Gemfiles and lockfiles remain the
+source of truth for the current exact dependency versions.
 
 This is an executable rails-mmd support boundary, not an upstream guarantee that
 all future Ruby patches work. Intermediate Ruby 3.4 is inside the tested bounds

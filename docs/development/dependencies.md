@@ -19,3 +19,13 @@ are listed in the [README](../../README.md).
 - `simplecov`, `undercover`
 - `rubocop`, `rubocop-rspec`, `rubocop-rake`, `rubocop-performance`, `rubocop-packaging`
 - `bundler-audit`, `lefthook`
+
+## Dependency auditing
+
+`bundle exec rake bundle:audit` checks both the root `Gemfile.lock` and every
+`fixtures/rails_matrix/bundles/*/Gemfile.lock`. A vulnerable fixture dependency
+fails the task and the default pre-push gate, even when the root bundle passes.
+The audit runs from the root bundle and does not need the fixture applications
+to boot. It reads the existing advisory database without updating it; refresh
+that database explicitly with `bundle exec rake bundle:audit:update` before
+checking newly published advisories.

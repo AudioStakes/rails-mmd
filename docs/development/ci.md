@@ -6,8 +6,11 @@ add tracked `.github/workflows/*.yml` or `.github/workflows/*.yaml` files.
 The local Lefthook `pre-push` hook is the CI-equivalent verification gate:
 
 ```sh
-ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook run pre-push
+ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook run pre-push --force
 ```
+
+For manual verification, `--force` runs the gate even when there are no commits
+to push; without it Lefthook can skip the run.
 
 `pre-push` runs the default Rake verification contract:
 
