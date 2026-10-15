@@ -14,7 +14,11 @@ module RailsMmd
 
     def undercover_compare_ref(default_ref)
       env_ref = ENV.fetch('UNDERCOVER_COMPARE', nil)
-      return env_ref if env_ref && git_ref?(env_ref)
+      unless env_ref.nil?
+        abort "UNDERCOVER_COMPARE does not resolve to a commit: #{env_ref.inspect}" unless git_ref?(env_ref)
+
+        return env_ref
+      end
 
       [default_ref, 'origin/main', 'main', 'HEAD^'].find { |ref| git_ref?(ref) }
     end

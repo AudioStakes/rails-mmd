@@ -153,7 +153,7 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     )
     text = result.payload.fetch('comments').first.fetch('text')
 
-    expect(text).to eq('[REDACTED] [REDACTED_PATH]')
+    expect(text).to eq('[REDACTED]')
     expect(text).not_to include('supersecret', 'hidden', 'pri', 'vate')
     expect(schema_valid_render_plan?(result.payload)).to be(true)
   end

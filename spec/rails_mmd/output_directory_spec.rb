@@ -122,6 +122,7 @@ RSpec.describe RailsMmd::OutputDirectory do
     end.to raise_error(Errno::EACCES)
     expect(output.join('core.er.mmd').read).to eq('old mermaid')
     expect(output.join('core.er.render_plan.json').read).to eq('old plan')
+    expect(output.children.map { |path| path.basename.to_s }).not_to include(a_string_starting_with('.rails-mmd-'))
   end
 
   it 'rolls back the managed set when replacement fails mid-publication' do
@@ -144,6 +145,40 @@ RSpec.describe RailsMmd::OutputDirectory do
     end.to raise_error(Errno::EACCES)
     expect(output.join('core.er.mmd').read).to eq('old mermaid')
     expect(output.join('core.er.render_plan.json').read).to eq('old plan')
+    expect(output.children.map { |path| path.basename.to_s }).not_to include(a_string_starting_with('.rails-mmd-'))
+  end
+
+  it 'retains recoverable originals inside the output directory when rollback also fails' do
+    output = project_root.join('out')
+    output.mkpath
+    output.join('core.er.mmd').write('old mermaid')
+    output.join('core.er.render_plan.json').write('old plan')
+    fail_replacement_and_rollback_moves
+
+    expect do
+      output_directory.publish!(output_directory.resolve('out'), selected_domain_ids: ['core']) do
+        {
+          'core.er.mmd' => 'new mermaid',
+          'core.er.render_plan.json' => 'new plan'
+        }
+      end
+    end.to raise_error(Errno::EACCES)
+
+    backups = output.children.select { |path| path.basename.to_s.start_with?('.rails-mmd-backup-') }
+    expect(backups.length).to eq(1)
+    expect(backups.first.stat.mode & 0o077).to eq(0)
+    expect(backups.first.join('core.er.mmd').read).to eq('old mermaid')
+    expect(backups.first.join('core.er.render_plan.json').read).to eq('old plan')
+
+    allow(FileUtils).to receive(:mv).and_call_original
+    output_directory.publish!(output_directory.resolve('out'), selected_domain_ids: ['core']) do
+      { 'core.er.mmd' => 'retried mermaid' }
+    end
+
+    expect(output.join('core.er.mmd').read).to eq('retried mermaid')
+    expect(backups.first.join('core.er.mmd').read).to eq('old mermaid')
+    expect(backups.first.join('core.er.render_plan.json').read).to eq('old plan')
+    expect(output.children.select { |path| path.basename.to_s.start_with?('.rails-mmd-') }).to eq(backups)
   end
 
   def fail_render_plan_move_once
@@ -151,6 +186,16 @@ RSpec.describe RailsMmd::OutputDirectory do
     allow(FileUtils).to receive(:mv).and_wrap_original do |method, source, target|
       if !failed && target.end_with?('/out/core.er.render_plan.json')
         failed = true
+        raise Errno::EACCES, source
+      end
+
+      method.call(source, target)
+    end
+  end
+
+  def fail_replacement_and_rollback_moves
+    allow(FileUtils).to receive(:mv).and_wrap_original do |method, source, target|
+      if source.include?('/.rails-mmd-backup-') || target.end_with?('/out/core.er.render_plan.json')
         raise Errno::EACCES, source
       end
 

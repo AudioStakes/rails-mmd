@@ -163,6 +163,10 @@ module RailsMmd
       unless habtm_key_metadata
         return omitted(context, owner, sanitized_name, 'ASSOCIATION_COMPOSITE_KEY_OMITTED', target_constant)
       end
+      unless habtm_key_metadata.fetch(:owner_primary_key) == owner.primary_key &&
+             habtm_key_metadata.fetch(:target_primary_key) == target.primary_key
+        return omitted(context, owner, sanitized_name, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED', target_constant)
+      end
 
       join_table = context.join_table_by_name[habtm_key_metadata.fetch(:join_table)]
       invalid_reason = habtm_join_table_invalid_reason(join_table, habtm_key_metadata)
@@ -185,7 +189,11 @@ module RailsMmd
       }
       return unless values.values.all? { |value| value.is_a?(String) && value.match?(STRUCTURED_COLUMN_PATTERN) }
 
-      values
+      owner_primary_key = scalar_key(safe_reflection_value(reflection, :active_record_primary_key))
+      target_primary_key = scalar_key(safe_reflection_value(reflection, :association_primary_key))
+      return unless owner_primary_key && target_primary_key
+
+      values.merge(owner_primary_key: owner_primary_key, target_primary_key: target_primary_key)
     end
 
     def habtm_join_table_invalid_reason(join_table, habtm_key_metadata)

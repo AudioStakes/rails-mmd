@@ -22,12 +22,10 @@ module RailsMmd
       @schemas = {}
     end
 
-    def valid?(schema_name, payload)
-      schema(schema_name).valid?(payload)
-    end
+    def valid?(schema_name, payload) = errors(schema_name, payload).empty?
 
     def errors(schema_name, payload)
-      schema(schema_name).validate(payload).to_a
+      schema(schema_name).validate(payload).to_a + attribute_identity_errors(schema_name, payload)
     end
 
     def validate!(schema_name, payload)
@@ -36,9 +34,7 @@ module RailsMmd
       raise InvalidPayload, "#{schema_name.to_s.tr('_', ' ')} schema invalid"
     end
 
-    def validate_render_plan!(render_plan)
-      validate!(:render_plan, render_plan)
-    end
+    def validate_render_plan!(render_plan) = validate!(:render_plan, render_plan)
 
     def validate_pre_output!(diagnostics)
       validate!(:diagnostics, diagnostic_document('global', nil, diagnostics))
@@ -59,6 +55,33 @@ module RailsMmd
     def schema(schema_name)
       key = schema_name.to_sym
       schemas[key] ||= JSONSchemer.schema(JSON.parse(schema_root.join(SCHEMA_FILES.fetch(key)).read))
+    end
+
+    def attribute_identity_errors(schema_name, payload)
+      return [] unless %i[ir render_plan].include?(schema_name.to_sym)
+      return [] unless payload.is_a?(Hash) && payload['entities'].is_a?(Array)
+
+      seen = {}
+      payload['entities'].each_with_index.flat_map { |entity, index| entity_attribute_errors(entity, index, seen) }
+    end
+
+    def entity_attribute_errors(entity, entity_index, seen)
+      return [] unless entity.is_a?(Hash) && entity['attributes'].is_a?(Array)
+
+      entity['attributes'].each_with_index.filter_map do |attribute, index|
+        duplicate_attribute_error(attribute, "/entities/#{entity_index}/attributes/#{index}/attribute_id", seen)
+      end
+    end
+
+    def duplicate_attribute_error(attribute, pointer, seen)
+      return unless attribute.is_a?(Hash) && attribute['attribute_id'].is_a?(String)
+
+      attribute_id = attribute.fetch('attribute_id')
+      duplicate = seen.key?(attribute_id)
+      seen[attribute_id] = true
+      return unless duplicate
+
+      { 'data_pointer' => pointer, 'type' => 'unique_attribute_identity' }
     end
 
     def each_render_plan(artifacts)

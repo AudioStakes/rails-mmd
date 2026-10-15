@@ -2,6 +2,8 @@
 
 Run `rails-mmd generate` from the **target Rails application's root**, with `rails-mmd` in that application's `Gemfile` (see the [quick start](../README.md)). The command loads and eager-loads the Rails app, reads metadata for selected models, builds Mermaid render plans, and publishes local artifacts. Use an environment that can boot the app and read its database schema.
 
+Booting also executes the application's initializers. Use an application and environment you trust; the [security policy](../SECURITY.md) describes this boundary and how to handle generated schema information.
+
 ## Command
 
 ```sh
@@ -116,6 +118,9 @@ Start with `bundle exec rails-mmd generate --help` to verify that the executable
 | Model not found | Use its full constant name, including namespace, and ensure Rails eager loading can load it. |
 | Expected relationship is missing | Include both models in the same domain, inspect warning diagnostics, and check the support matrix for unsupported options. |
 | Output directory rejected | Use an application-root-relative path such as `tmp/rails_mmd`; paths escaping the root are rejected. |
+| Output write or publish failure | Check stderr and inspect the output directory before retrying; follow the recovery steps below. |
 | Diagram appears as text | Use a Mermaid-capable viewer or the Markdown embedding instructions above. |
+
+If publication and rollback both fail, originals that could not be restored remain in a hidden `.rails-mmd-backup-*` directory inside the output directory. Inspect those backups first. Correct the filesystem problem, such as permissions or insufficient disk space, then manually restore the originals you need and verify them before running generation again. Keep the backups until recovery is confirmed.
 
 `rails-mmd generate` does not invoke Mermaid CLI or any hosted service.

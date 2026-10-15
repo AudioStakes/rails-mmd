@@ -5,10 +5,8 @@
 Please do not put credentials, private application code, database contents, or
 exploit details in a public issue or pull request.
 
-If GitHub shows **Report a vulnerability** on this repository's
-[Security page](https://github.com/AudioStakes/rails-mmd/security), use that private
-reporting form. Its availability depends on the repository settings; this project
-does not currently promise that the form is enabled.
+Use [GitHub private vulnerability reporting](https://github.com/AudioStakes/rails-mmd/security/advisories/new)
+to send a suspected vulnerability to the maintainer privately.
 
 If the private form is unavailable, open an
 [issue](https://github.com/AudioStakes/rails-mmd/issues/new) asking the maintainer

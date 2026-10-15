@@ -119,6 +119,8 @@ RSpec.describe RailsMmd::Publisher do
     expect(result.diagnostics.first.fetch('code')).to eq('OUTPUT_WRITE_FAILED')
     expect(output.join('core.diagnostics.json').read).to eq('old diagnostics')
     expect(JSON.generate(result.diagnostics)).not_to include(project_root.to_s)
+    expect(result.diagnostics.first.fetch('remediation').fetch('steps'))
+      .to include('Check the output directory for retained .rails-mmd-backup-* directories before retrying.')
   end
 
   it 'refuses existing directory targets without nesting artifacts inside them' do

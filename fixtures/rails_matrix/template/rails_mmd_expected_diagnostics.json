@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "code": "ASSOCIATION_NON_PRIMARY_KEY_OMITTED",
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship",
+    "subject_id": "authors.custom_primary_tags",
+    "metadata": {
+      "domain_id": "core",
+      "owner_constant": "Author",
+      "association_name": "custom_primary_tags",
+      "target_constant": "Tag"
+    }
+  }
+]

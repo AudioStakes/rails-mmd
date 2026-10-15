@@ -6,7 +6,6 @@ Gem::Specification.new do |spec|
   spec.name = 'rails-mmd'
   spec.version = RailsMmd::VERSION
   spec.authors = ['AudioStakes']
-  spec.email = ['engineering@audiostakes.com']
 
   spec.summary = 'Generate Mermaid diagrams from Rails and ActiveRecord applications.'
   spec.description = 'rails-mmd is a Ruby CLI for generating Mermaid diagrams ' \
@@ -17,11 +16,14 @@ Gem::Specification.new do |spec|
 
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main"
+  spec.metadata['documentation_uri'] = "#{spec.homepage}/blob/main/docs/usage.md"
+  spec.metadata['bug_tracker_uri'] = "#{spec.homepage}/issues"
   spec.metadata['rubygems_mfa_required'] = 'true'
 
   spec.files = Dir[
     'README.md',
     'LICENSE',
+    'SECURITY.md',
     'docs/usage.md',
     'docs/active-record-association-support.md',
     'exe/rails-mmd',
