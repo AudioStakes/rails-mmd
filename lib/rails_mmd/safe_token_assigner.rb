@@ -17,7 +17,9 @@ module RailsMmd
     def assign(subjects, scope:)
       validate_scope!(scope)
       subjects_by_base_token = subjects.group_by { |subject| base_token(subject.fetch(:source)) }
-      tokens_by_identity = {}
+      tokens_by_identity = subjects_by_base_token.filter_map do |base_token, subjects_for_token|
+        [subjects_for_token.first.fetch(:identity), base_token] if subjects_for_token.one?
+      end.to_h
       collision_diagnostics = assign_token_groups(subjects_by_base_token, scope, tokens_by_identity)
 
       { tokens: tokens_by_identity, diagnostics: collision_diagnostics }
@@ -46,29 +48,31 @@ module RailsMmd
 
     def assign_token_groups(subjects_by_base_token, scope, tokens_by_identity)
       subjects_by_base_token.filter_map do |base_token, colliding_subjects|
-        if colliding_subjects.one?
-          tokens_by_identity[colliding_subjects.first.fetch(:identity)] = base_token
-          next
-        end
+        next if colliding_subjects.one?
 
-        resolved_candidates = unique_collision_candidates(scope, base_token, colliding_subjects)
+        resolved_candidates = unique_collision_candidates(scope, base_token, colliding_subjects,
+                                                          tokens_by_identity.values)
         collision_resolved = !resolved_candidates.nil?
         tokens_by_identity.merge!(resolved_candidates) if collision_resolved
         collision_diagnostic(scope, base_token, colliding_subjects, resolved: collision_resolved)
       end
     end
 
-    def unique_collision_candidates(scope, base_token, colliding_subjects)
+    def unique_collision_candidates(scope, base_token, colliding_subjects, reserved_tokens)
       suffix_length = 12
       loop do
         candidates = collision_candidates(scope, base_token, colliding_subjects, suffix_length)
-        return candidates if candidates.values.uniq.length == candidates.length
+        return candidates if unique_candidates?(candidates, reserved_tokens)
 
         suffix_length += 4
         break if suffix_length > 64
       end
 
       nil
+    end
+
+    def unique_candidates?(candidates, reserved_tokens)
+      candidates.values.uniq.length == candidates.length && !candidates.values.intersect?(reserved_tokens)
     end
 
     def collision_candidates(scope, base_token, colliding_subjects, suffix_length)

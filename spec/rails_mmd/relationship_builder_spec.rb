@@ -167,6 +167,65 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     )
   end
 
+  it 'omits an explicitly specialized HABTM primary key while retaining a valid alias' do
+    tag_model = renderable_model('Tag', 'tags')
+    options = { klass: tag_model, join_table: 'authors_tags', foreign_key: 'author_id',
+                association_foreign_key: 'tag_id' }
+    specialized = association('custom_primary_tags', :has_and_belongs_to_many,
+                              options.merge(primary_key: :uuid, active_record_primary_key: 'uuid'))
+    valid = association('tags', :has_and_belongs_to_many, options)
+    domain = domain_result(
+      'core', [entity('Author', 'authors', columns: [column('id', false), column('uuid', false)]),
+               entity('Tag', 'tags')], join_tables: [join_table('authors_tags', %w[author_id tag_id])]
+    )
+
+    result = build(domain, 'Author' => owner_model(specialized, valid), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships.map(&:association_name)).to eq(['tags'])
+    expect(result.diagnostics).to contain_exactly(
+      include('code' => 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED',
+              'metadata' => include('association_name' => 'custom_primary_tags'))
+    )
+    expect(schema_valid_diagnostic?(result.diagnostics.first)).to be(true)
+  end
+
+  it 'accepts HABTM primary-key options that resolve to the actual scalar primary keys' do
+    tags = association(
+      'tags', :has_and_belongs_to_many, klass: renderable_model('Tag', 'tags'), join_table: 'authors_tags',
+                                        foreign_key: 'author_id', association_foreign_key: 'tag_id',
+                                        primary_key: :id, active_record_primary_key: 'id'
+    )
+    domain = domain_result(
+      'core', [entity('Author', 'authors'), entity('Tag', 'tags')],
+      join_tables: [join_table('authors_tags', %w[author_id tag_id])]
+    )
+
+    result = build(domain, 'Author' => owner_model(tags), 'Tag' => owner_model)
+
+    expect(result.domains.first.relationships.map(&:association_name)).to eq(['tags'])
+    expect(result.diagnostics).to eq([])
+  end
+
+  it 'omits HABTM target-key specializations and non-scalar reflected primary keys' do
+    cases = [
+      [{ association_primary_key: 'uuid' }, 'ASSOCIATION_NON_PRIMARY_KEY_OMITTED'],
+      [{ active_record_primary_key: %w[id tenant_id] }, 'ASSOCIATION_COMPOSITE_KEY_OMITTED'],
+      [{ association_primary_key: %w[id tenant_id] }, 'ASSOCIATION_COMPOSITE_KEY_OMITTED']
+    ]
+    actual = cases.map do |key_options, _code|
+      reflection = association(
+        'tags', :has_and_belongs_to_many,
+        { klass: renderable_model('Tag', 'tags'), join_table: 'authors_tags', foreign_key: 'author_id',
+          association_foreign_key: 'tag_id' }.merge(key_options)
+      )
+      domain = domain_result('core', [entity('Author', 'authors'), entity('Tag', 'tags')])
+      result = build(domain, 'Author' => owner_model(reflection), 'Tag' => owner_model)
+      [result.domains.first.relationships.empty?, result.diagnostics.first.fetch('code')]
+    end
+
+    expect(actual).to eq(cases.map { |_options, code| [true, code] })
+  end
+
   it 'builds custom-key self-HABTM with a stable column-normalized identity' do
     author_model = renderable_model('Author', 'authors')
     coauthors = association(

@@ -13,7 +13,7 @@ RSpec.describe Gem::Specification do
 
   it 'packages the license and user guides with the gem' do
     expect(specification.files).to include(
-      'LICENSE', 'README.md', 'docs/usage.md', 'docs/active-record-association-support.md'
+      'LICENSE', 'README.md', 'SECURITY.md', 'docs/usage.md', 'docs/active-record-association-support.md'
     )
   end
 

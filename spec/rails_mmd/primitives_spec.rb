@@ -32,6 +32,91 @@ RSpec.describe 'runtime primitives' do
       expect(redactor.sanitize_object(42)).to eq(42)
     end
 
+    it 'redacts credential assignment values that are not environment variables' do
+      redactor = described_class.new(env: {})
+      text = 'boot failed password=hunter2 secret:abc API_KEY=token123 ' \
+             '"password": "two words" access_token => \'quoted value\' retry=false'
+
+      sanitized = redactor.sanitize(text)
+
+      expect(sanitized).not_to include('hunter2', 'abc', 'token123', 'two words', 'quoted value')
+      expect(sanitized).to include('boot failed')
+    end
+
+    it 'redacts assignment tails containing punctuation, nested containers, or incomplete quotes' do
+      redactor = described_class.new(env: {})
+      assignments = [
+        'password=abc]def',
+        'password = { encrypted: "hunter2" }',
+        'password = ["first", { nested: "second" }]',
+        'password="unterminated secret',
+        'password="quoted"suffix'
+      ]
+
+      sanitized = assignments.map { |text| redactor.sanitize("boot failed #{text}") }
+
+      expect(sanitized).to eq(Array.new(assignments.length, 'boot failed [REDACTED]'))
+    end
+
+    it 'redacts URL credentials before interpreting credential words inside the password' do
+      redactor = described_class.new(env: {})
+      urls = [
+        'postgres://dbuser:prefix.secret=bar@db.example/app',
+        'postgres://dbuser:password=hunter2@db.example/app',
+        'postgres://dbuser:p@ss@db.example/app',
+        'postgres://dbuser@db.example/app'
+      ]
+
+      urls.each do |url|
+        expect(redactor.sanitize(url)).to eq('postgres://[REDACTED]@db.example/app')
+      end
+    end
+
+    it 'redacts structured credential values regardless of their type or environment origin' do
+      redactor = described_class.new(env: {})
+      payload = { 'password' => 'hunter2', 'nested' => [{ 'api_key' => ['token123'], 'retries' => 3 }] }
+
+      expect(redactor.sanitize_object(payload)).to eq(
+        '[REDACTED_KEY]' => '[REDACTED]',
+        'nested' => [{ '[REDACTED_KEY]' => '[REDACTED]', 'retries' => 3 }]
+      )
+    end
+
+    it 'redacts standalone token keys while retaining schema token metadata keys' do
+      redactor = described_class.new(env: {})
+      metadata = {
+        'token_kind' => 'entity', 'safe_token' => 'e_User', 'base_safe_token' => 'e_User',
+        'base_token' => 'e_User', 'resolved_tokens' => ['e_User_1']
+      }
+
+      expect(redactor.sanitize('token=abc123')).to eq('[REDACTED]')
+      expect(redactor.sanitize_object(metadata.merge('token' => 'abc123'))).to eq(
+        metadata.merge('[REDACTED_KEY]' => '[REDACTED]')
+      )
+    end
+
+    it 'redacts complete quoted assignment values before sanitizing Mermaid free text' do
+      redactor = described_class.new(env: {})
+      assignments = [
+        'password="two words"',
+        "password='two words'",
+        '"password": "two words"',
+        'access_token => "two words"',
+        'pid="two words"',
+        'password=abc]def',
+        'password = { encrypted: "hunter2" }',
+        'password = ["first", { nested: "second" }]',
+        'password="unterminated secret',
+        'password="quoted"suffix'
+      ]
+
+      sanitized = assignments.map do |text|
+        described_class.sanitize_mermaid_free_text(text, sanitizer: redactor)
+      end
+
+      expect(sanitized).to eq(Array.new(assignments.length, '[REDACTED]'))
+    end
+
     it 'owns Mermaid free-text and structured-identifier sanitization' do
       redactor = described_class.new(project_root: Dir.pwd, env: {})
 
@@ -39,7 +124,7 @@ RSpec.describe 'runtime primitives' do
         described_class.sanitize_mermaid_free_text(
           "api\n_key=secret /tmp/pri\nvate/token=hidden", sanitizer: redactor
         )
-      ).to eq('[REDACTED] [REDACTED_PATH]')
+      ).to eq('[REDACTED]')
       expect(
         described_class.sanitize_mermaid_free_text('database_url=postgres://u:p@db', sanitizer: redactor)
       ).to eq('[REDACTED]')
@@ -297,6 +382,26 @@ RSpec.describe 'runtime primitives' do
       expect(result).to eq(tokens: { 'model:User' => 'USER' }, diagnostics: [])
     end
 
+    it 'extends suffixes that collide with an unsuffixed token regardless of subject order' do
+      tokens = described_class.new
+      scope = { artifact_kind: 'er', domain_id: 'core', token_kind: 'entity' }
+      subjects = [
+        { source: 'Foo', identity: 'model:First' },
+        { source: 'foo', identity: 'model:Second' }
+      ]
+      first_token = tokens.assign(subjects, scope: scope).fetch(:tokens).fetch('model:First')
+      subjects << { source: first_token.downcase, identity: 'model:Third' }
+
+      forward = tokens.assign(subjects, scope: scope)
+      reverse = tokens.assign(subjects.reverse, scope: scope)
+
+      expect(forward).to eq(reverse)
+      expect(forward.fetch(:tokens).values.uniq.length).to eq(3)
+      expect(forward.fetch(:tokens).fetch('model:First')).to match(/\AFOO_H[0-9A-F]{16}\z/)
+      expect(forward.fetch(:tokens).fetch('model:Third')).to eq(first_token)
+      expect(forward.fetch(:diagnostics).first.dig('metadata', 'resolved')).to be(true)
+    end
+
     it 'emits a fatal diagnostic when suffix expansion cannot resolve a collision' do
       allow(RailsMmd::CanonicalJson).to receive(:digest_sha256).and_return('A' * 64)
 
@@ -328,6 +433,26 @@ RSpec.describe 'runtime primitives' do
       end
 
       expect(RailsMmd::SchemaValidator.new.valid?(:diagnostics, diagnostics_document(diagnostics))).to be(true)
+    end
+
+    it 'emits a fatal diagnostic when unsuffixed tokens block every suffix length' do
+      tokens = described_class.new
+      digests = { 'model:First' => 'A' * 64, 'model:Second' => 'B' * 64 }
+      allow(tokens).to receive(:collision_digest) do |_scope, _base_token, subject|
+        digests.fetch(subject.fetch(:identity))
+      end
+      reserved = 12.step(64, 4).map do |length|
+        { source: "foo_h#{'a' * length}", identity: "model:Reserved#{length}" }
+      end
+
+      result = tokens.assign(
+        [{ source: 'Foo', identity: 'model:First' }, { source: 'foo', identity: 'model:Second' }] + reserved,
+        scope: { artifact_kind: 'er', domain_id: 'core', token_kind: 'entity' }
+      )
+
+      expect(result.fetch(:tokens).length).to eq(reserved.length)
+      expect(result.fetch(:diagnostics).first).to include('code' => 'SAFE_TOKEN_COLLISION', 'severity' => 'fatal')
+      expect(result.fetch(:diagnostics).first.dig('metadata', 'resolved')).to be(false)
     end
   end
 

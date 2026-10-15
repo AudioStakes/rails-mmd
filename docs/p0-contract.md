@@ -380,7 +380,10 @@ candidates. STI expansion, scopes, through polymorphism, `source_type:`, and
 custom/composite keys remain deferred.
 
 P1-07 supports unscoped `has_and_belongs_to_many` declarations whose resolved
-target is renderable and selected in the same domain. The resolved scalar join
+target is renderable and selected in the same domain. Each reflected owner and
+target primary key must be scalar and equal the respective entity's actual
+primary key; an explicit option resolving to that same key remains eligible.
+The resolved scalar join
 table and two distinct scalar join columns must use structured identifiers. The
 hidden join table must exist, have no primary key, and contain exactly those two
 columns. One-sided, reciprocal, alias, custom table/key, `class_name`, and

@@ -118,6 +118,27 @@ RSpec.describe RailsMmd::IrBuilder do
     )
   end
 
+  it 'emits a shared primary and foreign key column once with primary key precedence' do
+    domain = RailsMmd::SchemaProbe::DomainResult.new(
+      domain_id: 'core', entities: [entity('User', 'users'), entity('Profile', 'profiles')], diagnostics: []
+    )
+    shared_key = relationship(
+      'relationships/users/id/profiles/id', 'entities/users', 'entities/profiles', 'profile', foreign_keys: ['id', nil]
+    )
+    relationships = RailsMmd::RelationshipBuilder::DomainResult.new(
+      domain_id: 'core', relationships: [shared_key], diagnostics: []
+    )
+
+    payload = described_class.new.build(domains: [domain], relationship_domains: [relationships]).domains.first.payload
+    user = payload.fetch('entities').find { |item| item.fetch('entity_id') == 'entities/users' }
+
+    expect(user.fetch('attributes')).to eq(
+      [{ 'attribute_id' => 'entities/users/attributes/id', 'name' => 'id', 'role' => 'primary_key',
+         'type' => 'integer' }]
+    )
+    expect(schema_valid_ir?(payload)).to be(true)
+  end
+
   it 'does not project hidden HABTM join columns onto endpoint attributes' do
     domain = RailsMmd::SchemaProbe::DomainResult.new(
       domain_id: 'core', entities: [entity('Author', 'authors'), entity('Tag', 'tags')], diagnostics: []

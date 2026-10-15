@@ -100,15 +100,16 @@ module RailsMmd
     end
 
     def replace_plan_files(output_path, tmp_path, plan, selected_domain_ids)
-      Dir.mktmpdir('.rails-mmd-backup-', output_path.to_s) do |backup|
-        backup_path = Pathname(backup)
-        published_paths = []
-        backup_existing_files(output_path, backup_path, selected_domain_ids)
-        move_plan_files(output_path, tmp_path, plan, published_paths)
-      rescue StandardError
-        rollback_replacement(output_path, backup_path, published_paths)
-        raise
-      end
+      backup_path = Pathname(Dir.mktmpdir('.rails-mmd-backup-', output_path.to_s))
+      published_paths = []
+      backup_existing_files(output_path, backup_path, selected_domain_ids)
+      move_plan_files(output_path, tmp_path, plan, published_paths)
+      replacement_complete = true
+    rescue StandardError
+      rollback_replacement(output_path, backup_path, published_paths) if backup_path
+      raise
+    ensure
+      FileUtils.remove_entry(backup_path) if backup_path && (replacement_complete || backup_path.children.empty?)
     end
 
     def backup_existing_files(output_path, backup_path, selected_domain_ids)

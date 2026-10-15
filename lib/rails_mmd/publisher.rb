@@ -156,7 +156,10 @@ module RailsMmd
         code: 'OUTPUT_WRITE_FAILED',
         message: 'output write failed',
         metadata: { operation: 'write', path: 'output' },
-        remediation: { summary: exception.class.name }
+        remediation: {
+          summary: exception.class.name,
+          steps: ['Check the output directory for retained .rails-mmd-backup-* directories before retrying.']
+        }
       )
     end
   end

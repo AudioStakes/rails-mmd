@@ -61,6 +61,14 @@ Supported associations and current limits are listed in the [Active Record suppo
 
 Generated diagrams and JSON artifacts can reveal model names, table names, columns, relationships, and connection identifiers in diagnostics. Review them before committing or sharing them. Output must stay inside the application's root; for private schemas, add the output directory to the application's `.gitignore` (for this example, `/tmp/rails_mmd/`).
 
+See the [security policy](https://github.com/AudioStakes/rails-mmd/blob/main/SECURITY.md) for the Rails boot trust boundary and vulnerability reporting.
+
+## How it works
+
+The [generation pipeline](https://github.com/AudioStakes/rails-mmd/blob/main/lib/rails_mmd/generation_pipeline.rb) separates model inventory, domain selection, schema probing, relationship construction, and rendering. It converts Rails metadata into an intermediate representation and validated render plans; Mermaid serialization consumes those plans without querying Rails or the database.
+
+Relationship cardinality uses database foreign-key, nullability, and unique-index evidence. Structured diagnostics explain omitted unsupported associations and degraded metadata. The [pipeline specs](https://github.com/AudioStakes/rails-mmd/blob/main/spec/rails_mmd/generation_pipeline_spec.rb) exercise these stages together, and the [publisher specs](https://github.com/AudioStakes/rails-mmd/blob/main/spec/rails_mmd/publisher_spec.rb) cover validation, selected-domain output, and rollback when file replacement fails. The [real-app matrix](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/ci.md) checks the public command against the declared Ruby/Rails pairs.
+
 ## Contributing and development
 
 See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. These contributor resources are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.

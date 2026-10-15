@@ -62,7 +62,7 @@ module RailsMmd
 
       names = [[entity.primary_key, 'primary_key']]
       names.concat(foreign_key_names(entity, relationship_domain).map { |name| [name, 'foreign_key'] })
-      payloads = names.compact.uniq.map do |name, role|
+      payloads = names.compact.uniq(&:first).map do |name, role|
         { 'attribute_id' => "#{entity_id(entity)}/attributes/#{name}", 'name' => name, 'role' => role,
           'type' => column_type(entity, name) }
       end

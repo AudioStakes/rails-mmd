@@ -35,8 +35,8 @@ end
 SimpleCov.formatter = NullCoverageFormatter
 
 SimpleCov.start do
-  track_files '{lib/**/*.rb,exe/rails-mmd}'
-  add_filter '/spec/'
+  cover '{lib/**/*.rb,exe/rails-mmd}'
+  skip '/spec/'
 end
 
 at_exit { write_undercover_coverage_json if Coverage.running? }

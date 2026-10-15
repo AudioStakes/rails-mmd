@@ -41,3 +41,20 @@ Status: TDD implementation reviewed and verified
 - Payload-bearing join tables, scoped HABTM, composite/custom primary-key
   semantics, and cross-domain or multi-DB joins remain deferred by the support
   matrix.
+
+## Public-quality review correction
+
+- A real Rails 8.1 reproduction declared HABTM `primary_key: :uuid` while the
+  owner's actual primary key remained `id`. The builder previously accepted
+  the two-column join table and published an unsupported edge without warning.
+- The regression failed with the custom alias winning the canonical label;
+  the real-app oracle also failed because its expected non-primary-key warning
+  was absent. The builder now compares both reflected scalar primary keys to
+  the probed entity keys before accepting the join table.
+- Unit coverage retains an explicit `primary_key: :id`, rejects owner/target
+  key specializations and non-scalar reflected keys, and preserves a valid
+  same-table alias beside the omission. The shared matrix fixture includes
+  both `:uuid` and `:id` options and requires the exact omission diagnostic.
+- Verification: relationship-builder specs and the Ruby 4.0.6 / Rails 8.1
+  real-app matrix passed. The repository's final hook runs the complete
+  declared matrix.

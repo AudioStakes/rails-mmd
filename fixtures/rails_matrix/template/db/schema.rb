@@ -4,6 +4,7 @@
 ActiveRecord::Schema[7.2].define(version: 20_260_718_000_001) do
   create_table 'authors', force: :cascade do |t|
     t.string 'name', null: false
+    t.string 'uuid', null: false
   end
 
   create_table 'tags', force: :cascade do |t|

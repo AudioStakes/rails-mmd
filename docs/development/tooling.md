@@ -37,6 +37,11 @@ UNDERCOVER_COMPARE=issue/9-bootstrap-ruby-gem-and-cli-skeleton \
   ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake coverage
 ```
 
+An explicit `UNDERCOVER_COMPARE` must resolve to a commit. An invalid or empty
+override stops verification so coverage cannot silently use a different base.
+When the variable is unset, the configured comparison and local fallback refs
+remain available.
+
 Specs start SimpleCov before application code through `.rspec`. RSpec randomizes
 example order and reports the seed. Focused specs fail the suite so committed
 focus metadata cannot narrow CI by accident.

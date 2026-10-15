@@ -8,9 +8,13 @@ module RailsMmd
   # rubocop:disable-next Metrics/ClassLength
   class Redactor
     SECRET_KEY_PATTERN = /
-      (?:password|passwd|secret|api[_-]?key|credential|database_url|(?:access|auth|refresh)[_-]?token)
+      (?:password|passwd|secret|api[_-]?key|credential|database_url|(?:access|auth|refresh)[_-]?token|\btoken\b)
     /ix
-    URL_CREDENTIAL_PATTERN = %r{([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@}i
+    # Free text has no reliable value delimiter, so keep only the context before an assignment.
+    SECRET_ASSIGNMENT_PATTERN = /
+      ["']?[A-Za-z0-9_-]*#{SECRET_KEY_PATTERN}[A-Za-z0-9_-]*["']?\s*(?:=>|=|:)[\s\S]*
+    /ix
+    URL_CREDENTIAL_PATTERN = %r{([a-z][a-z0-9+.-]*://)[^/\s]+@}i
     DRIVE_OR_UNC_PATTERN = %r{\b(?:[A-Za-z]:[\\/]|\\\\[^\\/\s]+[\\/][^\\/\s]+)}
     MERMAID_SECRET_KEY = /
       (?:
@@ -24,8 +28,12 @@ module RailsMmd
         raw\s*[_-]?\s*exception\s*[_-]?\s*backtrace
       )
     /ix
-    MERMAID_FORBIDDEN_ASSIGNMENT = /[A-Za-z0-9_-]*#{MERMAID_SECRET_KEY}[A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/ix
-    REDACTED_KEY_ASSIGNMENT = /[A-Za-z0-9_-]*\[REDACTED_KEY\][A-Za-z0-9_-]*\s*(?::|=|\s+)\s*\S+/
+    MERMAID_FORBIDDEN_ASSIGNMENT = /
+      ["']?[A-Za-z0-9_-]*#{MERMAID_SECRET_KEY}[A-Za-z0-9_-]*["']?\s*(?:=>|:|=|\s+)[\s\S]*
+    /ix
+    REDACTED_KEY_ASSIGNMENT = /
+      ["']?[A-Za-z0-9_-]*\[REDACTED_KEY\][A-Za-z0-9_-]*["']?\s*(?:=>|:|=|\s+)[\s\S]*
+    /x
     URL_PATTERN = %r{\b[a-z][a-z0-9+.-]*://[^\s]+}i
     URL_PLACEHOLDER_PREFIX = "\uE000RAILSMMDURL"
     REDACTED_URL = '[REDACTED_URL]'
@@ -82,6 +90,7 @@ module RailsMmd
       text = value.to_s.dup
       text = text.delete("\u0000")
       text = text.gsub(URL_CREDENTIAL_PATTERN, '\\1[REDACTED]@')
+      text = text.gsub(SECRET_ASSIGNMENT_PATTERN, '[REDACTED]')
       text = text.gsub(DRIVE_OR_UNC_PATTERN, '[REDACTED_PATH]')
       text = redact_absolute_paths(text)
       text = redact_env_values(text)
@@ -107,7 +116,8 @@ module RailsMmd
 
     def sanitize_hash(value)
       value.to_h do |key, item|
-        [sanitize(key), sanitize_object(item)]
+        sanitized_value = SECRET_KEY_PATTERN.match?(key.to_s) ? '[REDACTED]' : sanitize_object(item)
+        [sanitize(key), sanitized_value]
       end
     end
 

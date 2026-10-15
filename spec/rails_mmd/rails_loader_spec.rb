@@ -105,7 +105,7 @@ RSpec.describe RailsMmd::RailsLoader do
   it 'returns a schema-valid RAILS_LOAD_FAILED diagnostic for boot failures' do
     kernel = Class.new do
       def load(_path)
-        raise 'secret=/Users/dev/app failed'
+        raise 'password=hunter2 secret=/Users/dev/app failed'
       end
     end.new
 
@@ -119,6 +119,7 @@ RSpec.describe RailsMmd::RailsLoader do
       'backtrace' => nil
     )
     expect(result.diagnostics.first.fetch('metadata').fetch('exception_summary')).not_to include('/Users/dev/app')
+    expect(result.diagnostics.to_s).not_to include('hunter2')
     expect_schema_valid_diagnostic(result.diagnostics.first)
   end
 

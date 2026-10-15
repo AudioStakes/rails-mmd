@@ -29,6 +29,11 @@ Status: design complete and reviewed
   repository's structured table/column identifier rules before entering a
   public ID.
 - Owner and target already have scalar actual primary keys by `SchemaProbe`.
+  Safely read the reflection's scalar `active_record_primary_key` and
+  `association_primary_key` and require them to equal those actual keys. A
+  non-scalar reflected key retains the composite-key omission; a scalar
+  mismatch retains the non-primary-key omission. An explicit option resolving
+  to the actual key remains eligible, as with the direct association paths.
   No custom/non-primary association-key inference is added.
 - Require distinct join columns and a cached join table whose primary key is
   nil and whose complete column-name set equals the two join columns.
