@@ -1,5 +1,7 @@
 # rails-mmd
 
+![rails-mmd — Rails models to Mermaid diagrams](docs/assets/branding/rails-mmd-social-preview.jpg)
+
 Generate Mermaid ER and class diagrams from the models and database schema of a Rails application. `rails-mmd` runs in the application's bundle, loads its models, and writes local `.mmd` source files. Preview them with a Mermaid viewer or embed their contents in a Markdown `mermaid` code block.
 
 ```mermaid
