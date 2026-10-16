@@ -58,6 +58,10 @@ Push your branch to your fork and open a pull request against `AudioStakes/rails
 
 Keep changes consistent with the [P0 contract](docs/p0-contract.md) and the [association support matrix](docs/active-record-association-support.md). Add a real-app matrix expectation when association behavior changes.
 
+## Releases
+
+Maintainers publish releases manually from a verified commit on `main`. Follow the [release guide](docs/development/releasing.md) for package inspection, publishing, and recovery, and record user-facing changes in [CHANGELOG.md](CHANGELOG.md).
+
 ## When setup or checks fail
 
 - Wrong Ruby or Bundler version: check `asdf exec ruby --version` and `asdf exec bundle --version` after selecting `ASDF_RUBY_VERSION=4.0.6`. Install both matrix Rubies and their pinned Bundler versions before running the full gate.

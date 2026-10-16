@@ -23,13 +23,13 @@ The diagram above is illustrative. The actual output depends on your models, ass
 
 You need an existing Rails application with Active Record models and a prepared database. Check the [tested Ruby/Rails combinations](#compatibility-and-limits) below before installing. All commands in this section run from that application's root, not this repository.
 
-In the **target Rails application's** `Gemfile`, install this repository directly from GitHub:
+In the **target Rails application's** `Gemfile`, add the published [RubyGems package](https://rubygems.org/gems/rails-mmd):
 
 ```ruby
-gem 'rails-mmd', git: 'https://github.com/AudioStakes/rails-mmd.git', require: false
+gem 'rails-mmd', '~> 0.1.0', require: false
 ```
 
-Run `bundle install`. The application's `Gemfile.lock` records the selected Git revision. At the application root, create `rails_mmd.yml` and replace the model names with real models in your app:
+Run `bundle install`. The application's `Gemfile.lock` records the selected release. At the application root, create `rails_mmd.yml` and replace the model names with real models in your app:
 
 ```yaml
 version: 1
@@ -73,7 +73,7 @@ Relationship cardinality uses database foreign-key, nullability, and unique-inde
 
 ## Contributing and development
 
-See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks. Implementation contracts are in [docs/p0-contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. These contributor resources are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.
+See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks, the [changelog](https://github.com/AudioStakes/rails-mmd/blob/main/CHANGELOG.md) for released changes, and the [release guide](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/releasing.md) for the manual publishing process. Implementation contracts are in [docs/p0-contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. The contributor guide and development notes are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.
 
 The [P0 blocking fixture matrix](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-blocking-fixture-matrix.md) records the required verification cases.
 

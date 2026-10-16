@@ -13,7 +13,23 @@ RSpec.describe Gem::Specification do
 
   it 'packages the license and user guides with the gem' do
     expect(specification.files).to include(
-      'LICENSE', 'README.md', 'SECURITY.md', 'docs/usage.md', 'docs/active-record-association-support.md'
+      'LICENSE', 'README.md', 'CHANGELOG.md', 'SECURITY.md', 'docs/usage.md',
+      'docs/active-record-association-support.md'
+    )
+  end
+
+  it 'links to the source and documentation for the packaged release' do
+    expect(specification.metadata).to include(
+      'source_code_uri' => "https://github.com/AudioStakes/rails-mmd/tree/v#{specification.version}",
+      'documentation_uri' => "https://github.com/AudioStakes/rails-mmd/blob/v#{specification.version}/docs/usage.md",
+      'changelog_uri' => "https://github.com/AudioStakes/rails-mmd/blob/v#{specification.version}/CHANGELOG.md"
+    )
+  end
+
+  it 'restricts publication to RubyGems.org with multifactor authentication' do
+    expect(specification.metadata).to include(
+      'allowed_push_host' => 'https://rubygems.org',
+      'rubygems_mfa_required' => 'true'
     )
   end
 
