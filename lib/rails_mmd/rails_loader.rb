@@ -54,7 +54,9 @@ module RailsMmd
       return unless app_gemfile.file?
 
       current_gemfile = current_bundle_gemfile
-      return if current_gemfile && Pathname(current_gemfile).expand_path == app_gemfile
+      return if current_gemfile &&
+                File.basename(current_gemfile) == app_gemfile.basename.to_s &&
+                File.identical?(File.dirname(current_gemfile), project_root)
 
       raise BundleContextError,
             'rails-mmd must be run inside the target Rails application bundle'

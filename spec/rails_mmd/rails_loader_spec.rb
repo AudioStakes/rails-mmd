@@ -44,7 +44,10 @@ RSpec.describe RailsMmd::RailsLoader do
 
   it 'requires execution inside the target application bundle when a Gemfile exists' do
     project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
-    outside_bundle = Struct.new(:default_gemfile).new(project_root.parent.join('Gemfile'))
+    outside_gemfile = project_root.join('other/Gemfile')
+    outside_gemfile.dirname.mkpath
+    outside_gemfile.write(project_root.join('Gemfile').read)
+    outside_bundle = Struct.new(:default_gemfile).new(outside_gemfile)
 
     result = described_class.new(
       project_root: project_root,
@@ -59,6 +62,58 @@ RSpec.describe RailsMmd::RailsLoader do
       'backtrace' => nil
     )
     expect_schema_valid_diagnostic(result.diagnostics.first)
+  end
+
+  it 'accepts the target application bundle through a symbolic link' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+    linked_root = project_root.join('linked-app')
+    linked_root.make_symlink(project_root)
+    current_bundle = Struct.new(:default_gemfile).new(linked_root.join('Gemfile'))
+    application = Class.new { def eager_load!; end }.new
+    rails = Struct.new(:application).new(application)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path); end }.new,
+      rails_provider: -> { rails },
+      bundler: current_bundle
+    ).boot
+
+    expect(result).to be_success
+    expect(result.application).to be(application)
+  end
+
+  it 'rejects a different application bundle that links to the target Gemfile' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+    outside_gemfile = project_root.join('other/Gemfile')
+    outside_gemfile.dirname.mkpath
+    outside_gemfile.make_symlink(project_root.join('Gemfile'))
+    outside_bundle = Struct.new(:default_gemfile).new(outside_gemfile)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path) = raise('must not load') }.new,
+      bundler: outside_bundle
+    ).boot
+
+    expect(result.diagnostics.first.fetch('metadata'))
+      .to include('exception_class' => 'RailsMmd::RailsLoader::BundleContextError')
+  end
+
+  it 'rejects a differently named Gemfile in the target application directory' do
+    project_root.join('Gemfile').write("source 'https://rubygems.org'\n")
+    alternate_gemfile = project_root.join('AlternateGemfile')
+    File.link(project_root.join('Gemfile'), alternate_gemfile)
+    alternate_bundle = Struct.new(:default_gemfile).new(alternate_gemfile)
+
+    result = described_class.new(
+      project_root: project_root,
+      kernel: Class.new { def load(_path) = raise('must not load') }.new,
+      bundler: alternate_bundle
+    ).boot
+
+    expect(result.diagnostics.first.fetch('metadata'))
+      .to include('exception_class' => 'RailsMmd::RailsLoader::BundleContextError')
   end
 
   it 'fails closed when a target Gemfile exists without a Bundler context' do

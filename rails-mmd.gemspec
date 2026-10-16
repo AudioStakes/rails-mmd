@@ -15,13 +15,16 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = Gem::Requirement.new('>= 3.3', '< 4.1')
 
   spec.metadata['homepage_uri'] = spec.homepage
-  spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main"
-  spec.metadata['documentation_uri'] = "#{spec.homepage}/blob/main/docs/usage.md"
+  spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/v#{spec.version}"
+  spec.metadata['documentation_uri'] = "#{spec.homepage}/blob/v#{spec.version}/docs/usage.md"
+  spec.metadata['changelog_uri'] = "#{spec.homepage}/blob/v#{spec.version}/CHANGELOG.md"
   spec.metadata['bug_tracker_uri'] = "#{spec.homepage}/issues"
+  spec.metadata['allowed_push_host'] = 'https://rubygems.org'
   spec.metadata['rubygems_mfa_required'] = 'true'
 
   spec.files = Dir[
     'README.md',
+    'CHANGELOG.md',
     'LICENSE',
     'SECURITY.md',
     'docs/usage.md',
