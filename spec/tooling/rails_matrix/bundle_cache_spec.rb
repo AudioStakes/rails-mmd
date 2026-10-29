@@ -6,7 +6,7 @@ require 'pathname'
 require 'tmpdir'
 require_relative '../../../tooling/rails_matrix'
 
-RSpec.describe RailsMatrix::BundleCache do
+RSpec.describe RailsMatrix::BundleCache, env: { 'RAILS_MMD_MATRIX_CACHE_ROOT' => nil } do
   let(:ruby_version) { '4.0.6' }
   let(:rails_series) { '8.1' }
   let(:pair) { RailsMatrix::Pair.new(ruby_version:, rails_series:) }
