@@ -1,0 +1,157 @@
+{
+  "CONFIG_NOT_FOUND": {
+    "severity": "error",
+    "phase": "config",
+    "scope": "invocation"
+  },
+  "CONFIG_SCHEMA_INVALID": {
+    "severity": "error",
+    "phase": "config",
+    "scope": "invocation"
+  },
+  "CONFIG_DOMAIN_NOT_FOUND": {
+    "severity": "error",
+    "phase": "config",
+    "scope": "domain"
+  },
+  "OUTPUT_DIRECTORY_INVALID": {
+    "severity": "error",
+    "phase": "output_setup",
+    "scope": "invocation"
+  },
+  "DOMAIN_MODEL_NOT_FOUND": {
+    "severity": "error",
+    "phase": "domain_resolution",
+    "scope": "domain"
+  },
+  "DOMAIN_MODEL_NOT_RENDERABLE": {
+    "severity": "error",
+    "phase": "domain_resolution",
+    "scope": "model"
+  },
+  "DOMAIN_EMPTY": {
+    "severity": "error",
+    "phase": "domain_resolution",
+    "scope": "domain"
+  },
+  "RAILS_LOAD_FAILED": {
+    "severity": "error",
+    "phase": "rails_load",
+    "scope": "invocation"
+  },
+  "RAILS_EAGER_LOAD_FAILED": {
+    "severity": "error",
+    "phase": "rails_load",
+    "scope": "invocation"
+  },
+  "MULTI_DB_UNSUPPORTED": {
+    "severity": "error",
+    "phase": "schema_probe",
+    "scope": "domain"
+  },
+  "MODEL_TABLE_MISSING": {
+    "severity": "error",
+    "phase": "schema_probe",
+    "scope": "model"
+  },
+  "MODEL_PRIMARY_KEY_UNSUPPORTED": {
+    "severity": "error",
+    "phase": "schema_probe",
+    "scope": "model"
+  },
+  "ASSOCIATION_TARGET_UNRESOLVED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_THROUGH_UNRESOLVED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_SOURCE_UNRESOLVED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_TARGET_NOT_RENDERABLE_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_POLYMORPHIC_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_POLYMORPHIC_TARGETS_UNRESOLVED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_JOIN_TABLE_INVALID": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_SCOPED_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_COMPOSITE_KEY_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_KEY_COLUMN_MISSING": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_NON_PRIMARY_KEY_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_NAME_UNSUPPORTED_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "ASSOCIATION_MACRO_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "DOMAIN_RELATIONSHIP_OMITTED": {
+    "severity": "warning",
+    "phase": "relationship_build",
+    "scope": "relationship"
+  },
+  "DB_METADATA_DEGRADED": {
+    "severity": "warning",
+    "phase": "schema_probe",
+    "scope": "domain"
+  },
+  "SAFE_TOKEN_COLLISION": {
+    "severity": "warning",
+    "phase": "tokenization",
+    "scope": "artifact"
+  },
+  "MERMAID_SERIALIZATION_FAILED": {
+    "severity": "error",
+    "phase": "serialization",
+    "scope": "artifact"
+  },
+  "OUTPUT_WRITE_FAILED": {
+    "severity": "error",
+    "phase": "publish",
+    "scope": "invocation"
+  },
+  "INTERNAL_ERROR": {
+    "severity": "error",
+    "phase": "internal",
+    "scope": "invocation"
+  }
+}

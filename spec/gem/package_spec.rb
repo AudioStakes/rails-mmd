@@ -38,6 +38,15 @@ RSpec.describe Gem::Package do
     end
   end
 
+  it 'excludes repository-only tooling and test fixtures from the archive' do
+    with_packaged_cli do |packaged_root, _directory|
+      files = Dir.glob('**/*', base: packaged_root)
+
+      expect(files.grep(%r{\A(?:tooling|spec|fixtures)/|lib/rails_mmd/(?:tooling_tasks|verification_runner)\.rb\z}))
+        .to be_empty
+    end
+  end
+
   it 'loads the packaged schemas and diagnostic catalog when generation fails' do
     with_packaged_cli do |packaged_root, directory|
       stdout, stderr, status = run_packaged_cli(packaged_root, directory, 'generate')

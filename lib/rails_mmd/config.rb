@@ -7,7 +7,7 @@ require 'rails_mmd/redactor'
 require 'rails_mmd/schema_validator'
 
 module RailsMmd
-  # Loads and resolves the P0 YAML configuration contract without exposing CLI routing.
+  # Loads and resolves the YAML configuration contract without exposing CLI routing.
   # rubocop:disable-next Metrics/ClassLength, Metrics/AbcSize, Metrics/MethodLength
   class Config
     DEFAULT_CONFIG_PATH = 'rails_mmd.yml'
@@ -23,8 +23,8 @@ module RailsMmd
 
     CliOptions = Struct.new(:config_path, :output_dir, :domain, :format, keyword_init: true)
     Domain = Struct.new(:domain_id, :include_models, :exclude_models, keyword_init: true)
-    Output = Struct.new(:directory, :path, :format, :attributes, :direction, :sources, keyword_init: true)
-    Resolved = Struct.new(:config_path, :domains, :output, :selected_domain_ids, keyword_init: true)
+    Output = Struct.new(:directory, :format, :attributes, :direction, keyword_init: true)
+    Resolved = Struct.new(:domains, :output, :selected_domain_ids, keyword_init: true)
     Result = Struct.new(:config, :diagnostics, :exit_code, keyword_init: true) do
       def success?
         diagnostics.empty?
@@ -91,7 +91,7 @@ module RailsMmd
                        ))
       end
 
-      success(config_path, domains, output, selected_domain_ids)
+      success(domains, output, selected_domain_ids)
     end
 
     def build_domains(domain_data)
@@ -117,13 +117,7 @@ module RailsMmd
         directory_source: directory_source,
         format: format,
         attributes: data.fetch('attributes', DEFAULT_OUTPUT.fetch('attributes')),
-        direction: data.fetch('direction', DEFAULT_OUTPUT.fetch('direction')),
-        sources: {
-          'directory' => source_for(cli_options.output_dir, data, 'directory'),
-          'format' => source_for(cli_options.format, data, 'format'),
-          'attributes' => data.key?('attributes') ? 'config' : 'default',
-          'direction' => data.key?('direction') ? 'config' : 'default'
-        }
+        direction: data.fetch('direction', DEFAULT_OUTPUT.fetch('direction'))
       }
     end
 
@@ -134,18 +128,15 @@ module RailsMmd
       nil
     end
 
-    def success(config_path, domains, output_data, selected_domain_ids)
+    def success(domains, output_data, selected_domain_ids)
       directory = output_data.fetch(:directory_result)
       output = Output.new(
         directory: directory.relative_path,
-        path: directory.path,
         format: output_data.fetch(:format),
         attributes: output_data.fetch(:attributes),
-        direction: output_data.fetch(:direction),
-        sources: output_data.fetch(:sources)
+        direction: output_data.fetch(:direction)
       )
-      config = Resolved.new(config_path: config_path, domains: domains, output: output,
-                            selected_domain_ids: selected_domain_ids)
+      config = Resolved.new(domains: domains, output: output, selected_domain_ids: selected_domain_ids)
 
       Result.new(config: config, diagnostics: [], exit_code: 0)
     end
@@ -182,13 +173,13 @@ module RailsMmd
     end
 
     def data_for_schema_validation(data, cli_options)
-      data = deep_dup(data)
       output = data['output']
       return data unless output.is_a?(Hash)
 
-      output.delete('directory') unless cli_options.output_dir.nil?
-      output.delete('format') unless cli_options.format.nil?
-      data
+      overrides = []
+      overrides << 'directory' unless cli_options.output_dir.nil?
+      overrides << 'format' unless cli_options.format.nil?
+      data.merge('output' => output.except(*overrides))
     end
 
     def configured_output_directory_error(data, cli_options)
@@ -225,25 +216,8 @@ module RailsMmd
       "$.#{pointer.delete_prefix('/').tr('/', '.')}"
     end
 
-    def source_for(cli_value, config_data, key)
-      return 'cli' unless cli_value.nil?
-
-      config_data.key?(key) ? 'config' : 'default'
-    end
-
     def valid_domain_selection?(domain)
       domain.nil? || domain.match?(DOMAIN_ID_PATTERN)
-    end
-
-    def deep_dup(value)
-      case value
-      when Hash
-        value.transform_values { |item| deep_dup(item) }
-      when Array
-        value.map { |item| deep_dup(item) }
-      else
-        value
-      end
     end
   end
 end

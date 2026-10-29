@@ -10,10 +10,10 @@ ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec lefthook install
 
 ## Pre-Commit
 
-The `pre-commit` hook passes all staged paths to the deep
-`RailsMmd::VerificationRunner` class. Lefthook is only the adapter; path
-classification, deduplication, and repair-first ordering live behind the
-class's single `run!` interface.
+The `pre-commit` hook passes staged paths to
+`RailsMmd::VerificationRunner` in `tooling/verification_runner.rb`. Lefthook is
+only the adapter; path classification, deduplication, and repair-first ordering
+live behind the class's single `run!` interface.
 
 For Ruby-like staged files, it runs:
 
@@ -33,9 +33,11 @@ Dependency/setup files have their own route. `Gemfile`, `Gemfile.lock`, and
 and CLI version smoke checks.
 
 RuboCop, RSpec, SimpleCov, and Undercover config files run the relevant
-read-only fallback tasks. Schema, fixture, and setup documentation paths run
-`spec/contracts` so JSON schemas, schema fixtures, Mermaid golden fixtures, and
-setup drift guards stay executable without running unrelated checks.
+read-only fallback tasks. Schema, fixture, and contract documentation paths run
+`spec/contracts` for JSON schemas, schema fixtures, and repository drift guards.
+When a staged `.mmd` fixture is included, that same RSpec invocation also runs
+`spec/rails_mmd/mermaid_serializer_spec.rb` to compare actual serializer output
+with the golden files.
 
 When a repair command changes files, inspect the deterministic diff and stage
 only the intended repairs before rerunning the hook. Do not rely on automatic

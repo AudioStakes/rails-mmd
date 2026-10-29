@@ -1,15 +1,11 @@
 # frozen_string_literal: true
 
 module RailsMmd
-  # Stable ordering helpers used by later pipeline slices.
+  # Stable diagnostic ordering shared by publication and stderr output.
   module Ordering
     SEVERITY_RANK = { 'fatal' => 0, 'error' => 1, 'warning' => 2 }.freeze
 
     module_function
-
-    def sort_by_key(records, key)
-      records.sort_by { |record| record.fetch(key) }
-    end
 
     def sort_diagnostics(records)
       records.sort_by do |diagnostic|

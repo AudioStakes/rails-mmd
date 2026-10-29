@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/tooling_tasks'
+require_relative '../../../tooling/tooling_tasks'
 
 RSpec.describe RailsMmd::ToolingTasks do
   describe '.undercover_compare_ref' do

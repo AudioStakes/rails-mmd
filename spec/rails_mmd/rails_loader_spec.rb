@@ -38,7 +38,6 @@ RSpec.describe RailsMmd::RailsLoader do
 
     expect(result).to be_success
     expect(kernel.loaded_path).to eq(project_root.join('config/environment.rb').to_s)
-    expect(result.application).to be(application)
     expect(application.eager_loaded).to be(true)
   end
 
@@ -80,7 +79,6 @@ RSpec.describe RailsMmd::RailsLoader do
     ).boot
 
     expect(result).to be_success
-    expect(result.application).to be(application)
   end
 
   it 'rejects a different application bundle that links to the target Gemfile' do

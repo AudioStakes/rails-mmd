@@ -53,7 +53,6 @@ module RailsMmd
       plan = yield
       ensure_managed_plan!(plan, selected_domain_ids)
       write_plan(output_path, plan, selected_domain_ids)
-      plan.keys.sort
     end
 
     private

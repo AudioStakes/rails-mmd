@@ -81,15 +81,9 @@ RSpec.describe RailsMmd::Config do
     expect(result.config.output.format).to eq('class')
     expect(result.config.output.attributes).to eq('none')
     expect(result.config.output.direction).to eq('TB')
-    expect(result.config.output.sources).to include(
-      'directory' => 'cli',
-      'format' => 'cli',
-      'attributes' => 'config',
-      'direction' => 'config'
-    )
   end
 
-  it 'reads an explicit future CLI config path' do
+  it 'reads the models from an explicit CLI config path' do
     project_root.join('config').mkpath
     project_root.join('config/diagrams.yml').write(<<~YAML)
       version: 1
@@ -102,7 +96,8 @@ RSpec.describe RailsMmd::Config do
     result = load_config(config_path: 'config/diagrams.yml')
 
     expect(result).to be_success
-    expect(result.config.config_path).to eq(project_root.join('config/diagrams.yml'))
+    expect(result.config.selected_domain_ids).to eq(['admin'])
+    expect(result.config.domains.fetch('admin').include_models).to eq(['Admin::User'])
   end
 
   it 'returns a schema-valid CONFIG_NOT_FOUND diagnostic without writes' do

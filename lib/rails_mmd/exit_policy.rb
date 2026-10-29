@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RailsMmd
-  # Maps diagnostics to the public P0 process exit contract.
+  # Maps diagnostics to the public process exit contract.
   module ExitPolicy
     EXIT_CODE_BY_DIAGNOSTIC_CODE = {
       'MERMAID_SERIALIZATION_FAILED' => 3,

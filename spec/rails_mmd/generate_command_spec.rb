@@ -5,7 +5,7 @@ require 'tmpdir'
 
 # rubocop:disable-next Lint/ConstantDefinitionInBlock, RSpec/ExampleLength, RSpec/InstanceVariable, RSpec/LeakyConstantDeclaration, RSpec/MultipleExpectations
 RSpec.describe RailsMmd::GenerateCommand do
-  LoaderResult = Struct.new(:success?, :application, :diagnostics, :exit_code)
+  LoaderResult = Struct.new(:success?, :diagnostics, :exit_code)
 
   class FakeLoader
     attr_reader :boot_count
@@ -65,7 +65,7 @@ RSpec.describe RailsMmd::GenerateCommand do
       publisher = instance_double(
         RailsMmd::Publisher,
         publish: RailsMmd::Publisher::Result.new(
-          success: false, diagnostics: [failure_diagnostic], written_paths: [], stderr: nil
+          success: false, diagnostics: [failure_diagnostic], stderr: nil
         ),
         pre_output_stderr: "fallback stderr\n"
       )
@@ -113,7 +113,7 @@ RSpec.describe RailsMmd::GenerateCommand do
 
   it 'returns Rails boot failure without crossing the pipeline seam' do
     in_project do |root|
-      loader = FakeLoader.new(result: LoaderResult.new(false, nil, [diagnostic('RAILS_LOAD_FAILED')], 2))
+      loader = FakeLoader.new(result: LoaderResult.new(false, [diagnostic('RAILS_LOAD_FAILED')], 2))
       pipeline = FakePipeline.new(pipeline_result)
 
       result = described_class.new(project_root: root, rails_loader: loader, pipeline: pipeline)
@@ -186,7 +186,7 @@ RSpec.describe RailsMmd::GenerateCommand do
   end
 
   def successful_loader
-    FakeLoader.new(result: LoaderResult.new(true, Object.new, [], 0))
+    FakeLoader.new(result: LoaderResult.new(true, [], 0))
   end
 
   def pipeline_result(diagnostics: [], artifacts: {})

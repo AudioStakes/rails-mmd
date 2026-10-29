@@ -26,16 +26,12 @@ module RailsMmd
       :association_name,
       :association_macro,
       :relationship_kind,
-      :join_table_name,
       :declaration_owner_entity_id,
-      :through_path,
       :foreign_key_holder_entity_id,
       :foreign_key_column,
       :foreign_type_column,
       :referenced_primary_key_column,
       :physical_key,
-      :owner_foreign_key_column,
-      :target_primary_key_column,
       :foreign_key_unique,
       :foreign_key_constraint,
       :foreign_key_nullable,
@@ -237,9 +233,7 @@ module RailsMmd
         owner_entity_id: left[0],
         target_entity_id: right[0],
         association_name: association_name,
-        association_macro: :has_and_belongs_to_many,
         relationship_kind: :habtm,
-        join_table_name: join_table,
         declaration_owner_entity_id: entity_id(owner),
         physical_key: "habtm|#{join_table}|#{left[0]}|#{left[2]}|#{right[0]}|#{right[2]}",
         owner_cardinality: '0..many',
@@ -409,10 +403,6 @@ module RailsMmd
 
     def build_direct_reflection(context, owner, reflection)
       association_name = reflection_name(reflection)
-      if inverse_polymorphic?(reflection)
-        return omitted(context, owner, association_name,
-                       'ASSOCIATION_POLYMORPHIC_OMITTED')
-      end
       return omitted(context, owner, association_name, 'ASSOCIATION_SCOPED_OMITTED') if scoped?(reflection)
 
       sanitized_name = sanitize_association_name(association_name)
@@ -499,7 +489,6 @@ module RailsMmd
     def build_belongs_to_reflection(context, owner, reflection)
       association_name = reflection_name(reflection)
       sanitized_name = sanitize_association_name(association_name)
-      return omitted(context, owner, association_name, 'ASSOCIATION_POLYMORPHIC_OMITTED') if polymorphic?(reflection)
       return omitted(context, owner, association_name, 'ASSOCIATION_SCOPED_OMITTED') if scoped?(reflection)
 
       return omitted(context, owner, association_name, 'ASSOCIATION_NAME_UNSUPPORTED_OMITTED') unless sanitized_name
@@ -552,13 +541,9 @@ module RailsMmd
         referenced_primary_key_column: target_primary_key_column,
         physical_key: physical_key(entity_id(owner), owner_foreign_key_column, entity_id(target),
                                    target_primary_key_column),
-        owner_foreign_key_column: owner_foreign_key_column,
-        target_primary_key_column: target_primary_key_column,
         foreign_key_unique: foreign_key_unique,
         foreign_key_constraint: foreign_key_constraint,
-        foreign_key_nullable: foreign_key_nullable,
-        owner_cardinality: foreign_key_unique ? '0..1' : '0..many',
-        target_cardinality: foreign_key_constraint && foreign_key_nullable == false ? '1..1' : '0..1'
+        foreign_key_nullable: foreign_key_nullable
       )
     end
 
@@ -579,13 +564,9 @@ module RailsMmd
         foreign_key_column: foreign_key,
         referenced_primary_key_column: referenced_primary_key,
         physical_key: physical_key(entity_id(target), foreign_key, entity_id(owner), referenced_primary_key),
-        owner_foreign_key_column: foreign_key,
-        target_primary_key_column: referenced_primary_key,
         foreign_key_unique: unique_foreign_key_column?(target, foreign_key),
         foreign_key_constraint: foreign_key_constraint,
-        foreign_key_nullable: foreign_key_nullable,
-        owner_cardinality: foreign_key_constraint && foreign_key_nullable == false ? '1..1' : '0..1',
-        target_cardinality: macro == :has_one ? '0..1' : '0..many'
+        foreign_key_nullable: foreign_key_nullable
       )
     end
 
@@ -603,21 +584,13 @@ module RailsMmd
         owner_entity_id: entity_id(owner),
         target_entity_id: entity_id(target),
         association_name: association_name,
-        association_macro: :belongs_to,
         relationship_kind: :polymorphic,
-        foreign_key_holder_entity_id: entity_id(owner),
         foreign_key_column: foreign_key,
         foreign_type_column: foreign_type,
-        referenced_primary_key_column: target.primary_key,
         physical_key: [
           'polymorphic', entity_id(owner), association_name,
           foreign_key, foreign_type, entity_id(target)
         ].join('|'),
-        owner_foreign_key_column: foreign_key,
-        target_primary_key_column: target.primary_key,
-        foreign_key_unique: singular,
-        foreign_key_constraint: false,
-        foreign_key_nullable: column_nullable?(owner, foreign_key) || column_nullable?(owner, foreign_type),
         owner_cardinality: singular ? '0..1' : '0..many',
         target_cardinality: '0..1'
       )
@@ -634,7 +607,6 @@ module RailsMmd
         association_name: association_name,
         association_macro: macro,
         relationship_kind: :through,
-        through_path: path_names,
         physical_key: "through|#{entity_id(owner)}|#{path_names.join('|')}|#{entity_id(target)}",
         owner_cardinality: '0..many',
         target_cardinality: macro == :has_one ? '0..1' : '0..many'

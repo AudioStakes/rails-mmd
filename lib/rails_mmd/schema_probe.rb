@@ -12,7 +12,6 @@ module RailsMmd
     Entity = Struct.new(
       :ruby_constant,
       :table_name,
-      :connection_context_id,
       :columns,
       :primary_key,
       :foreign_keys,
@@ -130,7 +129,6 @@ module RailsMmd
         Entity.new(
           ruby_constant: record.ruby_constant,
           table_name: record.table_name,
-          connection_context_id: record.connection_context_id,
           columns: columns,
           primary_key: primary_key,
           foreign_keys: foreign_keys,

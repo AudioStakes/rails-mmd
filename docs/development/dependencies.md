@@ -15,7 +15,7 @@ are listed in the [README](../../README.md).
 
 ## Development and test
 
-- `rake`, `rspec`, `aruba`, `climate_control`
+- `rake`, `rspec`, `climate_control`
 - `simplecov`, `undercover`
 - `rubocop`, `rubocop-rspec`, `rubocop-rake`, `rubocop-performance`, `rubocop-packaging`
 - `bundler-audit`, `lefthook`

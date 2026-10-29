@@ -1192,7 +1192,6 @@ RSpec.describe RailsMmd::RelationshipBuilder do
     RailsMmd::SchemaProbe::Entity.new(
       ruby_constant: ruby_constant,
       table_name: table_name,
-      connection_context_id: '{"name":"primary"}',
       columns: columns,
       primary_key: primary_key,
       foreign_keys: foreign_keys,

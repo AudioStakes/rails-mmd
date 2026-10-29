@@ -4,7 +4,7 @@ require 'json'
 require 'json_schemer'
 
 # rubocop:disable-next RSpec/DescribeClass
-RSpec.describe 'P0 contract schemas' do
+RSpec.describe 'contract schemas' do
   def schema_root
     Pathname(__dir__).join('../../schemas').expand_path
   end
@@ -67,7 +67,16 @@ RSpec.describe 'P0 contract schemas' do
       diagnostics_invalid_fixtures.each { |path| expect_invalid('diagnostics', path) }
     end
 
-    it 'covers every diagnostic code from the P0 catalog fixture' do
+    it 'keeps runtime defaults aligned with the independent diagnostic examples' do
+      defaults = load_json(schema_root.join('diagnostic_defaults.json'))
+      expected = fixture('diagnostics/valid/catalog.json').fetch('diagnostics').to_h do |diagnostic|
+        [diagnostic.fetch('code'), diagnostic.slice('severity', 'phase', 'scope')]
+      end
+
+      expect(defaults).to eq(expected)
+    end
+
+    it 'covers every diagnostic code from the catalog fixture' do
       catalog = fixture('diagnostics/valid/catalog.json').fetch('diagnostics')
       codes = catalog.map { |diagnostic| diagnostic.fetch('code') }
 

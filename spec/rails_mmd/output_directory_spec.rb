@@ -33,12 +33,11 @@ RSpec.describe RailsMmd::OutputDirectory do
     output.join('core.er.json').write('lookalike user file')
     output.join('notes.txt').write('user file')
 
-    written_paths = output_directory.publish!(
+    output_directory.publish!(
       output_directory.resolve('out'),
       selected_domain_ids: ['core']
     ) { { 'core.er.mmd' => 'new mermaid' } }
 
-    expect(written_paths).to eq(['core.er.mmd'])
     expect(output.join('core.diagnostics.json')).not_to exist
     expect(output.join('core.er.mmd').read).to eq('new mermaid')
     expect(output.join('admin.er.mmd').read).to eq('unselected')

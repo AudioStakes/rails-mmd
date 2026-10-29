@@ -6,7 +6,7 @@ require 'rails_mmd/generate_command'
 require_relative 'version'
 
 module RailsMmd
-  # Minimal Thor shell for smokeable help and version output.
+  # Exposes generation, help, and version commands through Thor.
   class CLI < Thor
     MISSING_OPTION_VALUE = Object.new.freeze
     GENERATE_HELP = <<~HELP
@@ -68,7 +68,6 @@ module RailsMmd
       end
 
       def emit_result(result)
-        print result.stdout unless result.stdout.empty?
         warn result.stderr unless result.stderr.empty?
         exit(result.exit_code)
       end

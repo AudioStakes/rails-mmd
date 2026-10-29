@@ -10,7 +10,7 @@ module RailsMmd
     RUBY_PATH = %r{
       \A(?:
         [^/]+\.(?:rb|rake)|Rakefile|exe/rails-mmd|bin/.+|lib/.+\.rb|
-        spec/(?:.+/)?[^/]+\.rb|features/(?:.+/)?[^/]+\.rb
+        spec/(?:.+/)?[^/]+\.rb|tooling/(?:.+/)?[^/]+\.rb
       )\z
     }x
     DIRECT_SPEC_PATH = %r{\Aspec/.+_spec\.rb\z}
@@ -35,9 +35,8 @@ module RailsMmd
       end
     end
 
-    def initialize(process: ProcessAdapter.new, output: $stdout, error: $stderr)
+    def initialize(process: ProcessAdapter.new, error: $stderr)
       @process = process
-      @output = output
       @error = error
     end
 
@@ -50,7 +49,7 @@ module RailsMmd
 
     private
 
-    attr_reader :error, :output, :process
+    attr_reader :error, :process
 
     def route(paths)
       run_ruby_checks(paths.grep(RUBY_PATH))
@@ -59,7 +58,6 @@ module RailsMmd
       run_ruby_version_smoke(paths)
       run_rubocop_config(paths)
       run_contracts(paths)
-      report_p0_contract(paths)
     end
 
     def normalize_paths(paths)
@@ -131,13 +129,11 @@ module RailsMmd
     end
 
     def run_contracts(paths)
-      process.run!('bundle', 'exec', 'rspec', 'spec/contracts') if paths.any? { |path| path.match?(CONTRACT_PATH) }
-    end
+      return unless paths.any? { |path| path.match?(CONTRACT_PATH) }
 
-    def report_p0_contract(paths)
-      return unless paths.include?('docs/p0-contract.md')
-
-      output.puts('docs/p0-contract.md changed; no P0 contract verifier exists yet.')
+      specs = ['spec/contracts']
+      specs << 'spec/rails_mmd/mermaid_serializer_spec.rb' if paths.any? { |path| path.end_with?('.mmd') }
+      process.run!('bundle', 'exec', 'rspec', *specs)
     end
   end
 end

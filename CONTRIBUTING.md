@@ -56,7 +56,7 @@ The gate includes lint, specs, coverage, dependency audit, and the Rails compati
 
 Push your branch to your fork and open a pull request against `AudioStakes/rails-mmd`'s `main` branch. Explain the problem, resulting behavior, and any limitations. Keep unrelated changes out of the pull request.
 
-Keep changes consistent with the [P0 contract](docs/p0-contract.md) and the [association support matrix](docs/active-record-association-support.md). Add a real-app matrix expectation when association behavior changes.
+Keep changes consistent with the [generation contract](docs/contract.md) and the [association support matrix](docs/active-record-association-support.md). Add a real-app matrix expectation when association behavior changes.
 
 ## Releases
 

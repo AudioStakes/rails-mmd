@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'rails_mmd/verification_runner'
+require_relative '../../../tooling/verification_runner'
 require 'stringio'
 require 'tmpdir'
 require 'yaml'
@@ -60,10 +60,9 @@ RSpec.describe RailsMmd::VerificationRunner do
     end
   end
 
-  subject(:routing) { described_class.new(process: process, output: output, error: error) }
+  subject(:routing) { described_class.new(process: process, error: error) }
 
   let(:process) { RecordingProcess.new }
-  let(:output) { StringIO.new }
   let(:error) { StringIO.new }
 
   describe RailsMmd::VerificationRunner::ProcessAdapter do
@@ -85,7 +84,6 @@ RSpec.describe RailsMmd::VerificationRunner do
     routing.run!(full_path_set)
 
     expect(process.commands).to eq(expected_full_commands)
-    expect(output.string).to include('no P0 contract verifier exists yet')
   end
 
   it 'runs direct specs without the full coverage suite' do
@@ -100,6 +98,14 @@ RSpec.describe RailsMmd::VerificationRunner do
 
     expect(process.commands).to include(%w[bundle exec rake coverage])
     expect(process.commands).not_to include(%w[bundle exec rspec spec/example_spec.rb])
+  end
+
+  it 'verifies changed Mermaid fixtures against the actual serializer' do
+    routing.run!(%w[fixtures/mermaid/er_markers_pk_fk.mmd])
+
+    expect(process.commands).to eq(
+      [%w[bundle exec rspec spec/contracts spec/rails_mmd/mermaid_serializer_spec.rb]]
+    )
   end
 
   it 'preserves spaced filenames as argv entries' do
@@ -157,9 +163,9 @@ RSpec.describe RailsMmd::VerificationRunner do
     expect(process.commands).to include(
       ['bundle', 'exec', 'rubocop', '--force-exclusion', '--', *representative_ruby_paths],
       %w[bundle check],
-      %w[bundle exec rspec spec/contracts]
+      %w[bundle exec rspec spec/contracts spec/rails_mmd/mermaid_serializer_spec.rb]
     )
-    expect(process.commands.count { |command| command == %w[bundle exec rspec spec/contracts] }).to eq(1)
+    expect(process.commands.count { |command| command.include?('spec/contracts') }).to eq(1)
   end
 
   it 'runs the repair-first path against an isolated real Git repository' do
@@ -194,7 +200,7 @@ RSpec.describe RailsMmd::VerificationRunner do
   def full_path_set
     %w[
       lib/example.rb spec/example_spec.rb .rspec Gemfile .ruby-version .rubocop.yml
-      schemas/config.schema.json docs/p0-contract.md
+      schemas/config.schema.json docs/contract.md
     ]
   end
 
@@ -218,7 +224,7 @@ RSpec.describe RailsMmd::VerificationRunner do
   def activation_globs
     %w[
       *.rb *.rake Rakefile exe/rails-mmd bin/**/* lib/**/*.rb spec/*.rb spec/**/*.rb
-      features/*.rb features/**/*.rb .rspec .simplecov .undercover.yml Gemfile Gemfile.lock
+      tooling/*.rb tooling/**/*.rb .rspec .simplecov .undercover.yml Gemfile Gemfile.lock
       *.gemspec .ruby-version .rubocop.yml schemas/*.json schemas/**/*.json fixtures/*.json
       fixtures/**/*.json fixtures/*.mmd fixtures/**/*.mmd AGENTS.md README.md docs/*.md docs/**/*.md
     ]
@@ -234,12 +240,12 @@ RSpec.describe RailsMmd::VerificationRunner do
   def representative_ruby_paths
     %w[
       root.rb task.rake Rakefile exe/rails-mmd bin/tool lib/example.rb
-      spec/example.rb spec/unit/example_spec.rb features/example.rb features/unit/example.rb
+      spec/example.rb spec/unit/example_spec.rb tooling/example.rb tooling/nested/example.rb
     ]
   end
 
   def real_git_routing(repair: nil)
-    described_class.new(process: GitProcess.new(repair: repair), output: output, error: error)
+    described_class.new(process: GitProcess.new(repair: repair), error: error)
   end
 
   def in_git_repository(&block)

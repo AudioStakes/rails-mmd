@@ -10,8 +10,6 @@ module RailsMmd
   class ModelInventory
     Record = Struct.new(
       :ruby_constant,
-      :abstract_class,
-      :base_class,
       :table_name,
       :connection_context_id,
       :renderable,
@@ -55,8 +53,6 @@ module RailsMmd
 
       Record.new(
         ruby_constant: model.name,
-        abstract_class: abstract,
-        base_class: base_model&.name,
         table_name: table_name,
         connection_context_id: connection_context_id,
         renderable: renderability_reason.nil?,
@@ -122,12 +118,8 @@ module RailsMmd
     def sanitize_context(context)
       raw_context = context.to_h.transform_keys(&:to_s)
       CONNECTION_CONTEXT_KEYS.to_h do |key|
-        [key, sanitize_context_value(raw_context.fetch(key, default_context_value(key)))]
+        [key, raw_context.fetch(key, default_context_value(key))]
       end
-    end
-
-    def sanitize_context_value(value)
-      value
     end
 
     def default_context_value(key)
@@ -137,8 +129,7 @@ module RailsMmd
     def connection_context_value(connection_source, method_name)
       return unless connection_source.respond_to?(method_name)
 
-      context_value = connection_source.public_send(method_name)
-      sanitize_context_value(context_value)
+      connection_source.public_send(method_name)
     end
   end
 end

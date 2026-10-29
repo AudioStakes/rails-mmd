@@ -7,7 +7,6 @@ ruby file: '.ruby-version'
 gemspec
 
 group :development, :test do
-  gem 'aruba'
   gem 'bundler-audit', require: false
   gem 'climate_control'
   gem 'lefthook', require: false

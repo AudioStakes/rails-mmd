@@ -24,7 +24,7 @@ RSpec.describe RailsMmd::DomainResolver do
     expect(result.diagnostics).to eq([])
   end
 
-  it 'respects a future selected domain from config loading' do
+  it 'respects the selected domain from config loading' do
     config = config_for(
       {
         'core' => { include: ['User'], exclude: [] },
@@ -102,8 +102,6 @@ RSpec.describe RailsMmd::DomainResolver do
   def record(ruby_constant, renderable: true, reason: nil, connection_context_id: '{"name":"primary"}')
     RailsMmd::ModelInventory::Record.new(
       ruby_constant: ruby_constant,
-      abstract_class: reason == 'abstract_class',
-      base_class: ruby_constant,
       table_name: ruby_constant.split('::').last.downcase,
       connection_context_id: connection_context_id,
       renderable: renderable,

@@ -9,14 +9,6 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    aruba (3.0.1)
-      bundler (>= 2.4)
-      contracts (>= 0.16.0, < 0.18.0)
-      cucumber-core (>= 16.0, < 21.0)
-      marcel (>= 1.2, < 3.0)
-      rspec-expectations (>= 3.4, < 5.0)
-      tempfile (~> 0.3.1)
-      thor (~> 1.0)
     ast (2.4.3)
     base64 (0.3.0)
     benchmark (0.5.0)
@@ -25,15 +17,6 @@ GEM
       bundler (>= 1.2.0)
       thor (~> 1.0)
     climate_control (1.2.0)
-    contracts (0.17.3)
-    cucumber-core (20.0.0)
-      cucumber-gherkin (> 36, < 43)
-      cucumber-messages (> 31, < 35)
-      cucumber-tag-expressions (> 6, < 12)
-    cucumber-gherkin (42.0.1)
-      cucumber-messages (>= 34, < 35)
-    cucumber-messages (34.2.1)
-    cucumber-tag-expressions (11.0.1)
     diff-lcs (1.6.2)
     hana (1.3.7)
     imagen (0.2.0)
@@ -48,7 +31,6 @@ GEM
     language_server-protocol (3.17.0.6)
     lefthook (2.2.2)
     lint_roller (1.1.0)
-    marcel (2.1.0)
     parallel (2.3.0)
     parser (3.3.12.0)
       ast (~> 2.4.1)
@@ -104,7 +86,6 @@ GEM
     simplecov (1.3.2)
     simplecov_json_formatter (0.1.4)
     simpleidn (0.2.3)
-    tempfile (0.3.2)
     thor (1.5.0)
     undercover (0.8.5)
       base64
@@ -133,7 +114,6 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  aruba
   bundler-audit
   climate_control
   lefthook
@@ -149,18 +129,12 @@ DEPENDENCIES
   undercover
 
 CHECKSUMS
-  aruba (3.0.1) sha256=73bed71f8b5f7f8ace2a2ad3d8bbae3369fdcd1dd677978db9db02192913c2bd
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   benchmark (0.5.0) sha256=465df122341aedcb81a2a24b4d3bd19b6c67c1530713fd533f3ff034e419236c
   bigdecimal (4.1.3) sha256=61ebe1e5e559bdc3cc6f2c0ee7f427321fc838f59611c294356eb04d6e21cf66
   bundler-audit (0.9.3) sha256=81c8766c71e47d0d28a0f98c7eed028539f21a6ea3cd8f685eb6f42333c9b4e9
   climate_control (1.2.0) sha256=36b21896193fa8c8536fa1cd843a07cf8ddbd03aaba43665e26c53ec1bd70aa5
-  contracts (0.17.3) sha256=e72e626413ea47099becb7b5683beb1c2ea902c69f5bad55c9258fe2b48314d7
-  cucumber-core (20.0.0) sha256=15034c5f268e5311342d59679fb6310584db7e06e1c7a922c9138cd028dae292
-  cucumber-gherkin (42.0.1) sha256=427efa1996770fd91a6e860e3f2e8b644108682256f4189db494fe85f4595e2f
-  cucumber-messages (34.2.1) sha256=1de715dfeaa237939b8ab008987d3fbf3118ba32a86d844fd1503396ecc5bf7e
-  cucumber-tag-expressions (11.0.1) sha256=ead62a1c6bb613de1f5469975a9dd11ba2ced7322a6c8837cdde9db33dcbeac5
   diff-lcs (1.6.2) sha256=9ae0d2cba7d4df3075fe8cd8602a8604993efc0dfa934cff568969efb1909962
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
   imagen (0.2.0) sha256=369fe912078877dba92615ebfc6f35a7d833e31f24f47bdd3ad5371a4139e24b
@@ -170,7 +144,6 @@ CHECKSUMS
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
   lefthook (2.2.2) sha256=c43405b5fd14cd6de0dad8bfb76895767e8f21bb342460f6434191b32c5be333
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87
-  marcel (2.1.0) sha256=f8b0327111dc7e516331eeefe052e981ce50e2bd826c1042a53cdf047fcc3512
   parallel (2.3.0) sha256=f75a3e904101ce6a1ccb6b8dc800cbafd42166d83330192438dcf29395167a6f
   parser (3.3.12.0) sha256=21a6d7f755d5a24dfbdc6e6b772e4e879a52e7631a88bc5a3a134606052c9828
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
@@ -195,7 +168,6 @@ CHECKSUMS
   simplecov (1.3.2) sha256=2a22ec1759f1b8db60881a2e038758956fc69ef93ed669be0bde0678de6d0e85
   simplecov_json_formatter (0.1.4) sha256=529418fbe8de1713ac2b2d612aa3daa56d316975d307244399fa4838c601b428
   simpleidn (0.2.3) sha256=08ce96f03fa1605286be22651ba0fc9c0b2d6272c9b27a260bc88be05b0d2c29
-  tempfile (0.3.2) sha256=5c35f90a620e429fb948ef54decf774dc26d36c2d63d285a2914884c42d80482
   thor (1.5.0) sha256=e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73
   undercover (0.8.5) sha256=054a3c77ef3a08a2e8ebcc272a383b7e187fb30b55c2a164ff1643dc2999aaa9
   unicode-display_width (3.3.0) sha256=4b7aa66a4b11db50f6f7e98411215cd0dd10eaecb665d36eec5bcacb3fa0b613

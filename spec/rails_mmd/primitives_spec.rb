@@ -208,9 +208,10 @@ RSpec.describe 'runtime primitives' do
   end
 
   describe RailsMmd::DiagnosticFactory do
-    it 'exposes the closed diagnostic catalog from the schema fixture' do
-      expect(described_class.codes).to include('CONFIG_NOT_FOUND', 'SAFE_TOKEN_COLLISION', 'INTERNAL_ERROR')
-      expect(described_class.codes).not_to include('UNKNOWN_CODE')
+    it 'rejects codes outside the closed diagnostic contract' do
+      expect do
+        described_class.new.build(code: 'UNKNOWN_CODE', message: 'unknown')
+      end.to raise_error(KeyError)
     end
 
     it 'builds schema-valid closed diagnostics and rejects extra metadata' do
@@ -329,7 +330,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   describe RailsMmd::SafeTokenAssigner do
-    it 'implements the P0 safe-token examples' do
+    it 'normalizes structured sources to safe tokens' do
       subjects = {
         'Admin::User' => 'ADMIN_USER',
         'HTTPResponseCode' => 'HTTP_RESPONSE_CODE',
@@ -457,10 +458,7 @@ RSpec.describe 'runtime primitives' do
   end
 
   describe RailsMmd::Ordering do
-    it 'sorts records deterministically by named keys and diagnostic tuple' do
-      expect(described_class.sort_by_key([{ 'id' => 'b' }, { 'id' => 'a' }], 'id'))
-        .to eq([{ 'id' => 'a' }, { 'id' => 'b' }])
-
+    it 'sorts diagnostics deterministically by severity, code, subject, and identity' do
       diagnostics = [
         { 'severity' => 'fatal', 'phase' => 'tokenization', 'code' => 'SAFE_TOKEN_COLLISION', 'subject_id' => 'c',
           'diagnostic_id' => '3' },
@@ -488,7 +486,7 @@ RSpec.describe 'runtime primitives' do
       files = Gem::Specification.load('rails-mmd.gemspec').files
 
       expect(files).to include(
-        'fixtures/schemas/diagnostics/valid/catalog.json',
+        'schemas/diagnostic_defaults.json',
         'schemas/diagnostics.schema.json',
         'schemas/config.schema.json',
         'schemas/ir.schema.json',
