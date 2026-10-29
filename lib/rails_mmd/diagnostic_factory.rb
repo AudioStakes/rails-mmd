@@ -10,7 +10,7 @@ require 'rails_mmd/subject_ids'
 module RailsMmd
   # Schema-backed diagnostic object factory.
   class DiagnosticFactory
-    CATALOG_PATH = Pathname(__dir__).join('../../fixtures/schemas/diagnostics/valid/catalog.json').expand_path
+    DEFAULTS_PATH = Pathname(__dir__).join('../../schemas/diagnostic_defaults.json').expand_path
     SCHEMA_PATH = Pathname(__dir__).join('../../schemas/diagnostics.schema.json').expand_path
     FREE_TEXT_REFS = %w[#/$defs/relative_path #/$defs/sanitized_string].freeze
 
@@ -20,7 +20,7 @@ module RailsMmd
     end
 
     def build(code:, message:, **options)
-      template = self.class.catalog.fetch(code)
+      template = self.class.defaults.fetch(code)
       diagnostic = diagnostic_payload(code, message, template, options)
       validate_metadata_keys!(code, diagnostic.fetch('metadata'))
       self.class.metadata_shapes.validate!(code, diagnostic.fetch('metadata'))
@@ -61,14 +61,8 @@ module RailsMmd
       }
     end
 
-    def self.codes
-      catalog.keys
-    end
-
-    def self.catalog
-      @catalog ||= JSON.parse(CATALOG_PATH.read).fetch('diagnostics').to_h do |diagnostic|
-        [diagnostic.fetch('code'), diagnostic]
-      end
+    def self.defaults
+      @defaults ||= JSON.parse(DEFAULTS_PATH.read)
     end
 
     def self.metadata_shapes

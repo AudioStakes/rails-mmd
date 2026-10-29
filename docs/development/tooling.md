@@ -29,11 +29,10 @@ network access is intended:
 ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake bundle:audit:update
 ```
 
-Set `UNDERCOVER_COMPARE` when a stacked PR should compare changed-code coverage
-against a specific base branch:
+Set `UNDERCOVER_COMPARE` to compare changed-code coverage against the PR base:
 
 ```sh
-UNDERCOVER_COMPARE=issue/9-bootstrap-ruby-gem-and-cli-skeleton \
+UNDERCOVER_COMPARE=origin/main \
   ASDF_RUBY_VERSION=4.0.6 asdf exec bundle exec rake coverage
 ```
 
@@ -54,4 +53,7 @@ it 'uses an isolated environment', env: { 'RAILS_MMD_EXAMPLE' => '1' } do
 end
 ```
 
-Aruba is loaded in `spec/spec_helper.rb` for future CLI acceptance tests.
+CLI specs use Ruby subprocesses to exercise the executable. See the
+[testing guide](testing.md) for contract fixtures, package checks, and matrix
+expectations. Development-only task and hook helpers live in `tooling/` and are
+not shipped in the gem; coverage includes both `lib/` and `tooling/`.

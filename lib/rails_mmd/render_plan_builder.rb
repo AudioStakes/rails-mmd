@@ -9,7 +9,7 @@ module RailsMmd
   # Projects normalized IR into renderer-only ER or class render plans.
   # rubocop:disable-next Metrics/AbcSize, Metrics/ClassLength, Metrics/MethodLength, Metrics/ParameterLists, Naming/MethodParameterName, Style/MultilineBlockChain
   class RenderPlanBuilder
-    DomainResult = Struct.new(:domain_id, :payload, :diagnostics, keyword_init: true)
+    DomainResult = Struct.new(:payload, :diagnostics, keyword_init: true)
 
     ER_MARKERS = {
       '0..1' => ['|o', 'o|'],
@@ -42,7 +42,7 @@ module RailsMmd
         available_diagnostic_ids: available_diagnostic_ids
       )
 
-      DomainResult.new(domain_id: ir.fetch('domain_id'), payload: payload, diagnostics: diagnostics)
+      DomainResult.new(payload: payload, diagnostics: diagnostics)
     end
 
     private

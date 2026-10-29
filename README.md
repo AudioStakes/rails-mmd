@@ -73,9 +73,9 @@ Relationship cardinality uses database foreign-key, nullability, and unique-inde
 
 ## Contributing and development
 
-See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks, the [changelog](https://github.com/AudioStakes/rails-mmd/blob/main/CHANGELOG.md) for released changes, and the [release guide](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/releasing.md) for the manual publishing process. Implementation contracts are in [docs/p0-contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. The contributor guide and development notes are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.
+See [CONTRIBUTING.md](https://github.com/AudioStakes/rails-mmd/blob/main/CONTRIBUTING.md) for local setup and checks, the [changelog](https://github.com/AudioStakes/rails-mmd/blob/main/CHANGELOG.md) for released changes, and the [release guide](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/releasing.md) for the manual publishing process. The current generation contract is in [docs/contract.md](https://github.com/AudioStakes/rails-mmd/blob/main/docs/contract.md); the [development notes](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/tooling.md) cover the Rake tasks. The contributor guide and development notes are maintained in the repository, outside the installed gem. Serena is optional local development tooling, not a runtime dependency.
 
-The [P0 blocking fixture matrix](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-blocking-fixture-matrix.md) records the required verification cases.
+The [testing guide](https://github.com/AudioStakes/rails-mmd/blob/main/docs/development/testing.md) maps the contract to executable fixtures, failure-path checks, and the real Rails matrix.
 
 ## License
 

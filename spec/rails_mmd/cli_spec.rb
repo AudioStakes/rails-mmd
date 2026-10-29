@@ -25,7 +25,7 @@ RSpec.describe RailsMmd::CLI do
       expect(result[0]).to include('rails-mmd generate', 'rails-mmd help [COMMAND]', 'rails-mmd version')
     end
 
-    it 'does not expose excluded P0 option names' do
+    it 'does not expose unsupported option names' do
       expect(result[0]).not_to match(/\.erdconfig|--strict|--no-strict|--allow-partial|--validate|--cache/)
     end
   end
@@ -83,14 +83,14 @@ RSpec.describe RailsMmd::CLI do
     expect_generator_fail_on_warning(generator, true)
   end
 
-  it 'passes all P0 generate options through Thor in process' do
+  it 'passes all supported generate options through Thor in process' do
     generator = stub_generator
 
-    expect { described_class.start(p0_generate_args) }.to raise_error(SystemExit)
-    expect_generator_p0_options(generator)
+    expect { described_class.start(generate_args) }.to raise_error(SystemExit)
+    expect_generator_options(generator)
   end
 
-  it 'ignores non-true fail-on-warning values through Thor in process' do
+  it 'passes a false fail-on-warning value through Thor in process' do
     generator = stub_generator
 
     expect do
@@ -127,7 +127,7 @@ RSpec.describe RailsMmd::CLI do
       end
     end
 
-    it 'prints P0 options in command help' do
+    it 'prints supported options in command help' do
       stdout, stderr, status = run_cli('generate', '--help')
 
       expect_generate_help(stdout, stderr, status)
@@ -175,7 +175,7 @@ RSpec.describe RailsMmd::CLI do
   end
 
   def stub_generator
-    result = Struct.new(:stdout, :stderr, :exit_code).new('', '', 0)
+    result = Struct.new(:stderr, :exit_code).new('', 0)
     instance_double(RailsMmd::GenerateCommand, run: result).tap do |generator|
       allow(RailsMmd::GenerateCommand).to receive(:new).and_return(generator)
     end
@@ -195,7 +195,7 @@ RSpec.describe RailsMmd::CLI do
     )
   end
 
-  def expect_generator_p0_options(generator)
+  def expect_generator_options(generator)
     expect(generator).to have_received(:run).with(
       cli_options: have_attributes(
         config_path: 'config.yml',
@@ -207,7 +207,7 @@ RSpec.describe RailsMmd::CLI do
     )
   end
 
-  def p0_generate_args
+  def generate_args
     %w[generate --config config.yml --output-dir docs/diagrams --domain billing --format class --fail-on-warning]
   end
 

@@ -71,8 +71,6 @@ RSpec.describe RailsMmd::ModelInventory do
 
     expect(record.members).to eq(%i[
                                    ruby_constant
-                                   abstract_class
-                                   base_class
                                    table_name
                                    connection_context_id
                                    renderable
@@ -80,8 +78,6 @@ RSpec.describe RailsMmd::ModelInventory do
                                  ])
     expect(record.to_h).to include(
       ruby_constant: 'User',
-      abstract_class: false,
-      base_class: 'User',
       table_name: 'users',
       renderable: true,
       renderability_reason: nil

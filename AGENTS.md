@@ -1,8 +1,8 @@
 # Repository Instructions
 
 This repository is a standalone Ruby CLI/gem project named `rails-mmd`.
-The product is a Ruby command-line tool that generates Mermaid diagrams
-from Rails/ActiveRecord applications. The P0 runtime and selected P1 association support are implemented.
+The product is a Ruby command-line tool that generates Mermaid ER and class
+diagrams from the supported Rails/ActiveRecord association forms.
 
 ## Project Model
 
@@ -12,9 +12,9 @@ from Rails/ActiveRecord applications. The P0 runtime and selected P1 association
   issue explicitly changes the project model.
 - Do not create generated Node package-manager manifests or lockfiles.
 - Do not apply monorepo policy assumptions from other AudioStakes repositories.
-- Treat `docs/p0-contract.md` as the source of truth for P0 implementation
-  scope. Do not rely on chat history, local attachments, or local-only paths for
-  P0 behavior.
+- Treat `docs/contract.md`, `docs/active-record-association-support.md`, and
+  `schemas/` as the current behavior contract. Do not infer support from old
+  issue/PR plans, chat history, attachments, or local-only design files.
 
 ## Serena Workflow
 
@@ -26,9 +26,9 @@ from Rails/ActiveRecord applications. The P0 runtime and selected P1 association
   caches, logs, language-server installs, and other machine-local state as
   unversioned user-local files.
 - `.serena/memories/**` is versionable/reviewable project memory by design, but
-  this initial setup does not commit automatically generated or onboarding
-  memories. Add future team-reviewed memories only through a later
-  human-approved issue that defines review and revert ownership.
+  automatically generated or onboarding memories are not committed. Add future
+  team-reviewed memories only through a later human-approved issue that defines
+  review and revert ownership.
 
 ## Security
 
@@ -52,13 +52,15 @@ from Rails/ActiveRecord applications. The P0 runtime and selected P1 association
 - Preserve the repair-first loop: run/autocorrect first, inspect the diff, stage
   explicit repairs, then let read-only checks run.
 
-## P1 Engineering Records
+## Implementation Boundaries
 
-- Before P1 work, read [`docs/p1/README.md`](docs/p1/README.md) and the applicable
-  feature records. Keep phase rules and feature details there, not in this file.
+- Keep current behavior and verification guidance in the contract, support
+  matrix, and [`testing guide`](docs/development/testing.md). Completed research,
+  delivery plans, and review evidence belong in issue/PR history, not parallel
+  specifications in the source tree.
 - For runtime-compatibility scope changes, prefer editing
   `fixtures/rails_matrix/matrix.yml` as an explicit `pairs:` list and keep
-  documentation aligned in `docs/p1/01-runtime-compatibility/*` to avoid
+  the README and `docs/development/ci.md` aligned to avoid
   accidental Cartesian matrix drift.
 - For association features, verify Rails reflection behavior in the shared real
   app and extend its exact relationship oracle on every declared matrix pair;

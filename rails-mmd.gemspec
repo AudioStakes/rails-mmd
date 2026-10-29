@@ -31,7 +31,6 @@ Gem::Specification.new do |spec|
     'docs/active-record-association-support.md',
     'docs/assets/branding/rails-mmd-social-preview.jpg',
     'exe/rails-mmd',
-    'fixtures/schemas/diagnostics/valid/catalog.json',
     'lib/**/*.rb',
     'schemas/**/*.json'
   ]

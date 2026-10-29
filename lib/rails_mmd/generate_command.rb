@@ -8,10 +8,10 @@ require 'rails_mmd/rails_loader'
 require 'rails_mmd/redactor'
 
 module RailsMmd
-  # Coordinates the P0 generate pipeline behind the Thor command.
+  # Coordinates generation and publication behind the Thor command.
   # @api private
   class GenerateCommand
-    Result = Struct.new(:exit_code, :stdout, :stderr, :diagnostics, keyword_init: true) do
+    Result = Struct.new(:exit_code, :stderr, :diagnostics, keyword_init: true) do
       def success?
         exit_code.zero?
       end
@@ -57,7 +57,6 @@ module RailsMmd
     def command_result_for(publication_result, fail_on_warning)
       Result.new(
         exit_code: publication_exit_code(publication_result, fail_on_warning),
-        stdout: '',
         stderr: publication_stderr(publication_result),
         diagnostics: publication_result.diagnostics
       )
@@ -75,7 +74,7 @@ module RailsMmd
     end
 
     def pre_output_result(diagnostics, exit_code)
-      Result.new(exit_code: exit_code, stdout: '', stderr: publisher.pre_output_stderr(diagnostics),
+      Result.new(exit_code: exit_code, stderr: publisher.pre_output_stderr(diagnostics),
                  diagnostics: diagnostics)
     end
 
@@ -85,7 +84,7 @@ module RailsMmd
         message: 'internal error',
         metadata: diagnostics_factory.exception_metadata(exception)
       )
-      Result.new(exit_code: 99, stdout: '', stderr: publisher.pre_output_stderr([diagnostic]),
+      Result.new(exit_code: 99, stderr: publisher.pre_output_stderr([diagnostic]),
                  diagnostics: [diagnostic])
     end
 

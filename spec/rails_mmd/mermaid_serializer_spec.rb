@@ -48,7 +48,7 @@ RSpec.describe RailsMmd::MermaidSerializer do
     end
   end
 
-  it 'does not emit P1 Mermaid syntax or runtime validation hooks' do
+  it 'does not emit unsupported class syntax or runtime validation hooks' do
     result = serializer.serialize(render_plan: render_plan_fixture('class'))
 
     expect(result.text).not_to match(/\bas\b|namespace|<\|--|\binterface\b|mmdc|mermaid-cli/i)

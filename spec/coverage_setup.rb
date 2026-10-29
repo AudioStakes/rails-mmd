@@ -35,7 +35,7 @@ end
 SimpleCov.formatter = NullCoverageFormatter
 
 SimpleCov.start do
-  cover '{lib/**/*.rb,exe/rails-mmd}'
+  cover '{lib/**/*.rb,exe/rails-mmd,tooling/**/*.rb}'
   skip '/spec/'
 end
 

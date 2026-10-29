@@ -8,7 +8,7 @@ RSpec.describe Rake::Task do
       { 'SIMPLECOV_NO_DEFAULTS' => 'true' },
       'bundle', 'exec', 'undercover',
       '--simplecov', 'coverage/undercover.json',
-      '--include-files', 'lib/**/*.rb,exe/rails-mmd',
+      '--include-files', 'lib/**/*.rb,exe/rails-mmd,tooling/**/*.rb',
       '--exclude-files', YAML.safe_load_file('.undercover.yml').fetch('exclude_files'),
       '--max-warnings', '20',
       '--compare', RailsMmd::ToolingTasks.undercover_compare_ref('HEAD~1')

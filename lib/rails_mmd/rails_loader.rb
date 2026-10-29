@@ -6,7 +6,7 @@ module RailsMmd
   # Boots a host Rails app and eager-loads it through explicit, testable paths.
   # rubocop:disable-next Metrics/MethodLength
   class RailsLoader
-    Result = Struct.new(:application, :diagnostics, :exit_code, keyword_init: true) do
+    Result = Struct.new(:diagnostics, :exit_code, keyword_init: true) do
       def success?
         diagnostics.empty?
       end
@@ -28,7 +28,7 @@ module RailsMmd
       kernel.load(environment_path.to_s)
       application = rails_provider.call.application
       eager_load(application)
-      Result.new(application: application, diagnostics: [], exit_code: 0)
+      Result.new(diagnostics: [], exit_code: 0)
     rescue EagerLoadError => e
       failure('RAILS_EAGER_LOAD_FAILED', e.cause || e)
     rescue LoadError, SyntaxError, StandardError => e
@@ -73,14 +73,13 @@ module RailsMmd
     def eager_load(application)
       raise EagerLoadError, 'Rails application does not expose eager_load!' unless application.respond_to?(:eager_load!)
 
-      application.eager_load! if application.respond_to?(:eager_load!)
+      application.eager_load!
     rescue LoadError, SyntaxError, StandardError => e
       raise EagerLoadError, e.message
     end
 
     def failure(code, exception)
       Result.new(
-        application: nil,
         diagnostics: [
           diagnostic_factory.build(
             code: code,

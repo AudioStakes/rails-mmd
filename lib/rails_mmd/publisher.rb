@@ -9,7 +9,7 @@ module RailsMmd
   # Atomically publishes diagnostics, render plans, and Mermaid artifacts.
   # rubocop:disable-next Metrics/ClassLength
   class Publisher
-    Result = Struct.new(:success, :diagnostics, :written_paths, :stderr, keyword_init: true) do
+    Result = Struct.new(:success, :diagnostics, :stderr, keyword_init: true) do
       def success?
         success
       end
@@ -41,7 +41,7 @@ module RailsMmd
 
       publish_inside_output(output_resolution, selected_domain_ids, diagnostics, artifacts)
     rescue StandardError => e
-      Result.new(success: false, diagnostics: [output_write_failed(e)], written_paths: [], stderr: nil)
+      Result.new(success: false, diagnostics: [output_write_failed(e)], stderr: nil)
     end
 
     private
@@ -49,14 +49,14 @@ module RailsMmd
     attr_reader :diagnostics_factory, :output_directory, :schema_validator
 
     def publish_inside_output(output_resolution, selected_domain_ids, diagnostics, artifacts)
-      written_paths = output_directory.publish!(output_resolution, selected_domain_ids: selected_domain_ids) do
+      output_directory.publish!(output_resolution, selected_domain_ids: selected_domain_ids) do
         diagnostics = scoped_diagnostics(diagnostics, selected_domain_ids)
         artifacts = scoped_artifacts(artifacts, selected_domain_ids)
         diagnostic_documents = validate_payloads!(diagnostics, artifacts)
         blocked_domains = blocked_domains(selected_domain_ids, diagnostics)
         publish_plan(selected_domain_ids, diagnostic_documents, artifacts, blocked_domains)
       end
-      Result.new(success: true, diagnostics: diagnostics, written_paths: written_paths, stderr: nil)
+      Result.new(success: true, diagnostics: diagnostics, stderr: nil)
     end
 
     def validate_payloads!(diagnostics, artifacts)
@@ -140,7 +140,7 @@ module RailsMmd
         message: 'output directory invalid',
         metadata: { field_path: '$.output.directory', reason: reason.to_s }
       )
-      Result.new(success: false, diagnostics: [diagnostic], written_paths: [], stderr: pre_output_stderr([diagnostic]))
+      Result.new(success: false, diagnostics: [diagnostic], stderr: pre_output_stderr([diagnostic]))
     end
 
     def pre_output_fatal?(diagnostics)
@@ -148,7 +148,7 @@ module RailsMmd
     end
 
     def pre_output_fatal_result(diagnostics)
-      Result.new(success: false, diagnostics: diagnostics, written_paths: [], stderr: pre_output_stderr(diagnostics))
+      Result.new(success: false, diagnostics: diagnostics, stderr: pre_output_stderr(diagnostics))
     end
 
     def output_write_failed(exception)

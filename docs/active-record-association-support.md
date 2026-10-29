@@ -1,37 +1,55 @@
-# Active Record association support (Rails 7.2 / 8.1)
+# Active Record association support
 
-The target Rails series are 7.2 and 8.1. "Supported" describes behavior covered by the current implementation and tests; it does not imply support for every option of that association. The real-app matrix currently uses SQLite. PostgreSQL and MySQL have not been verified in a real-app run.
+The verified Rails series are 7.2 and 8.1. Support means the behavior below is
+covered by the current implementation and tests; it does not cover every option
+of an association. The real-app matrix uses SQLite. PostgreSQL and MySQL have
+not been verified in a real-app run. See the [README](../README.md#compatibility-and-limits)
+for the exact Ruby/Rails pairs.
 
-## Implemented features
+## Supported relationships
 
-| Priority | Active Record feature | Status | Implemented behavior |
-|---|---|---|---|
-| P1-01 | Rails 7.2 / 8.1 runtime compatibility | Supported | Three Ruby/Rails pairs run through the local real-app matrix. |
-| P1-02 | Association macro detection | Supported | Reflections are classified; unsupported macros produce diagnostics. |
-| P1-03 | Direct `has_many` / `has_one` | Supported | Direct associations and self joins have verified cardinalities. |
-| P1-04 | `inverse_of` | Supported | Physical relationships are merged into a canonical edge independently of an inverse declaration. |
-| P1-05 | `has_many :through` / `has_one :through` | Supported | Inferred-source one-step and nested paths are rendered as semantic edges without duplicate endpoints. |
-| P1-06 | Polymorphic associations | Supported | Selected matching inverse candidates produce one normalized edge per concrete target. |
-| P1-07 | `has_and_belongs_to_many` | Supported | A hidden join table is verified and rendered as one normalized many-to-many relationship. |
+All endpoints must be selected, renderable base models in the same configured
+domain. Associations must be unscoped and use eligible scalar keys.
 
-## Not yet supported
+| Association | Behavior and limits |
+|---|---|
+| Direct `belongs_to` | Renders an existing scalar FK referencing the target's actual primary key. |
+| Direct `has_many` / `has_one` | Renders the FK on the associated target. Includes self joins. `has_one` contributes a singular bound even without a unique DB index. |
+| Reciprocal declarations and `inverse_of` | Merges the same physical relationship into one edge, independently of explicit, inferred, absent, or disabled inverse metadata. |
+| `has_many :through` / `has_one :through` | Renders inferred-source one-step and nested paths as semantic edges alongside direct physical edges. Every intermediate model must also be selected. Explicit `source:` and `source_type:` are unsupported. |
+| Polymorphic `belongs_to` | Renders one edge per concrete target found through selected matching direct `has_many` / `has_one ..., as:` inverses. Requires the default `<interface>_id` and `<interface>_type` columns. Both appear as FK attributes. |
+| `has_and_belongs_to_many` | Verifies an id-less hidden join table containing exactly two distinct join columns and emits one many-to-many edge. Supports one-sided, reciprocal, alias, custom table/column, and self associations; payload/timestamp columns are unsupported. |
 
-| Priority | Active Record feature | Needed for support |
-|---|---|---|
-| P2-01 | Scoped associations | Retain scope presence as metadata. |
-| P2-02 | STI | Define how base and derived classes appear. |
-| P2-03 | `delegated_type` | Render the delegator and concrete types. |
-| P2-04 | Composite primary/foreign keys and `query_constraints` | Preserve and match key tuples. |
-| P2-05 | Non-default `primary_key`, `source`, `source_type`, and `as` options | Resolve the target and key for each option. The supported polymorphic inverse case already uses `as:`. |
-| P2-06 | Cross-domain and multi-database relationships | Represent external nodes or emit diagnostics. |
-| P2-07 | `dependent`, `touch`, and `counter_cache` | Decide which behavior belongs in the diagram metadata. |
-| P3-01 | `disable_joins`, `strict_loading`, and async | Decide whether execution properties belong in the diagram. |
-| P3-02 | Association extensions | Represent or diagnose structural extensions. |
+Scalar `foreign_key` and `class_name` options are supported for direct
+relationships. A `primary_key` option is eligible only when it resolves to the
+referenced entity's actual scalar primary key. HABTM applies the same actual-key
+check to both endpoints; custom join-column names do not permit non-primary
+endpoint keys.
 
-The supported baseline covers non-polymorphic, unscoped, scalar direct `belongs_to`; scalar `foreign_key` and `class_name`; conservative cardinalities from foreign keys, nullability, and unique indexes; same-domain ER/class output; diagnostics for excluded supported `belongs_to`; direct polymorphic `belongs_to` with selected `has_many` / `has_one ..., as:` inverse candidates; and unscoped scalar HABTM with a verified hidden join table.
+Cardinality uses FK/nullability/unique-index evidence conservatively. Missing
+optional DB metadata weakens that evidence and emits a diagnostic. Reflection
+enumeration order does not change canonical IDs, labels, or edge counts.
+
+## Unsupported or unrepresented behavior
+
+| Feature | Current behavior |
+|---|---|
+| Association scopes | Omits scoped relationships with a warning; does not execute scope procs. A target model's `default_scope` alone is not an explicit direct-association scope. |
+| STI subclasses | Cannot be selected as renderable entities; selecting one produces a domain error. |
+| `delegated_type` specialization | Does not discover declared types or render a delegated-type hierarchy. Ordinary eligible underlying reflections follow the rules above. |
+| Composite primary/foreign keys and `query_constraints` | Does not support key tuples; selected composite primary keys block the domain and composite association keys are omitted. |
+| Non-primary association keys | Omits relationships that reference another column instead of the actual primary key. |
+| Polymorphic through paths, custom polymorphic keys, and explicit through sources | Omits these declarations with diagnostics. The supported inverse polymorphic case uses `as:` as described above. |
+| Cross-domain relationships | Does not create external nodes or auto-include targets. Out-of-domain targets on resolved association paths are diagnosed and omitted; polymorphic candidate discovery stays within the selected domain. |
+| Multiple connection contexts in one domain | Blocks that domain with `MULTI_DB_UNSUPPORTED`. Separate domains are checked independently. |
+| `dependent`, `touch`, `counter_cache`, `disable_joins`, `strict_loading`, async, and association extensions | Does not represent their behavioral metadata or guarantee execution semantics in the diagram. |
+
+Inspect diagnostics whenever an expected edge is absent. Warning omissions
+normally return exit `0`; use `--fail-on-warning` when they should fail a check.
+These limits describe the current release, not a delivery roadmap.
 
 ## References
 
-- [P0 contract](https://github.com/AudioStakes/rails-mmd/blob/main/docs/p0-contract.md)
+- [Generation contract](https://github.com/AudioStakes/rails-mmd/blob/main/docs/contract.md)
 - [Relationship builder](../lib/rails_mmd/relationship_builder.rb) and [render plan builder](../lib/rails_mmd/render_plan_builder.rb)
 - [Rails Association Basics](https://guides.rubyonrails.org/association_basics.html), [Rails 7.2 API](https://api.rubyonrails.org/v7.2/classes/ActiveRecord/Associations/ClassMethods.html), [Rails 8.1 API](https://api.rubyonrails.org/v8.1/classes/ActiveRecord/Associations/ClassMethods.html)

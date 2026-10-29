@@ -4,7 +4,7 @@ require 'rails_mmd/diagnostic_factory'
 require 'rails_mmd/schema_validator'
 
 module RailsMmd
-  # Serializes renderer-only plans into deterministic P0 Mermaid text.
+  # Serializes renderer-only plans into deterministic Mermaid text.
   # rubocop:disable-next Metrics/ClassLength
   class MermaidSerializer
     Result = Struct.new(:text, :diagnostics, keyword_init: true)

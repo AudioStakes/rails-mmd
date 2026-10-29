@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'pathname'
-require 'uri'
 
 module RailsMmd
   # Sanitizes free-form text before it can leave the process.

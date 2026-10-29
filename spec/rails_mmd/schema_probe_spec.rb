@@ -475,8 +475,6 @@ RSpec.describe RailsMmd::SchemaProbe do
   def record(ruby_constant, connection_context_id: '{"name":"primary","role":"writing","shard":"default"}')
     RailsMmd::ModelInventory::Record.new(
       ruby_constant: ruby_constant,
-      abstract_class: false,
-      base_class: ruby_constant,
       table_name: "#{ruby_constant.downcase}s",
       connection_context_id: connection_context_id,
       renderable: true,

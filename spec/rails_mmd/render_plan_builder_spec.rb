@@ -343,7 +343,6 @@ RSpec.describe RailsMmd::RenderPlanBuilder do
     entity = RailsMmd::SchemaProbe::Entity.new(
       ruby_constant: 'User',
       table_name: 'users',
-      connection_context_id: '{"name":"primary"}',
       columns: [RailsMmd::SchemaProbe::Column.new(name: 'id', type: :bigint, nullable: false)],
       primary_key: 'id',
       foreign_keys: [],
