@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'aruba/rspec'
 require 'climate_control'
 
 RSpec.configure do |config|
